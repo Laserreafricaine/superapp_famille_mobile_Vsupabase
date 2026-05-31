@@ -479,7 +479,10 @@
     const categories = uniqueOptionValues(docs, '_filterCategory');
     if(state.member !== 'all' && !members.includes(state.member)) state.member = 'all';
     if(state.category !== 'all' && !categories.includes(state.category)) state.category = 'all';
-    const chip = (group, value, label)=>'<button type="button" class="' + ((state[group]||'all')===value ? 'active' : '') + '" onclick="window.sbSetDocsPanelFilter(\'' + mode + '\',\'' + group + '\',' + safeJsString(value) + ')">' + escH(label) + '</button>';
+    const chip = (group, value, label)=>{
+      const handler = 'window.sbSetDocsPanelFilter(' + safeJsString(mode) + ',' + safeJsString(group) + ',' + safeJsString(value) + ')';
+      return '<button type="button" class="' + ((state[group]||'all')===value ? 'active' : '') + '" onclick="' + escH(handler) + '">' + escH(label) + '</button>';
+    };
     const groupHtml = (title, group, values, allLabel)=>{
       if(!values.length) return '<div class="sb-doc-filter-group muted"><span>' + escH(title) + '</span><p>Aucun filtre disponible pour le moment.</p></div>';
       return '<div class="sb-doc-filter-group"><span>' + escH(title) + '</span><div>' + chip(group, 'all', allLabel) + values.map(v=>chip(group, v, v)).join('') + '</div></div>';
