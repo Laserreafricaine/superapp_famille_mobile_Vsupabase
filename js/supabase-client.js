@@ -136,3 +136,15 @@ function sbServerIsNewer(serverUpdatedAt, localData){
     : 0;
   return serverTs > localTs;
 }
+
+async function sbListAllDocuments(){
+  const user = await sbCurrentUser();
+  if(!user) return [];
+  const { data, error } = await sbClient()
+    .from('family_documents')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+  if(error){ console.warn('[Supabase] list all docs error:', error.message); return []; }
+  return data || [];
+}

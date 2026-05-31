@@ -1012,7 +1012,7 @@
       education:[['ecole','École'],['ecole_notes','Notes']],
       sante:[['tous','Tous'],['rendez_vous','Rendez-vous'],['traitements','Traitements'],['documents','Documents'],['alertes','Alertes']],
       sport_loisirs:[['tout','Tout'],['sport_activites','Sport'],['loisir_activites','Loisir'],['voyage_activites','Voyage']],
-      familles:[['documents','Documents']]
+      familles:[['documents','Documents',String.fromCodePoint(0x1F4C1)]]
     }[module] || [];
     if(!groups.length) return '';
     return `<div class="list-filter-chips">${groups.map(([b,l])=>`<button type="button" class="${b===block?'active':''}" onclick="SuperApp.openModuleList('${module}','${b}')">${l}</button>`).join('')}</div>`;
@@ -1704,10 +1704,9 @@
     if(state.editing?.collection==='sportGear' && !item.type) item.type = item.category==='Documents sport' ? 'document_sport' : 'materiel_sport';
     if(state.editing?.collection==='weeklyMeals' && (!item.type || item.type==='repas')) item.type='repas_semaine';
     $('#editFields').innerHTML = fieldsFor(type,item);
-    // Ajouter la section documents Supabase si on consulte un item existant
-    if(id && typeof window.sbDocsSectionHtml === 'function'){
-      $('#editFields').insertAdjacentHTML('beforeend', window.sbDocsSectionHtml(id));
-      setTimeout(()=>{ if(typeof window.sbLoadItemDocs==='function') window.sbLoadItemDocs(id); }, 200);
+    // Injecter la section documents dans le placeholder dédié
+    if(id && typeof window.sbInjectItemDocs === 'function'){
+      setTimeout(()=>window.sbInjectItemDocs(id), 150);
     }
     if($('#editDialog').open) $('#editDialog').close();
     $('#editDialog').showModal();
@@ -3195,7 +3194,8 @@
       : '';
 
     const visibilityField = ['maison','education','sante','sport_loisirs','familles','calendrier'].includes(type) ? setHomeVisibilityFields(item) : '';
-    return `${hiddenRouting}${titleField}${dateField}${hourField}${memberField}${categoryField}${moduleDetails}${notesField}${statusField}${danger}${visibilityField}`;
+    const docsPlaceholder = (isEditing && item.id && ['maison','education','sante','sport_loisirs','familles'].includes(type)) ? `<div class="sb-item-docs-placeholder" data-item-id="${escapeAttr(item.id)}"></div>` : '';
+    return `${hiddenRouting}${titleField}${dateField}${hourField}${memberField}${categoryField}${moduleDetails}${notesField}${statusField}${danger}${docsPlaceholder}${visibilityField}`;
   }
 
   // Champs cachés pour le routage : module + type sont déduits du bouton cliqué, jamais demandés à l'utilisateur (sauf depuis le calendrier).
@@ -3760,11 +3760,16 @@
           return managementRow(x,cfg);
         }).join('') : `<article class="empty cute-empty"><b>${cfg.emoji} Rien pour le moment</b><small>Ajoute un premier élément. Tout élément affiché peut ensuite être modifié ou supprimé.</small><button class="btn primary" onclick="${addAction}">+ Ajouter</button></article>`);
     const titleBar = module === 'sante' ? '' : `<div class="section-title compact-title v53-list-title"><h2>${cfg.emoji} ${escapeHtml(moduleListTitle(module, block, cfg))}</h2><button class="link-btn" onclick="${addAction}">+ Ajouter</button></div>`;
+    // Section documents Supabase pour le block 'documents'
+    const isDocsBlock = (block==='documents' || block==='carnet_sante');
+    const sbDocsSection = isDocsBlock ? `<div class="sb-module-docs-section" data-module="${escapeAttr(module)}"><p style="font-size:12px;color:#888">Chargement des documents...</p></div>` : '';
+    if(isDocsBlock) setTimeout(()=>{ if(typeof window.sbLoadModuleDocs==='function') window.sbLoadModuleDocs(module); }, 200);
     return `<section class="v53-direct-list ${module==='sante'?'health-direct-list':''}" data-block="${escapeAttr(block)}">
       <section class="filter-zone"><h3>${module==='sante'?'Filtrer la liste':'Filtrer'}</h3>${listTabsForModule(module)}</section>
       ${memberFilterRow(module)}
       ${titleBar}
       <div class="management-list">${rows}</div>
+      ${sbDocsSection}
     </section>`;
   }
   function paintModule(id, focusKey=''){

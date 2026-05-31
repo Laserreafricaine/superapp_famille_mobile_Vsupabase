@@ -193,8 +193,19 @@
   };
 
   window.sbOpenDoc = async function(path){
-    try { window.open(await sbGetDocumentUrl(path), '_blank'); }
-    catch { window.SuperApp?.toast('Impossible d\'ouvrir le document.'); }
+    try {
+      const url = await sbGetDocumentUrl(path);
+      // Créer un lien temporaire pour contourner le blocage Safari/mobile
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => document.body.removeChild(a), 200);
+    } catch(e) {
+      window.SuperApp?.toast('Impossible d\'ouvrir le document : ' + e.message);
+    }
   };
 
   window.sbDeleteDoc = async function(docId, path, itemId){
@@ -237,3 +248,129 @@
   };
 
 })();
+
+// ─── Injection docs dans le placeholder du dialog item ──────────
+window.sbInjectItemDocs = async function(itemId){
+  const placeholder = document.querySelector('.sb-item-docs-placeholder[data-item-id="'+itemId+'"]');
+  if(!placeholder) return;
+  // Remplacer le placeholder par la zone colorée
+  placeholder.outerHTML = '<div class="sb-item-docs-zone" id="sb-item-docs-zone-'+itemId+'">'
+    + '<h4>📎 Documents attachés</h4>'
+    + '<div id="item-docs-section"><p style="font-size:12px;color:#888">Chargement…</p></div>'
+    + '</div>';
+  await window.sbLoadItemDocs(itemId);
+};
+
+// ─── Vue docs par module ─────────────────────────────────────────
+window._sbModuleDocsState = { memberFilter:'all', moduleFilter:'all' };
+
+window.sbLoadModuleDocs = async function(module){
+  const section = document.querySelector('.sb-module-docs-section[data-module="'+module+'"]');
+  if(!section) return;
+  if(typeof sbCurrentUser !== 'function') return;
+  const user = await sbCurrentUser();
+  if(!user){ section.innerHTML = '<p style="font-size:12px;color:#888">Connecte-toi pour voir les documents.</p>'; return; }
+  section.innerHTML = '<p style="font-size:12px;color:#888">Chargement…</p>';
+  const allDocs = await sbListAllDocuments();
+  const isGlobal = (module === 'familles');
+  // Filtrer par module si pas global
+  const docs = isGlobal ? allDocs : allDocs.filter(d => d.module === module || d.module === '');
+  section.innerHTML = sbModuleDocsHtml(docs, module, isGlobal);
+};
+
+function sbModuleDocsHtml(docs, module, isGlobal){
+  const SA = window.SuperApp;
+  // Construire les membres pour les filtres
+  const memberState = window._sbModuleDocsState;
+  const members = SA ? (window._sbFamilyMembers || []) : [];
+
+  // Récupérer les membres depuis SuperApp si dispo
+  if(SA && SA._getData) {
+    window._sbFamilyMembers = (SA._getData().family || []).filter(m => m.status !== 'archive');
+  }
+  const familyMembers = window._sbFamilyMembers || [];
+
+  // Modules disponibles pour filtre global
+  const moduleLabels = {
+    sante:'Santé', education:'École', maison:'Maison',
+    sport_loisirs:'Sport/Loisir/Voyage', familles:'Familles', calendrier:'Calendrier'
+  };
+
+  // Filtres actifs
+  const activeMember = memberState.memberFilter || 'all';
+  const activeModule = memberState.moduleFilter || 'all';
+
+  // Appliquer filtres
+  let filtered = docs;
+  if(activeMember !== 'all') filtered = filtered.filter(d => d.item_id && sbDocBelongsToMember(d, activeMember, SA));
+  if(isGlobal && activeModule !== 'all') filtered = filtered.filter(d => d.module === activeModule);
+
+  // Chips membres
+  const memberChips = ['<button class="sb-docs-filter-chip '+(activeMember==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\',\'all\',\''+module+'\')">Tous</button>']
+    .concat(familyMembers.map(m =>
+      '<button class="sb-docs-filter-chip '+(activeMember===m.id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\',\''+m.id+'\',\''+module+'\')">'
+      + escHtml(m.name.split(' ')[0]) + '</button>'
+    )).join('');
+
+  // Chips modules (seulement en vue globale)
+  const moduleChips = isGlobal ? ['<button class="sb-docs-filter-chip '+(activeModule==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\',\'all\',\''+module+'\')">Tous</button>']
+    .concat(Object.entries(moduleLabels).map(([id, lbl]) =>
+      '<button class="sb-docs-filter-chip '+(activeModule===id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\',\''+id+'\',\''+module+'\')">'
+      + lbl + '</button>'
+    )).join('') : '';
+
+  // Lignes documents
+  const rows = filtered.map(d => {
+    const icon = d.mime_type?.includes('pdf') ? '📄' : d.mime_type?.includes('image') ? '🖼️' : '📎';
+    const size = d.size ? (d.size > 1048576 ? (d.size/1048576).toFixed(1)+' Mo' : Math.round(d.size/1024)+' Ko') : '';
+    const modLabel = moduleLabels[d.module] || d.module || '';
+    const itemInfo = isGlobal && modLabel ? '<span class="sb-doc-item-link">'+escHtml(modLabel)+'</span>' : '';
+    return '<div class="sb-doc-row">'
+      + '<span class="sb-doc-icon">'+icon+'</span>'
+      + '<div class="sb-doc-info">'
+      + '<b>'+escHtml(d.name)+'</b>'
+      + '<small>'+size+(size&&itemInfo?' · ':'')+itemInfo+'</small>'
+      + '</div>'
+      + '<div class="sb-doc-actions">'
+      + '<button class="doc-btn" onclick="window.sbOpenDoc(\''+d.storage_path+'\')">Ouvrir</button>'
+      + '<button class="doc-btn" onclick="window.sbDeleteModuleDoc(\''+d.id+'\',\''+d.storage_path+'\',\''+module+'\')">✕</button>'
+      + '</div></div>';
+  }).join('');
+
+  const empty = filtered.length === 0
+    ? '<div class="sb-doc-empty">📂 Aucun document'+(activeMember!=='all'||activeModule!=='all' ? ' pour ce filtre' : ' encore')+'. Ouvre un item pour en ajouter.</div>'
+    : '';
+
+  return '<h3>📁 '+(isGlobal ? 'Tous les documents' : 'Documents')+'</h3>'
+    + (isGlobal ? '<div class="sb-docs-filters">'+moduleChips+'</div>' : '')
+    + (familyMembers.length > 0 ? '<div class="sb-docs-filters">'+memberChips+'</div>' : '')
+    + '<div class="sb-docs-list">'+rows+empty+'</div>';
+}
+
+function sbDocBelongsToMember(doc, memberId, SA){
+  if(!SA || !SA._findRecord) return false;
+  const found = SA._findRecord(doc.item_id);
+  if(!found) return false;
+  const item = found.item;
+  return item.member === memberId
+    || item.companion === memberId
+    || (item.members && String(item.members).split(',').map(s=>s.trim()).includes(memberId))
+    || (item.students && String(item.students).split(',').map(s=>s.trim()).includes(memberId));
+}
+
+window.sbFilterModuleDocs = function(type, value, module){
+  if(type === 'member') window._sbModuleDocsState.memberFilter = value;
+  if(type === 'module') window._sbModuleDocsState.moduleFilter = value;
+  window.sbLoadModuleDocs(module);
+};
+
+window.sbDeleteModuleDoc = async function(docId, path, module){
+  if(!confirm('Supprimer ce document ?')) return;
+  try {
+    await sbDeleteDocument(docId, path);
+    window.SuperApp?.toast('Document supprimé.');
+    window.sbLoadModuleDocs(module);
+  } catch { window.SuperApp?.toast('Erreur lors de la suppression.'); }
+};
+
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
