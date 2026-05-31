@@ -253,11 +253,10 @@
 window.sbInjectItemDocs = async function(itemId){
   const placeholder = document.querySelector('.sb-item-docs-placeholder[data-item-id="'+itemId+'"]');
   if(!placeholder) return;
-  // Remplacer le placeholder par la zone colorée
-  placeholder.outerHTML = '<div class="sb-item-docs-zone" id="sb-item-docs-zone-'+itemId+'">'
-    + '<h4>📎 Documents attachés</h4>'
-    + '<div id="item-docs-section"><p style="font-size:12px;color:#888">Chargement…</p></div>'
-    + '</div>';
+  // Transformer le placeholder en zone colorée (innerHTML évite les soucis de outerHTML)
+  placeholder.className = 'sb-item-docs-zone';
+  placeholder.innerHTML = '<h4>📎 Documents attachés</h4>'
+    + '<div id="item-docs-section"><p style="font-size:12px;color:#888">Chargement…</p></div>';
   await window.sbLoadItemDocs(itemId);
 };
 
@@ -265,8 +264,12 @@ window.sbInjectItemDocs = async function(itemId){
 window._sbModuleDocsState = { memberFilter:'all', moduleFilter:'all' };
 
 window.sbLoadModuleDocs = async function(module){
-  const section = document.querySelector('.sb-module-docs-section[data-module="'+module+'"]');
-  if(!section) return;
+  // Retry si le DOM n'est pas encore prêt
+  let section = document.querySelector('.sb-module-docs-section[data-module="'+module+'"]');
+  if(!section){
+    setTimeout(()=>window.sbLoadModuleDocs(module), 300);
+    return;
+  }
   if(typeof sbCurrentUser !== 'function') return;
   const user = await sbCurrentUser();
   if(!user){ section.innerHTML = '<p style="font-size:12px;color:#888">Connecte-toi pour voir les documents.</p>'; return; }
