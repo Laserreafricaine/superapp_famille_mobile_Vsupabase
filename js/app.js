@@ -3194,7 +3194,12 @@
       : '';
 
     const visibilityField = ['maison','education','sante','sport_loisirs','familles','calendrier'].includes(type) ? setHomeVisibilityFields(item) : '';
-    const docsPlaceholder = (isEditing && item.id && ['maison','education','sante','sport_loisirs','familles'].includes(type)) ? `<div class="sb-item-docs-placeholder" data-item-id="${escapeAttr(item.id)}"></div>` : '';
+    const docsEnabledModules = ['maison','education','sante','sport_loisirs','familles'];
+    const docsPlaceholder = docsEnabledModules.includes(type)
+      ? (isEditing && item.id
+        ? `<div class="sb-item-docs-placeholder" data-item-id="${escapeAttr(item.id)}"></div>`
+        : `<div class="sb-item-docs-zone sb-item-docs-zone-pending"><h4>📎 Documents attachés</h4><p>Enregistre d’abord cet élément. Tu pourras ensuite le rouvrir et déposer un document lié à cette fiche.</p></div>`)
+      : '';
     return `${hiddenRouting}${titleField}${dateField}${hourField}${memberField}${categoryField}${moduleDetails}${notesField}${statusField}${danger}${docsPlaceholder}${visibilityField}`;
   }
 

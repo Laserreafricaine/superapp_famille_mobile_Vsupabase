@@ -162,6 +162,17 @@
   display: flex; align-items: center; gap: 6px;
 }
 
+.sb-item-docs-zone-pending {
+  border-style: dashed;
+  background: linear-gradient(135deg, #f8fafc, #eff6ff);
+}
+.sb-item-docs-zone-pending p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #64748b;
+}
+
 /* === Vue docs dans les modules === */
 .sb-module-docs-section {
   margin-top: 16px;

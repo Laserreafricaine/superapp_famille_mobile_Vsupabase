@@ -377,7 +377,12 @@ window.sbInjectItemDocs = async function(itemId){
   placeholder.className = 'sb-item-docs-zone';
   placeholder.innerHTML = '<h4>📎 Documents attachés</h4>'
     + '<div id="item-docs-section"><p style="font-size:12px;color:#888">Chargement…</p></div>';
-  await window.sbLoadItemDocs(itemId);
+  if(typeof window.sbLoadItemDocs === 'function'){
+    await window.sbLoadItemDocs(itemId);
+  } else {
+    const section = document.getElementById('item-docs-section');
+    if(section) section.innerHTML = '<p style="font-size:12px;color:#888">Module Supabase non chargé. Connecte Supabase pour déposer ou ouvrir les documents.</p>';
+  }
 };
 
 // ─── Vue docs par module ─────────────────────────────────────────
