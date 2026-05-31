@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.14';
+  const APP_VERSION = '5.36.15';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -535,7 +535,7 @@
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
     }
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.14').catch(()=>{}); }
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.15').catch(()=>{}); }
     maybeStartOnboarding();
     setTimeout(()=>maybeFireNotifications(), 800);
     setTimeout(()=>{ if(typeof window.sbInitAuth==="function") window.sbInitAuth(); }, 400);
@@ -1046,12 +1046,14 @@
       : cfg.special === 'checklistView'
           ? `<div class="management-list">${visibleCollectionItems(cfg).map(x=>shoppingRow(x,{collection:cfg.collection})).join('')||'<div class="empty">Checklist vide.</div>'}</div>`
       : '';
+    const supabaseDocsHtml = (module==='sante' && block==='documents') ? supabaseDocsPanelHtml('sante') : (module==='familles' && block==='documents') ? supabaseDocsPanelHtml('global') : '';
+    if(supabaseDocsHtml) setTimeout(()=>window.sbHydrateDocsPanel?.(module==='sante'?'sante':'global'), 120);
     // V5.28 — Les vues spéciales Courses/Repas/Stock gardent leurs vrais écrans, même ouvertes depuis les chips.
     view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openModule('${module}')">← Retour ${m.short}</button></div>
       <div class="sublist-title-bar"><div class="sublist-emoji">${cfg.emoji || m.icon}</div><div><h2>${cfg.title}</h2><small>${cfg.help || ''}</small></div></div>
       ${chips}
       <div class="list-toolbar-card"><button class="btn ghost" onclick="SuperApp.openModule('${module}')">← Retour ${m.short}</button><button class="btn primary" onclick="SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')">${cfg.emoji} + Ajouter</button></div>
-      ${specialHtml || `<div class="management-list">${items.length ? items.map(x=>module==='sante' ? healthInfoRow(x,cfg) : managementRow(x,cfg)).join('') : `<article class="empty cute-empty"><b>${cfg.emoji} Rien pour le moment</b><small>Ajoute un premier élément. Tout élément affiché peut ensuite être vu, modifié, marqué fait ou supprimé.</small><button class="btn primary" onclick="SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')">+ Ajouter</button></article>`}</div>`}`;
+      ${supabaseDocsHtml || specialHtml || `<div class="management-list">${items.length ? items.map(x=>module==='sante' ? healthInfoRow(x,cfg) : managementRow(x,cfg)).join('') : `<article class="empty cute-empty"><b>${cfg.emoji} Rien pour le moment</b><small>Ajoute un premier élément. Tout élément affiché peut ensuite être vu, modifié, marqué fait ou supprimé.</small><button class="btn primary" onclick="SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')">+ Ajouter</button></article>`}</div>`}`;
   }
   function emergencyNumbers(){
     return data.settings?.emergencyNumbers || {pompiers:'', police:'', samu:''};
@@ -3752,6 +3754,17 @@
     const memberTxt = member && member !== 'all' ? ` · ${memberName(member)}` : '';
     return `${cfg.title}${memberTxt}`;
   }
+  function supabaseDocsPanelHtml(mode){
+    const title = mode === 'global' ? 'Documents globaux Supabase' : 'Documents Santé Supabase';
+    const desc = mode === 'global' ? 'Tous les documents déposés depuis les modules sont regroupés ici.' : 'Documents réellement déposés dans Supabase et liés aux fiches Santé.';
+    return `<section class="sb-module-docs-panel" data-sb-docs-panel="${escapeAttr(mode)}">
+      <div class="section-title compact-title v53-list-title"><h2>📁 ${escapeHtml(title)}</h2><button class="link-btn" type="button" onclick="window.sbHydrateDocsPanel?.('${escapeAttr(mode)}')">↻ Actualiser</button></div>
+      <div class="sb-doc-test-intro"><b>📎 Liste documentaire</b><small>${escapeHtml(desc)}</small></div>
+      <div class="sb-module-docs-status info">Chargement des documents…</div>
+      <div class="sb-module-docs-list"><div class="sb-doc-empty">Chargement…</div></div>
+    </section>`;
+  }
+
     function renderDirectList(module){
     module = canonicalModuleId(module);
     const block = activeModuleBlock(module);
@@ -3775,6 +3788,22 @@
       return `<section class="v53-direct-list" data-block="${escapeAttr(block)}">
         ${listTabsForModule(module)}
         ${weeklyMealsTableHtml()}
+      </section>`;
+    }
+    if(module === 'sante' && block === 'documents'){
+      setTimeout(()=>window.sbHydrateDocsPanel?.('sante'), 120);
+      return `<section class="v53-direct-list health-direct-list" data-block="${escapeAttr(block)}">
+        <section class="filter-zone"><h3>Filtrer la liste</h3>${listTabsForModule(module)}</section>
+        ${memberFilterRow(module)}
+        ${supabaseDocsPanelHtml('sante')}
+      </section>`;
+    }
+    if(module === 'familles' && block === 'documents'){
+      setTimeout(()=>window.sbHydrateDocsPanel?.('global'), 120);
+      return `<section class="v53-direct-list" data-block="${escapeAttr(block)}">
+        <section class="filter-zone"><h3>Filtrer</h3>${listTabsForModule(module)}</section>
+        ${memberFilterRow(module)}
+        ${supabaseDocsPanelHtml('global')}
       </section>`;
     }
     const items = visibleCollectionItems(cfg);
@@ -3817,6 +3846,8 @@
         <section class="palette-soft ${tone}"><div class="v53-recap-head"><b>Récap rapide</b><small>Vue rapide des éléments importants du module.</small></div><div class="v53-summary-grid">${moduleSummary(m.id)}</div></section>
         <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
     }
+    if(m.id==='sante' && activeModuleBlock('sante')==='documents') setTimeout(()=>window.sbHydrateDocsPanel?.('sante'), 120);
+    if(m.id==='familles' && activeModuleBlock('familles')==='documents') setTimeout(()=>window.sbHydrateDocsPanel?.('global'), 120);
     if(focusKey){ setTimeout(()=>document.querySelector(`[data-block="${focusKey}"]`)?.scrollIntoView({behavior:'smooth',block:'start'}),50); }
   }
   // V5.8 — Boutons "+ Nouvelle ..." spécifiques à chaque module, en haut.

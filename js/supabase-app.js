@@ -403,6 +403,122 @@
     }
   };
 
+
+  // ─── Listes documents visibles : Santé + Familles global ─────────────
+  const docsPanelStore = new Map();
+  function docsPanelRoot(mode){ return document.querySelector('[data-sb-docs-panel="' + mode + '"]'); }
+  function docsPanelStatus(mode, message, type='info'){
+    const root = docsPanelRoot(mode); if(!root) return;
+    const el = root.querySelector('.sb-module-docs-status'); if(!el) return;
+    el.className = 'sb-module-docs-status ' + type;
+    el.textContent = message || '';
+  }
+  function moduleNameForDoc(module){
+    const labels = {sante:'Santé', test_documents:'Test accueil', education:'Éducation', maison:'Maison', sport_loisirs:'Sport / Loisir / Voyage', familles:'Familles', courses_repas:'Courses / Repas'};
+    return labels[module] || module || 'Module inconnu';
+  }
+  function itemInfoForDoc(doc){
+    try {
+      const found = window.SuperApp?._findRecord?.(doc.item_id || doc.itemId || '');
+      const item = found?.item || {};
+      const data = window.SuperApp?._getData?.() || {};
+      const memberId = item.member || item.memberId || item.assignedTo || item.companion || item.childId || item.eleveId || '';
+      const member = Array.isArray(data.family) ? data.family.find(m=>m.id===memberId) : null;
+      return {
+        title: item.title || item.meal || item.category || doc.item_id || 'fiche liée',
+        member: member?.name || (memberId ? memberId : ''),
+        category: item.category || doc.category || '',
+        date: item.date || ''
+      };
+    } catch {
+      return {title: doc.item_id || 'fiche liée', member:'', category:'', date:''};
+    }
+  }
+  function renderDocsPanel(mode, docs){
+    const root = docsPanelRoot(mode); if(!root) return;
+    const list = root.querySelector('.sb-module-docs-list'); if(!list) return;
+    [...docsPanelStore.keys()].filter(k=>k.startsWith(mode+'::')).forEach(k=>docsPanelStore.delete(k));
+    if(!docs || !docs.length){
+      list.innerHTML = '<div class="sb-doc-empty">Aucun document Supabase trouvé pour cette vue.</div>';
+      return;
+    }
+    list.innerHTML = docs.map((doc, idx)=>{
+      const key = mode + '::' + idx + '::' + Date.now();
+      docsPanelStore.set(key, doc);
+      const info = itemInfoForDoc(doc);
+      const parts = [moduleNameForDoc(doc.module), info.member, info.category, info.date].filter(Boolean).join(' · ');
+      return '<article class="sb-doc-test-row sb-module-doc-row">'
+        + '<div class="sb-doc-test-icon">📄</div>'
+        + '<div class="sb-doc-test-info"><b>' + escH(doc.name || 'Document') + '</b>'
+        + '<small>' + escH(parts || 'Document Supabase') + '</small>'
+        + '<em>Lié à : ' + escH(info.title) + '</em></div>'
+        + '<div class="sb-doc-test-actions">'
+        + '<button type="button" class="doc-btn" onclick="window.sbOpenDocsPanelBtn(\'' + key + '\')">Ouvrir</button>'
+        + '<button type="button" class="doc-btn" onclick="window.sbDownloadDocsPanelBtn(\'' + key + '\')">Télécharger</button>'
+        + '<button type="button" class="doc-btn danger" onclick="window.sbDeleteDocsPanelBtn(\'' + key + '\')">Supprimer</button>'
+        + '</div></article>';
+    }).join('');
+  }
+  window.sbHydrateDocsPanel = async function(mode){
+    try {
+      const cleanMode = mode === 'global' ? 'global' : 'sante';
+      docsPanelStatus(cleanMode, 'Lecture des documents Supabase…', 'info');
+      let docs = [];
+      if(cleanMode === 'global'){
+        if(typeof sbListAllFamilyDocuments !== 'function') throw new Error('Fonction liste globale indisponible.');
+        docs = await sbListAllFamilyDocuments();
+      } else {
+        if(typeof sbListModuleDocuments !== 'function') throw new Error('Fonction liste module indisponible.');
+        docs = await sbListModuleDocuments('sante');
+      }
+      renderDocsPanel(cleanMode, docs);
+      docsPanelStatus(cleanMode, docs.length ? docs.length + ' document(s) affiché(s).' : 'Aucun document trouvé.', 'ok');
+    } catch(e){
+      renderDocsPanel(mode === 'global' ? 'global' : 'sante', []);
+      docsPanelStatus(mode === 'global' ? 'global' : 'sante', e.message || String(e), 'error');
+    }
+  };
+  window.sbOpenDocsPanelBtn = async function(key){
+    const doc = docsPanelStore.get(key);
+    const win = window.open('', '_blank');
+    try {
+      if(!doc) throw new Error('Document introuvable dans la liste courante.');
+      const url = await sbItemSignedUrl(doc.storage_path, false);
+      if(win) win.location.href = url; else window.location.href = url;
+    } catch(e){
+      if(win) try { win.close(); } catch {}
+      const mode = String(key||'').split('::')[0] || 'global';
+      docsPanelStatus(mode, e.message || String(e), 'error');
+    }
+  };
+  window.sbDownloadDocsPanelBtn = async function(key){
+    const doc = docsPanelStore.get(key);
+    const win = window.open('', '_blank');
+    try {
+      if(!doc) throw new Error('Document introuvable dans la liste courante.');
+      const url = await sbItemSignedUrl(doc.storage_path, true);
+      if(win) win.location.href = url; else window.location.href = url;
+    } catch(e){
+      if(win) try { win.close(); } catch {}
+      const mode = String(key||'').split('::')[0] || 'global';
+      docsPanelStatus(mode, e.message || String(e), 'error');
+    }
+  };
+  window.sbDeleteDocsPanelBtn = async function(key){
+    const doc = docsPanelStore.get(key);
+    const mode = String(key||'').split('::')[0] || 'global';
+    try {
+      if(!doc) throw new Error('Document introuvable dans la liste courante.');
+      if(!confirm('Supprimer ce document ?')) return;
+      docsPanelStatus(mode, 'Suppression du document…', 'info');
+      await sbDeleteItemDocument(doc);
+      docsPanelStatus(mode, 'Document supprimé. Rechargement…', 'ok');
+      await window.sbHydrateDocsPanel(mode);
+    } catch(e){
+      docsPanelStatus(mode, e.message || String(e), 'error');
+    }
+  };
+
   // Documents Supabase réactivés uniquement en test accueil + fiches Santé.
 
 })();

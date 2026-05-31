@@ -215,6 +215,31 @@ async function sbListItemDocuments(itemId, module='sante'){
   return Array.isArray(data) ? data.sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))) : [];
 }
 
+
+async function sbListModuleDocuments(module){
+  const user = await sbCurrentUser();
+  if(!user) throw new Error('Utilisateur non connecté.');
+  if(!module) throw new Error('Module manquant.');
+  const { data, error } = await sbClient()
+    .from('family_documents')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('module', module);
+  if(error) throw new Error('Lecture family_documents impossible : ' + error.message);
+  return Array.isArray(data) ? data.sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))) : [];
+}
+
+async function sbListAllFamilyDocuments(){
+  const user = await sbCurrentUser();
+  if(!user) throw new Error('Utilisateur non connecté.');
+  const { data, error } = await sbClient()
+    .from('family_documents')
+    .select('*')
+    .eq('user_id', user.id);
+  if(error) throw new Error('Lecture family_documents impossible : ' + error.message);
+  return Array.isArray(data) ? data.sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))) : [];
+}
+
 async function sbItemSignedUrl(storagePath, download=false){
   if(!storagePath) throw new Error('Chemin Storage manquant.');
   const options = download ? { download: true } : undefined;
