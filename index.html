@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#fff8f1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>SuperApp Famille Mobile V5.36.6</title>
+  <link rel="manifest" href="manifest.json?v=5.36.6" />
+  <link rel="stylesheet" href="css/app.css?v=5.36.6" />
+  <link rel="stylesheet" href="css/supabase-auth.css?v=5.36.6" />
+</head>
+<body>
+  <!-- Barre de synchronisation -->
+  <div id="sb-sync-bar"></div>
+  <!-- Écran de connexion (caché par défaut, affiché si non connecté) -->
+  <div id="sb-auth-overlay" style="display:none"></div>
+  <div id="app" class="app-shell">
+    <main class="mobile-frame">
+      <header class="topbar" aria-label="En-tête">
+        <div class="family-mini" aria-hidden="true"><img id="familyMiniImg" src="" alt="" onerror="this.style.display='none'" /></div>
+        <div class="topbar-title">
+          <img id="screenLogo" class="topbar-module-logo" src="" alt="" style="display:none">
+          <div>
+            <h1 id="screenTitle">Bonjour la famille 👋</h1>
+            <p id="screenSubtitle">Tout est bien organisé aujourd’hui.</p>
+          </div>
+        </div>
+        <button class="icon-btn" id="quickNotificationBtn" aria-label="Voir les notifications">🔔<span class="badge" id="topBadge">3</span></button>
+      </header>
+
+      <section id="view-home" class="view active" data-view="home" aria-label="Accueil"></section>
+      <section id="view-calendar" class="view" data-view="calendar" aria-label="Calendrier"></section>
+      <section id="view-apps" class="view" data-view="apps" aria-label="Applications"></section>
+      <section id="view-notifications" class="view" data-view="notifications" aria-label="Notifications"></section>
+      <section id="view-settings" class="view" data-view="settings" aria-label="Paramètres"></section>
+
+      <button id="fab" class="fab" aria-label="Ajouter rapidement">+</button>
+
+      <nav class="bottom-nav" aria-label="Navigation principale">
+        <button class="nav-btn active" data-target="home" aria-label="Accueil"><span>🏠</span><small>Accueil</small></button>
+        <button class="nav-btn" data-target="calendar" aria-label="Calendrier"><span>📅</span><small>Calendrier</small></button>
+        <button class="nav-btn" data-target="apps" aria-label="Apps"><span>▦</span><small>Apps</small></button>
+        <button class="nav-btn" data-target="notifications" aria-label="Notifications"><span>🔔</span><small>Notifications</small><em id="navNotifBadge">3</em></button>
+        <button class="nav-btn" data-target="settings" aria-label="Paramètres"><span>⚙️</span><small>Paramètres</small></button>
+      </nav>
+    </main>
+  </div>
+
+  <div id="modalBackdrop" class="modal-backdrop" hidden></div>
+  <dialog id="actionDialog" class="dialog-card" aria-label="Action rapide">
+    <form method="dialog">
+      <header class="dialog-head">
+        <h2>Ajouter rapidement</h2>
+        <button class="icon-btn" type="button" id="closeAction" aria-label="Fermer">✕</button>
+      </header>
+      <div class="quick-actions" id="quickActions"></div>
+    </form>
+  </dialog>
+
+  <dialog id="editDialog" class="dialog-card" aria-label="Formulaire">
+    <form id="editForm" method="dialog">
+      <header class="dialog-head">
+        <h2 id="editTitle">Nouvel élément</h2>
+        <button class="icon-btn" type="button" id="closeEdit" aria-label="Fermer">✕</button>
+      </header>
+      <div id="editFields" class="form-stack"></div>
+      <footer class="dialog-actions">
+        <button class="btn ghost" type="button" id="cancelEdit">Annuler</button>
+        <button class="btn primary" type="submit">Enregistrer</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <input id="importInput" type="file" accept="application/json" hidden />
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js?v=5.36.6"></script>
+  <script src="js/app.js?v=5.36.6"></script>
+  <script src="js/supabase-app.js?v=5.36.6"></script>
+</body>
+</html>
