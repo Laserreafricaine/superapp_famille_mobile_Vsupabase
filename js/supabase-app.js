@@ -186,18 +186,20 @@
         + '// URL pré-signée — lien direct sans await au clic\n'
         + (d._signedUrl ? '<a href="' + escHtml(d._signedUrl) + '" target="_blank" rel="noopener noreferrer" class="doc-btn">Ouvrir</a>' : '<button type="button" class="doc-btn" disabled>Ouvrir</button>')
         + (d._signedUrl ? '<a href="' + escHtml(d._signedUrl) + '" download="' + escHtml(d.name) + '" target="_blank" class="doc-btn">Télécharger</a>' : '<button type="button" class="doc-btn" disabled>Télécharger</button>')
-        + '<button type="button" class="doc-btn" onclick="window.sbDeleteDoc(' + jsArg(d.id) + ',' + jsArg(d.storage_path) + ',' + jsArg(itemId) + ')">✕</button>'
+        + '<button type="button" class="doc-btn" onclick="window.sbDeleteDoc(' + haArg(d.id) + ',' + haArg(d.storage_path) + ',' + haArg(itemId) + ')">✕</button>'
         + '</div></div>';
     }).join('');
     const uploadId = 'sb-upload-'+itemId;
     return (rows || '<p style="font-size:12px;color:#888;margin:0">Aucun document attaché.</p>')
       + '<label class="doc-upload-btn" style="display:block;margin-top:8px;cursor:pointer">'
       + '+ Ajouter un document (PDF, photo…)'
-      + '<input type="file" accept="image/*,.pdf,.doc,.docx" style="display:none" onchange="window.sbHandleUpload(this,' + jsArg(itemId) + ',' + jsArg(module) + ')">'
+      + '<input type="file" accept="image/*,.pdf,.doc,.docx" style="display:none" onchange="window.sbHandleUpload(this,' + haArg(itemId) + ',' + haArg(module) + ')">'
       + '</label>';
   }
 
   function jsArg(v){ return JSON.stringify(String(v ?? '')); }
+  // haArg : comme jsArg mais avec guillemets simples — safe dans attributs HTML double-quotés
+  function haArg(v){ return "'" + String(v ?? '').replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'"; }
 
   function sbCanonicalModuleForFound(found){
     if(!found) return '';
@@ -361,6 +363,7 @@
 
   // Exposer les helpers documents pour les vues modules situées hors IIFE
   window.jsArg = jsArg;
+  window.haArg = haArg;
   window.sbCanonicalModuleId = sbCanonicalModuleId;
   window.sbDocContext = sbDocContext;
   window.sbModuleLabels = sbModuleLabels;
@@ -449,21 +452,21 @@ function sbModuleDocsHtml(docs, module, isGlobal){
   let filtered = base;
   if(activeCategory !== 'all') filtered = filtered.filter(d => d._ctx.category === activeCategory);
 
-  const moduleChips = isGlobal ? ['<button type="button" class="sb-docs-filter-chip '+(activeModule==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\',\'all\','+jsArg(module)+')">Tous</button>']
+  const moduleChips = isGlobal ? ['<button type="button" class="sb-docs-filter-chip '+(activeModule==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\',\'all\','+haArg(module)+')">Tous</button>']
     .concat(Object.entries(moduleLabels).map(([id, lbl]) =>
-      '<button type="button" class="sb-docs-filter-chip '+(activeModule===id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\','+jsArg(id)+','+jsArg(module)+')">'
+      '<button type="button" class="sb-docs-filter-chip '+(activeModule===id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\','+haArg(id)+','+haArg(module)+')">'
       + escHtml(lbl) + '</button>'
     )).join('') : '';
 
-  const memberChips = ['<button type="button" class="sb-docs-filter-chip '+(activeMember==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\',\'all\','+jsArg(module)+')">Tous les membres</button>']
+  const memberChips = ['<button type="button" class="sb-docs-filter-chip '+(activeMember==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\',\'all\','+haArg(module)+')">Tous les membres</button>']
     .concat(familyMembers.map(m =>
-      '<button type="button" class="sb-docs-filter-chip '+(activeMember===m.id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\','+jsArg(m.id)+','+jsArg(module)+')">'
+      '<button type="button" class="sb-docs-filter-chip '+(activeMember===m.id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\','+haArg(m.id)+','+haArg(module)+')">'
       + escHtml(String(m.name||'').split(' ')[0] || 'Membre') + '</button>'
     )).join('');
 
-  const categoryChips = ['<button type="button" class="sb-docs-filter-chip '+(activeCategory==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'category\',\'all\','+jsArg(module)+')">Toutes catégories</button>']
+  const categoryChips = ['<button type="button" class="sb-docs-filter-chip '+(activeCategory==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'category\',\'all\','+haArg(module)+')">Toutes catégories</button>']
     .concat(categories.map(cat =>
-      '<button type="button" class="sb-docs-filter-chip '+(activeCategory===cat?'active':'')+'" onclick="window.sbFilterModuleDocs(\'category\','+jsArg(cat)+','+jsArg(module)+')">'
+      '<button type="button" class="sb-docs-filter-chip '+(activeCategory===cat?'active':'')+'" onclick="window.sbFilterModuleDocs(\'category\','+haArg(cat)+','+haArg(module)+')">'
       + escHtml(cat) + '</button>'
     )).join('');
 
@@ -487,7 +490,7 @@ function sbModuleDocsHtml(docs, module, isGlobal){
       + '<div class="sb-doc-actions">'
       + (d._signedUrl ? '<a href="'+escHtml(d._signedUrl)+'" target="_blank" rel="noopener noreferrer" class="doc-btn">Ouvrir</a>' : '<button type="button" class="doc-btn" disabled>Ouvrir</button>')
       + (d._signedUrl ? '<a href="'+escHtml(d._signedUrl)+'" download="'+escHtml(d.name)+'" target="_blank" class="doc-btn">Télécharger</a>' : '<button type="button" class="doc-btn" disabled>Télécharger</button>')
-      + '<button type="button" class="doc-btn" onclick="window.sbDeleteModuleDoc('+jsArg(d.id)+','+jsArg(d.storage_path)+','+jsArg(module)+')">✕</button>'
+      + '<button type="button" class="doc-btn" onclick="window.sbDeleteModuleDoc('+haArg(d.id)+','+haArg(d.storage_path)+','+haArg(module)+')">✕</button>'
       + '</div></div>';
   }).join('');
 
