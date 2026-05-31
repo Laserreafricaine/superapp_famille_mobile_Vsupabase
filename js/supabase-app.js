@@ -1,10 +1,12 @@
 // ─────────────────────────────────────────────────────────────────
-// SuperApp Famille — Intégration Supabase (Auth + Sync uniquement)
-// Documents : supprimés — refonte à venir
+// SuperApp Famille — Intégration Supabase (Auth + Sync)
 // ─────────────────────────────────────────────────────────────────
 
 (function(){
   'use strict';
+
+  // ─── Helpers internes ────────────────────────────────────────
+  function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
   // ─── Init auth ───────────────────────────────────────────────
   window.sbInitAuth = async function(){
@@ -40,7 +42,7 @@
     } catch(e){ console.warn('[Sync]', e.message); }
   };
 
-  // ─── Barre de sync ───────────────────────────────────────────
+  // ─── Sync bar ────────────────────────────────────────────────
   window.sbShowSyncBar = function(type, msg, autohideMs){
     const bar = document.getElementById('sb-sync-bar');
     if(!bar) return;
@@ -54,7 +56,7 @@
     window._sbUserEmail = user ? user.email : '';
   };
 
-  // ─── Overlay auth ────────────────────────────────────────────
+  // ─── Auth overlay ────────────────────────────────────────────
   window.sbShowAuthOverlay = function(){
     const el = document.getElementById('sb-auth-overlay');
     if(!el) return;
@@ -101,47 +103,47 @@
     const btn   = document.getElementById('sb-submit-btn');
     const showErr  = m=>{errEl.textContent=m;errEl.className='sb-auth-error visible';infoEl.className='sb-auth-info';};
     const showInfo = m=>{infoEl.textContent=m;infoEl.className='sb-auth-info visible';errEl.className='sb-auth-error';};
-    if(!email||!pass){ showErr('Remplis tous les champs.'); return; }
-    if(tab==='register'&&pass!==pass2){ showErr('Mots de passe différents.'); return; }
-    if(pass.length<6){ showErr('Mot de passe trop court (6 car. min).'); return; }
+    if(!email||!pass){showErr('Remplis tous les champs.');return;}
+    if(tab==='register'&&pass!==pass2){showErr('Mots de passe différents.');return;}
+    if(pass.length<6){showErr('Mot de passe trop court (6 car. min).');return;}
     btn.disabled=true; btn.textContent='Connexion…';
     try {
       if(tab==='register'){
-        await sbSignUp(email, pass);
+        await sbSignUp(email,pass);
         showInfo('📧 Compte créé ! Confirme ton email puis connecte-toi.');
         window.sbSwitchTab('login'); return;
       }
-      await sbSignIn(email, pass);
+      await sbSignIn(email,pass);
       document.getElementById('sb-auth-overlay').style.display='none';
       sbShowSyncBar('syncing','🔄 Récupération de tes données…');
       await window.sbPullAndMerge();
-      sbShowSyncBar('synced','✅ Connecté !', 3000);
-      const user = await sbCurrentUser();
+      sbShowSyncBar('synced','✅ Connecté !',3000);
+      const user=await sbCurrentUser();
       sbUpdateUserBar(user);
-      window.SuperApp?.toast('👋 Bienvenue ! Données synchronisées.');
+        window.SuperApp?.toast('👋 Bienvenue ! Données synchronisées.');
     } catch(e){
-      const msg = e.message||'';
+      const msg=e.message||'';
       if(msg.includes('Invalid login')) showErr('Email ou mot de passe incorrect.');
       else if(msg.includes('Email not confirmed')) showErr('Confirme ton email d\'abord.');
       else if(msg.includes('already registered')) showErr('Email déjà utilisé. Connecte-toi.');
       else showErr('Erreur : '+msg);
       btn.disabled=false;
-      btn.textContent = tab==='login' ? 'Se connecter' : 'Créer mon compte famille';
+      btn.textContent=tab==='login'?'Se connecter':'Créer mon compte famille';
     }
   };
 
   window.sbLogout = async function(){
     if(!confirm('Se déconnecter ?')) return;
     await sbSignOut();
-    window._sbUser = null; window._sbUserEmail = '';
+    window._sbUser=null; window._sbUserEmail='';
     sbShowAuthOverlay();
     window.SuperApp?.toast('Déconnecté.');
   };
 
-  // ─── Bandeau utilisateur (Paramètres) ────────────────────────
+  // ─── Bandeau utilisateur (settings) ─────────────────────────
   window.sbUserBarExternal = function(){
-    const e = window._sbUserEmail||'';
-    const ico = String.fromCodePoint;
+    const e=window._sbUserEmail||'';
+    const ico=String.fromCodePoint;
     if(!e) return '<div class="sb-user-bar"><div class="sb-user-info"><strong>'
       +ico(0x1F534)+' Hors ligne</strong><small>Appuie pour te connecter</small></div>'
       +'<button class="sb-logout-btn" onclick="window.sbShowAuthOverlay()">'+ico(0x1F511)+' Connexion</button></div>';
@@ -151,180 +153,139 @@
       +'<button class="sb-logout-btn" onclick="window.sbLogout()">'+ico(0x1F6AA)+' Déconnexion</button></div>';
   };
 
-})();
 
-// ─────────────────────────────────────────────────────────────────
-// TEST WIDGET DOCUMENTS — visible sur l'écran d'accueil
-// Permet de tester upload / open / download / delete
-// ─────────────────────────────────────────────────────────────────
 
-// Initialiser l'input file global (une seule fois)
-(function initGlobalFileInput(){
-  const input = document.getElementById('sb-global-file-input');
-  if(!input || input._sbBound) return;
-  input._sbBound = true;
-  input.addEventListener('change', async function(){
-    const file = this.files?.[0];
-    this.value = ''; // reset pour permettre re-sélection du même fichier
-    if(!file) return;
-
-    const target = window._sbUploadTarget;
-    window._sbUploadTarget = null;
-    if(!target){ alert('Erreur : cible upload non définie.'); return; }
-
-    // Afficher état pendant l'upload
-    const statusEl = document.getElementById('sb-test-status');
-    if(statusEl) statusEl.textContent = '📤 Envoi en cours…';
-
-    try {
-      if(typeof sbCurrentUser !== 'function') throw new Error('Supabase non chargé');
-      const user = await sbCurrentUser();
-      if(!user) throw new Error('Non connecté');
-
-      // Chemin de stockage : userId/test/timestamp_filename
-      const safeName = String(file.name||'document')
-        .normalize('NFKD').replace(/[\u0300-\u036f]/g,'')
-        .replace(/[^a-zA-Z0-9._-]+/g,'_').replace(/^_+|_+$/g,'')||'document';
-      const path = user.id + '/test/' + Date.now() + '_' + safeName;
-
-      // 1. Upload Storage
-      const { error: upErr } = await sbClient()
-        .storage.from('family-documents')
-        .upload(path, file, { upsert: false, contentType: file.type||'application/octet-stream' });
-      if(upErr) throw new Error('Storage : ' + upErr.message);
-
-      // 2. Enregistrer métadonnées
-      const { error: dbErr } = await sbClient()
-        .from('family_documents')
-        .insert({
-          user_id: user.id,
-          item_id: 'test-widget',
-          module: 'test',
-          name: file.name,
-          storage_path: path,
-          size: file.size,
-          mime_type: file.type || 'application/octet-stream'
-        });
-      if(dbErr) throw new Error('DB : ' + dbErr.message);
-
-      if(statusEl) statusEl.textContent = '✅ Document uploadé !';
-      setTimeout(()=>window.sbDocTestWidget(), 300);
-    } catch(e){
-      if(statusEl) statusEl.textContent = '❌ ' + (e.message||'Erreur inconnue');
-      console.error('[sbUpload]', e);
-    }
-  });
-})();
-
-// Widget principal — injecté dans #view-home par le hook renderHome
-window.sbDocTestWidget = async function(){
-  const home = document.getElementById('view-home');
-  if(!home || home.style.display === 'none') return;
-
-  // Supprimer l'ancien widget s'il existe
-  document.getElementById('sb-test-widget')?.remove();
-
-  // Créer le widget
-  const widget = document.createElement('div');
-  widget.id = 'sb-test-widget';
-  widget.style.cssText = 'margin:16px;padding:16px;background:#fff;border-radius:16px;border:2px solid #2D5DA6;box-shadow:0 4px 16px rgba(0,0,0,.10);';
-  widget.innerHTML = '<h3 style="margin:0 0 12px;font-size:15px;color:#2D5DA6">📎 Test Documents Supabase</h3>'
-    + '<p id="sb-test-status" style="font-size:12px;color:#888;margin:0 0 10px;min-height:16px"></p>'
-    + '<button id="sb-test-upload-btn" style="width:100%;padding:12px;border-radius:12px;border:2px dashed #2D5DA6;background:#eff6ff;color:#2D5DA6;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:12px">'
-    + '+ Charger un document</button>'
-    + '<div id="sb-test-doc-list"><p style="font-size:12px;color:#888">Chargement…</p></div>';
-
-  // Bouton upload
-  widget.querySelector('#sb-test-upload-btn').addEventListener('click', function(){
-    window._sbUploadTarget = { itemId: 'test-widget', module: 'test' };
-    document.getElementById('sb-global-file-input').click();
-  });
-
-  // Insérer en haut du home
-  home.insertBefore(widget, home.firstChild);
-
-  // Charger la liste des docs
-  await sbTestLoadDocs();
-};
-
-async function sbTestLoadDocs(){
-  const listEl = document.getElementById('sb-test-doc-list');
-  if(!listEl) return;
-
-  if(typeof sbCurrentUser !== 'function'){ listEl.innerHTML='<p style="font-size:12px;color:#888">Supabase non chargé.</p>'; return; }
-  const user = await sbCurrentUser();
-  if(!user){ listEl.innerHTML='<p style="font-size:12px;color:#888">Connecte-toi pour voir les documents.</p>'; return; }
-
-  listEl.innerHTML='<p style="font-size:12px;color:#888">Chargement…</p>';
-  try {
-    const { data, error } = await sbClient()
-      .from('family_documents')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('item_id', 'test-widget')
-      .order('created_at', { ascending: false });
-    if(error) throw new Error(error.message);
-    const docs = data || [];
-
-    if(docs.length === 0){
-      listEl.innerHTML='<p style="font-size:12px;color:#888">Aucun document. Upload-en un pour tester.</p>';
+  // ─── Laboratoire documents accueil (test isolé) ───────────────
+  const testDocStore = new Map();
+  function fmtSize(bytes){
+    const n = Number(bytes || 0);
+    if(!Number.isFinite(n) || n <= 0) return 'taille inconnue';
+    if(n < 1024) return n + ' o';
+    if(n < 1024 * 1024) return Math.round(n / 1024) + ' Ko';
+    return (Math.round((n / (1024 * 1024)) * 10) / 10).toString().replace('.', ',') + ' Mo';
+  }
+  function testDocModal(){
+    let dlg = document.getElementById('sb-doc-test-dialog');
+    if(dlg) return dlg;
+    dlg = document.createElement('dialog');
+    dlg.id = 'sb-doc-test-dialog';
+    dlg.className = 'dialog-card sb-doc-test-dialog';
+    dlg.innerHTML = '<header class="dialog-head"><h2>📎 Test documents</h2><button class="icon-btn" type="button" onclick="window.sbCloseDocumentTest()" aria-label="Fermer">✕</button></header>'
+      + '<div class="form-stack sb-doc-test-stack">'
+      + '<section class="sb-doc-test-intro"><b>Laboratoire Supabase</b><small>Test isolé depuis l’accueil : upload Storage, ligne family_documents, ouverture, téléchargement et suppression.</small></section>'
+      + '<input id="sb-doc-test-input" type="file" hidden onchange="window.sbUploadTestDocument(this)">'
+      + '<button type="button" class="btn primary sb-doc-test-upload" onclick="document.getElementById(\'sb-doc-test-input\').click()">📤 Charger un document</button>'
+      + '<div id="sb-doc-test-status" class="sb-doc-test-status"></div>'
+      + '<div id="sb-doc-test-list" class="sb-doc-test-list"><div class="empty">Chargement…</div></div>'
+      + '</div>';
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function testDocStatus(message, type='info'){
+    const el = document.getElementById('sb-doc-test-status');
+    if(!el) return;
+    el.className = 'sb-doc-test-status ' + type;
+    el.textContent = message || '';
+  }
+  function renderTestDocs(docs){
+    const list = document.getElementById('sb-doc-test-list');
+    if(!list) return;
+    testDocStore.clear();
+    if(!docs || !docs.length){
+      list.innerHTML = '<div class="empty">Aucun document de test déposé.</div>';
       return;
     }
-
-    // Pré-signer toutes les URLs en parallèle
-    await Promise.all(docs.map(async d=>{
-      try {
-        const { data: sd, error: se } = await sbClient()
-          .storage.from('family-documents')
-          .createSignedUrl(d.storage_path, 3600);
-        d._url = se ? '' : sd.signedUrl;
-      } catch { d._url = ''; }
-    }));
-
-    const rows = docs.map(d => {
-      const icon = d.mime_type?.includes('pdf') ? '📄' : d.mime_type?.includes('image') ? '🖼️' : '📎';
-      const size = d.size ? (d.size>1048576 ? (d.size/1048576).toFixed(1)+' Mo' : Math.round(d.size/1024)+' Ko') : '';
-      const escUrl = (d._url||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-      const escName = (d.name||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-      const escId = (d.id||'').replace(/"/g,'&quot;');
-      const escPath = (d.storage_path||'').replace(/"/g,'&quot;');
-
-      const openBtn = d._url
-        ? '<a href="'+escUrl+'" target="_blank" rel="noopener noreferrer" style="padding:4px 10px;border-radius:8px;border:1px solid #ddd;background:#fff;font-size:12px;text-decoration:none;color:#333">Ouvrir</a>'
-        : '<span style="font-size:11px;color:#c00">URL échouée</span>';
-      const dlBtn = d._url
-        ? '<a href="'+escUrl+'" download="'+escName+'" target="_blank" style="padding:4px 10px;border-radius:8px;border:1px solid #ddd;background:#fff;font-size:12px;text-decoration:none;color:#333">Télécharger</a>'
-        : '';
-
-      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f5f7fa;border-radius:10px;margin-bottom:6px">'
-        +'<span style="font-size:20px">'+icon+'</span>'
-        +'<div style="flex:1;min-width:0"><b style="display:block;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escName+'</b>'
-        +'<small style="font-size:11px;color:#888">'+size+'</small></div>'
-        +'<div style="display:flex;gap:4px;flex-shrink:0">'
-        +openBtn+' '+dlBtn
-        +' <button data-doc-id="'+escId+'" data-path="'+escPath+'" onclick="window.sbTestDelete(this)" style="padding:4px 10px;border-radius:8px;border:1px solid #fca5a5;background:#fef2f2;font-size:12px;cursor:pointer;color:#c00">✕</button>'
-        +'</div></div>';
+    list.innerHTML = docs.map((doc, idx)=>{
+      const key = 'doc_' + idx + '_' + Date.now();
+      testDocStore.set(key, doc);
+      return '<article class="sb-doc-test-row">'
+        + '<div class="sb-doc-test-icon">📄</div>'
+        + '<div class="sb-doc-test-info"><b>' + escH(doc.name || 'Document') + '</b>'
+        + '<small>' + escH(doc.mime_type || 'type inconnu') + ' · ' + escH(fmtSize(doc.size)) + '</small>'
+        + '<em>module test_documents · item accueil_test</em></div>'
+        + '<div class="sb-doc-test-actions">'
+        + '<button type="button" class="doc-btn" onclick="window.sbOpenTestDocBtn(\'' + key + '\')">Ouvrir</button>'
+        + '<button type="button" class="doc-btn" onclick="window.sbDownloadTestDocBtn(\'' + key + '\')">Télécharger</button>'
+        + '<button type="button" class="doc-btn danger" onclick="window.sbDeleteTestDocBtn(\'' + key + '\')">Supprimer</button>'
+        + '</div></article>';
     }).join('');
-    listEl.innerHTML = rows;
-  } catch(e){
-    listEl.innerHTML='<p style="font-size:12px;color:#c00">Erreur : '+e.message+'</p>';
   }
-}
+  window.sbOpenDocumentTest = async function(){
+    const dlg = testDocModal();
+    try { dlg.showModal(); } catch { dlg.setAttribute('open',''); }
+    await window.sbLoadTestDocuments();
+  };
+  window.sbCloseDocumentTest = function(){
+    const dlg = document.getElementById('sb-doc-test-dialog');
+    try { dlg?.close(); } catch { dlg?.removeAttribute('open'); }
+  };
+  window.sbLoadTestDocuments = async function(){
+    try {
+      testDocStatus('Lecture des documents de test…', 'info');
+      if(typeof sbTestListDocuments !== 'function') throw new Error('Fonctions de test documents indisponibles.');
+      const docs = await sbTestListDocuments();
+      renderTestDocs(docs);
+      testDocStatus(docs.length ? docs.length + ' document(s) chargé(s).' : 'Aucun document de test pour le moment.', 'ok');
+    } catch(e){
+      renderTestDocs([]);
+      testDocStatus(e.message || String(e), 'error');
+    }
+  };
+  window.sbUploadTestDocument = async function(input){
+    try {
+      const file = input?.files?.[0];
+      if(!file) return;
+      testDocStatus('Envoi du fichier vers Supabase…', 'info');
+      if(typeof sbTestUploadDocument !== 'function') throw new Error('Fonction upload test indisponible.');
+      await sbTestUploadDocument(file);
+      input.value = '';
+      testDocStatus('Document ajouté. Rechargement de la liste…', 'ok');
+      await window.sbLoadTestDocuments();
+    } catch(e){
+      if(input) input.value = '';
+      testDocStatus(e.message || String(e), 'error');
+    }
+  };
+  window.sbOpenTestDocBtn = async function(key){
+    const doc = testDocStore.get(key);
+    const win = window.open('', '_blank');
+    try {
+      if(!doc) throw new Error('Document introuvable dans la liste courante.');
+      const url = await sbTestSignedUrl(doc.storage_path, false);
+      if(win) win.location.href = url;
+      else window.location.href = url;
+    } catch(e){
+      if(win) try { win.close(); } catch {}
+      testDocStatus(e.message || String(e), 'error');
+    }
+  };
+  window.sbDownloadTestDocBtn = async function(key){
+    const doc = testDocStore.get(key);
+    const win = window.open('', '_blank');
+    try {
+      if(!doc) throw new Error('Document introuvable dans la liste courante.');
+      const url = await sbTestSignedUrl(doc.storage_path, true);
+      if(win) win.location.href = url;
+      else window.location.href = url;
+    } catch(e){
+      if(win) try { win.close(); } catch {}
+      testDocStatus(e.message || String(e), 'error');
+    }
+  };
+  window.sbDeleteTestDocBtn = async function(key){
+    const doc = testDocStore.get(key);
+    try {
+      if(!doc) throw new Error('Document introuvable dans la liste courante.');
+      if(!confirm('Supprimer ce document de test ?')) return;
+      testDocStatus('Suppression du document…', 'info');
+      await sbTestDeleteDocument(doc);
+      testDocStatus('Document supprimé.', 'ok');
+      await window.sbLoadTestDocuments();
+    } catch(e){
+      testDocStatus(e.message || String(e), 'error');
+    }
+  };
 
-window.sbTestDelete = async function(btn){
-  if(!confirm('Supprimer ce document ?')) return;
-  const docId = btn.dataset.docId;
-  const path  = btn.dataset.path;
-  const statusEl = document.getElementById('sb-test-status');
-  if(statusEl) statusEl.textContent = '🗑️ Suppression…';
-  try {
-    const { error: stErr } = await sbClient().storage.from('family-documents').remove([path]);
-    if(stErr) throw new Error('Storage : '+stErr.message);
-    const { error: dbErr } = await sbClient().from('family_documents').delete().eq('id', docId);
-    if(dbErr) throw new Error('DB : '+dbErr.message);
-    if(statusEl) statusEl.textContent = '✅ Supprimé !';
-    setTimeout(()=>window.sbDocTestWidget(), 300);
-  } catch(e){
-    if(statusEl) statusEl.textContent = '❌ '+e.message;
-  }
-};
+  // La couche documents Supabase a été retirée volontairement.
+
+})();

@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.10';
+  const APP_VERSION = '5.36.13';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -535,7 +535,7 @@
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
     }
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.10').catch(()=>{}); }
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.13').catch(()=>{}); }
     maybeStartOnboarding();
     setTimeout(()=>maybeFireNotifications(), 800);
     setTimeout(()=>{ if(typeof window.sbInitAuth==="function") window.sbInitAuth(); }, 400);
@@ -645,7 +645,6 @@
       if(checkedMoments.length) item.doseMoments = [...checkedMoments].map(c=>c.value).join(',');
       if(String(type).startsWith('settings_')){ saveSettingsForm(type,item,e.currentTarget.dataset.id || ''); return; }
       if(type === 'settings' || type === 'reset_confirm'){ closeEditDialog(); return; }
-      const wasNewRecord = !(e.currentTarget.dataset.id || '');
       const savedRecord = addItem(type,item);
       const backToList = state.returnList ? {...state.returnList} : null;
       state.preset=null;
@@ -857,14 +856,17 @@
       </article>
       ${mealsCardHtml}
       ${shoppingHintHtml}
+      <article class="home-doc-test-card clickable-card" onclick="window.sbOpenDocumentTest?.()">
+        <span class="ico">📎</span>
+        <div><b>Test documents Supabase</b><small>Charger, ouvrir, télécharger et supprimer un fichier.</small></div>
+        <span class="chev">›</span>
+      </article>
       <div class="section-title"><h2>${isMemberProfile()?'Ma journée':'Aujourd’hui pour la famille'}</h2><span>${displayDate(today).replace(/^./,c=>c.toUpperCase())}</span></div>
       <div class="digest-list">${digestRows}</div>
       <div class="section-title"><h2>Mes apps</h2><button class="link-btn" onclick="SuperApp.setView('apps')">Voir tout</button></div>
       <div class="app-grid visual-grid">
         ${modules.filter(m=>m.id !== 'calendrier').map(moduleTileSmall).join('')}
       </div>`;
-  // Hook test documents Supabase
-  setTimeout(()=>{ if(typeof window.sbDocTestWidget==='function') window.sbDocTestWidget(); }, 50);
   }
   function moduleImage(m,variant='tile'){
     return `<div class="app-icon-large ${variant}" aria-hidden="true"><span>${m.icon}</span></div>`;
