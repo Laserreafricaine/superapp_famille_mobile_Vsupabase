@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.13';
+  const APP_VERSION = '5.36.14';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -535,7 +535,7 @@
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
     }
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.13').catch(()=>{}); }
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.14').catch(()=>{}); }
     maybeStartOnboarding();
     setTimeout(()=>maybeFireNotifications(), 800);
     setTimeout(()=>{ if(typeof window.sbInitAuth==="function") window.sbInitAuth(); }, 400);
@@ -645,9 +645,20 @@
       if(checkedMoments.length) item.doseMoments = [...checkedMoments].map(c=>c.value).join(',');
       if(String(type).startsWith('settings_')){ saveSettingsForm(type,item,e.currentTarget.dataset.id || ''); return; }
       if(type === 'settings' || type === 'reset_confirm'){ closeEditDialog(); return; }
+      const wasNewHealth = canonicalModuleId(type)==='sante' && !e.currentTarget.dataset.id;
       const savedRecord = addItem(type,item);
       const backToList = state.returnList ? {...state.returnList} : null;
       state.preset=null;
+      if(savedRecord && wasNewHealth){
+        state.editing = findRecord(savedRecord.id);
+        $('#editTitle').textContent = 'Modifier l’élément';
+        $('#editForm').dataset.type = 'sante';
+        $('#editForm').dataset.id = savedRecord.id;
+        $('#editFields').innerHTML = fieldsFor('sante', savedRecord);
+        toast('✅ Fiche Santé enregistrée. Tu peux maintenant déposer un document.');
+        setTimeout(()=>window.sbHydrateHealthItemDocs?.(savedRecord.id), 120);
+        return;
+      }
       closeEditDialog();
       // V5.7 : addItem est autonome (save + render inclus), pas besoin de relancer ici.
       if(savedRecord && canonicalModuleId(type)==='sport_loisirs' && wantsSlvChecklistAfterSave){
@@ -1712,6 +1723,9 @@
     $('#editFields').innerHTML = fieldsFor(type,item);
     if($('#editDialog').open) $('#editDialog').close();
     $('#editDialog').showModal();
+    if(type === 'sante' && item.id){
+      setTimeout(()=>window.sbHydrateHealthItemDocs?.(item.id), 120);
+    }
   }
   function openAdd(module,type='',category='',title='',member=''){
     // V5.11 — Fusionner avec un preset existant (ex. day/slot posés par openAddWeeklyMeal)
@@ -3158,6 +3172,15 @@
     return 'Ex : Nouvel élément';
   }
 
+
+  function healthDocsFieldHtml(item={}){
+    const id = item && item.id ? String(item.id) : '';
+    if(!id){
+      return `<section class="sb-health-doc-zone locked"><div class="sb-doc-test-intro"><b>📎 Documents attachés</b><small>Enregistre d’abord cette fiche Santé. La fenêtre restera ouverte et tu pourras ensuite déposer un PDF, une ordonnance, un résultat ou une photo liée à cette fiche.</small></div></section>`;
+    }
+    return `<section class="sb-health-doc-zone" data-sb-health-docs="${escapeAttr(id)}"><div class="sb-doc-test-intro"><b>📎 Documents attachés</b><small>Documents Supabase liés uniquement à cette fiche Santé.</small></div><input id="sb-health-doc-input-${escapeAttr(id)}" type="file" hidden onchange="window.sbUploadHealthItemDocument?.(this,'${escapeAttr(id)}')"><button type="button" class="btn primary sb-doc-test-upload" onclick="document.getElementById('sb-health-doc-input-${escapeAttr(id)}')?.click()">📤 Charger un document</button><div class="sb-health-doc-status info">Chargement des documents…</div><div class="sb-health-doc-list"><div class="empty">Chargement…</div></div></section>`;
+  }
+
   // V5.8 — Formulaire standardisé : MÊME séquence partout, peu importe le module.
   // Quoi → Quand → Pour qui → Où ça se range → Détails (repliés) → Notes → Statut (en édition seulement).
   function fieldsFor(type,item={}){
@@ -3199,8 +3222,9 @@
       ? `<div class="danger-actions"><button class="btn ghost" type="button" onclick="SuperApp.archiveItem('${item.id}')">Archiver</button><button class="btn ghost danger" type="button" onclick="SuperApp.deleteItem('${item.id}')">🗑️ Supprimer</button></div>`
       : '';
 
+    const docsField = type === 'sante' ? healthDocsFieldHtml(item) : '';
     const visibilityField = ['maison','education','sante','sport_loisirs','familles','calendrier'].includes(type) ? setHomeVisibilityFields(item) : '';
-    return `${hiddenRouting}${titleField}${dateField}${hourField}${memberField}${categoryField}${moduleDetails}${notesField}${statusField}${danger}${visibilityField}`;
+    return `${hiddenRouting}${titleField}${dateField}${hourField}${memberField}${categoryField}${moduleDetails}${notesField}${statusField}${danger}${docsField}${visibilityField}`;
   }
 
   // Champs cachés pour le routage : module + type sont déduits du bouton cliqué, jamais demandés à l'utilisateur (sauf depuis le calendrier).

@@ -286,6 +286,123 @@
     }
   };
 
-  // La couche documents Supabase a été retirée volontairement.
+
+
+  // ─── Documents attachés aux fiches Santé (test contrôlé) ─────────
+  const healthDocStore = new Map();
+  function healthDocRoot(itemId){
+    return [...document.querySelectorAll('[data-sb-health-docs]')].find(el => el.getAttribute('data-sb-health-docs') === String(itemId||'')) || null;
+  }
+  function healthDocStatus(itemId, message, type='info'){
+    const root = healthDocRoot(itemId);
+    const el = root?.querySelector('.sb-health-doc-status');
+    if(!el) return;
+    el.className = 'sb-health-doc-status ' + type;
+    el.textContent = message || '';
+  }
+  function healthDocItemTitle(itemId){
+    try {
+      const found = window.SuperApp?._findRecord?.(itemId);
+      const item = found?.item || {};
+      return item.title || item.meal || item.category || 'fiche Santé';
+    } catch { return 'fiche Santé'; }
+  }
+  function renderHealthItemDocs(itemId, docs){
+    const root = healthDocRoot(itemId);
+    if(!root) return;
+    const list = root.querySelector('.sb-health-doc-list');
+    if(!list) return;
+    [...healthDocStore.keys()].filter(k=>k.startsWith(String(itemId)+'::')).forEach(k=>healthDocStore.delete(k));
+    if(!docs || !docs.length){
+      list.innerHTML = '<div class="sb-doc-empty">Aucun document attaché à cette fiche Santé.</div>';
+      return;
+    }
+    const title = healthDocItemTitle(itemId);
+    list.innerHTML = docs.map((doc, idx)=>{
+      const key = String(itemId) + '::' + idx + '::' + Date.now();
+      healthDocStore.set(key, doc);
+      return '<article class="sb-health-doc-row">'
+        + '<div class="sb-doc-test-icon">📄</div>'
+        + '<div class="sb-doc-test-info"><b>' + escH(doc.name || 'Document') + '</b>'
+        + '<small>' + escH(doc.mime_type || 'type inconnu') + ' · ' + escH(fmtSize(doc.size)) + '</small>'
+        + '<em>Santé · lié à ' + escH(title) + '</em></div>'
+        + '<div class="sb-doc-test-actions">'
+        + '<button type="button" class="doc-btn" onclick="window.sbOpenHealthDocBtn(\'' + key + '\')">Ouvrir</button>'
+        + '<button type="button" class="doc-btn" onclick="window.sbDownloadHealthDocBtn(\'' + key + '\')">Télécharger</button>'
+        + '<button type="button" class="doc-btn danger" onclick="window.sbDeleteHealthDocBtn(\'' + key + '\',\'' + escH(itemId) + '\')">Supprimer</button>'
+        + '</div></article>';
+    }).join('');
+  }
+  window.sbHydrateHealthItemDocs = async function(itemId){
+    try {
+      if(!itemId) return;
+      healthDocStatus(itemId, 'Lecture des documents Santé…', 'info');
+      if(typeof sbListItemDocuments !== 'function') throw new Error('Fonctions documents Santé indisponibles.');
+      const docs = await sbListItemDocuments(itemId, 'sante');
+      renderHealthItemDocs(itemId, docs);
+      healthDocStatus(itemId, docs.length ? docs.length + ' document(s) attaché(s).' : 'Aucun document attaché pour le moment.', 'ok');
+    } catch(e){
+      renderHealthItemDocs(itemId, []);
+      healthDocStatus(itemId, e.message || String(e), 'error');
+    }
+  };
+  window.sbUploadHealthItemDocument = async function(input, itemId){
+    try {
+      const file = input?.files?.[0];
+      if(!file) return;
+      healthDocStatus(itemId, 'Envoi du fichier vers Supabase…', 'info');
+      if(typeof sbUploadItemDocument !== 'function') throw new Error('Fonction upload Santé indisponible.');
+      await sbUploadItemDocument(file, itemId, 'sante');
+      input.value = '';
+      healthDocStatus(itemId, 'Document ajouté. Rechargement de la liste…', 'ok');
+      await window.sbHydrateHealthItemDocs(itemId);
+    } catch(e){
+      if(input) input.value = '';
+      healthDocStatus(itemId, e.message || String(e), 'error');
+    }
+  };
+  window.sbOpenHealthDocBtn = async function(key){
+    const doc = healthDocStore.get(key);
+    const win = window.open('', '_blank');
+    try {
+      if(!doc) throw new Error('Document introuvable dans la liste courante.');
+      const url = await sbItemSignedUrl(doc.storage_path, false);
+      if(win) win.location.href = url;
+      else window.location.href = url;
+    } catch(e){
+      if(win) try { win.close(); } catch {}
+      const itemId = String(key||'').split('::')[0];
+      healthDocStatus(itemId, e.message || String(e), 'error');
+    }
+  };
+  window.sbDownloadHealthDocBtn = async function(key){
+    const doc = healthDocStore.get(key);
+    const win = window.open('', '_blank');
+    try {
+      if(!doc) throw new Error('Document introuvable dans la liste courante.');
+      const url = await sbItemSignedUrl(doc.storage_path, true);
+      if(win) win.location.href = url;
+      else window.location.href = url;
+    } catch(e){
+      if(win) try { win.close(); } catch {}
+      const itemId = String(key||'').split('::')[0];
+      healthDocStatus(itemId, e.message || String(e), 'error');
+    }
+  };
+  window.sbDeleteHealthDocBtn = async function(key, itemId){
+    const doc = healthDocStore.get(key);
+    try {
+      if(!doc) throw new Error('Document introuvable dans la liste courante.');
+      if(!confirm('Supprimer ce document Santé ?')) return;
+      healthDocStatus(itemId, 'Suppression du document…', 'info');
+      await sbDeleteItemDocument(doc);
+      healthDocStatus(itemId, 'Document supprimé.', 'ok');
+      await window.sbHydrateHealthItemDocs(itemId);
+    } catch(e){
+      healthDocStatus(itemId, e.message || String(e), 'error');
+    }
+  };
+
+  // Documents Supabase réactivés uniquement en test accueil + fiches Santé.
 
 })();

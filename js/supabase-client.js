@@ -158,6 +158,90 @@ async function sbTestDeleteDocument(doc){
   return true;
 }
 
+
+
+// ─── Documents attachés à un item (déploiement progressif Santé) ─────
+const SB_ITEM_DOC_BUCKET = 'family-documents';
+
+async function sbUploadItemDocument(file, itemId, module='sante'){
+  const user = await sbCurrentUser();
+  if(!user) throw new Error('Utilisateur non connecté.');
+  if(!file) throw new Error('Aucun fichier sélectionné.');
+  if(!itemId) throw new Error('ID de fiche manquant. Enregistre d’abord la fiche.');
+  const safeName = sbSafeFileName(file.name);
+  const cleanItemId = sbSafeFileName(itemId);
+  const storagePath = `${user.id}/${cleanItemId}/${Date.now()}_${safeName}`;
+
+  const { error: uploadError } = await sbClient()
+    .storage
+    .from(SB_ITEM_DOC_BUCKET)
+    .upload(storagePath, file, { upsert: false, contentType: file.type || 'application/octet-stream' });
+  if(uploadError) throw new Error('Storage upload impossible : ' + uploadError.message);
+
+  const payload = {
+    user_id: user.id,
+    item_id: itemId,
+    module,
+    name: file.name,
+    storage_path: storagePath,
+    size: file.size || 0,
+    mime_type: file.type || 'application/octet-stream'
+  };
+
+  const { data, error: dbError } = await sbClient()
+    .from('family_documents')
+    .insert(payload)
+    .select('*')
+    .single();
+
+  if(dbError){
+    try { await sbClient().storage.from(SB_ITEM_DOC_BUCKET).remove([storagePath]); } catch {}
+    throw new Error('Métadonnées family_documents non enregistrées : ' + dbError.message);
+  }
+  return data || payload;
+}
+
+async function sbListItemDocuments(itemId, module='sante'){
+  const user = await sbCurrentUser();
+  if(!user) throw new Error('Utilisateur non connecté.');
+  if(!itemId) throw new Error('ID de fiche manquant.');
+  const { data, error } = await sbClient()
+    .from('family_documents')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('module', module)
+    .eq('item_id', itemId);
+  if(error) throw new Error('Lecture family_documents impossible : ' + error.message);
+  return Array.isArray(data) ? data.sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))) : [];
+}
+
+async function sbItemSignedUrl(storagePath, download=false){
+  if(!storagePath) throw new Error('Chemin Storage manquant.');
+  const options = download ? { download: true } : undefined;
+  const { data, error } = await sbClient()
+    .storage
+    .from(SB_ITEM_DOC_BUCKET)
+    .createSignedUrl(storagePath, 3600, options);
+  if(error) throw new Error('URL signée impossible : ' + error.message);
+  if(!data?.signedUrl) throw new Error('URL signée vide.');
+  return data.signedUrl;
+}
+
+async function sbDeleteItemDocument(doc){
+  const user = await sbCurrentUser();
+  if(!user) throw new Error('Utilisateur non connecté.');
+  const storagePath = doc?.storage_path || doc?.storagePath || '';
+  if(!storagePath) throw new Error('Chemin Storage manquant.');
+  const { error: storageError } = await sbClient().storage.from(SB_ITEM_DOC_BUCKET).remove([storagePath]);
+  if(storageError) throw new Error('Suppression Storage impossible : ' + storageError.message);
+
+  let query = sbClient().from('family_documents').delete().eq('user_id', user.id).eq('storage_path', storagePath);
+  if(doc?.id) query = query.eq('id', doc.id);
+  const { error: dbError } = await query;
+  if(dbError) throw new Error('Suppression family_documents impossible : ' + dbError.message);
+  return true;
+}
+
 // ─── Sync utilitaire ─────────────────────────────────────────────
 
 // Retourne true si le serveur est plus récent que le local
