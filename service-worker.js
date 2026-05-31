@@ -1,5 +1,5 @@
-const CACHE = 'superapp-famille-v5-36-6';
-const CORE_ASSETS = ['./', './index.html', './css/app.css?v=5.36.6', './js/app.js?v=5.36.6', './js/supabase-client.js?v=5.36.6', './js/supabase-app.js?v=5.36.6', './css/supabase-auth.css?v=5.36.6', './manifest.json?v=5.36.6'];
+const CACHE = 'superapp-famille-v5-36-9';
+const CORE_ASSETS = ['./', './index.html', './css/app.css?v=5.36.9', './js/app.js?v=5.36.9', './js/supabase-client.js?v=5.36.9', './js/supabase-app.js?v=5.36.9', './css/supabase-auth.css?v=5.36.9', './manifest.json?v=5.36.9'];
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE_ASSETS)).catch(()=>{}));

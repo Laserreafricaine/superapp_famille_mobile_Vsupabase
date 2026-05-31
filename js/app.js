@@ -645,9 +645,34 @@
       if(checkedMoments.length) item.doseMoments = [...checkedMoments].map(c=>c.value).join(',');
       if(String(type).startsWith('settings_')){ saveSettingsForm(type,item,e.currentTarget.dataset.id || ''); return; }
       if(type === 'settings' || type === 'reset_confirm'){ closeEditDialog(); return; }
+      const wasNewRecord = !(e.currentTarget.dataset.id || '');
       const savedRecord = addItem(type,item);
       const backToList = state.returnList ? {...state.returnList} : null;
-      state.preset=null; closeEditDialog();
+      state.preset=null;
+      const docsEnabledModules = ['maison','education','sante','sport_loisirs','familles'];
+      const shouldKeepOpenForDocs = wasNewRecord && savedRecord && docsEnabledModules.includes(canonicalModuleId(type));
+      // V5.36.9 — Documents : après la première création, on reste dans la fiche.
+      // Cela permet d'activer immédiatement la zone de dépôt Supabase au lieu de forcer
+      // l'utilisateur à fermer, retrouver puis rouvrir l'item.
+      if(shouldKeepOpenForDocs){
+        const savedId = savedRecord.id;
+        state.editing = findRecord(savedId) || {item:savedRecord};
+        e.currentTarget.dataset.id = savedId;
+        $('#editTitle').textContent = 'Modifier l’élément';
+        $('#editFields').innerHTML = fieldsFor(type, savedRecord);
+        toast('✅ Élément enregistré. Tu peux maintenant ajouter un document.');
+        if(typeof window.sbInjectItemDocs === 'function'){
+          setTimeout(()=>window.sbInjectItemDocs(savedId), 80);
+        }
+        if(backToList) setTimeout(()=>openModuleList(backToList.module, backToList.block), 30);
+        if(canonicalModuleId(type)==='sport_loisirs' && wantsSlvChecklistAfterSave){
+          setTimeout(()=>openSlvChecklistLight(savedId), 90);
+        } else if(canonicalModuleId(type)==='sport_loisirs') {
+          setTimeout(()=>refreshSlvChecklistDialog(savedId), 80);
+        }
+        return;
+      }
+      closeEditDialog();
       // V5.7 : addItem est autonome (save + render inclus), pas besoin de relancer ici.
       if(savedRecord && canonicalModuleId(type)==='sport_loisirs' && wantsSlvChecklistAfterSave){
         setTimeout(()=>openSlvChecklistLight(savedRecord.id), 90);
@@ -3197,8 +3222,8 @@
     const docsEnabledModules = ['maison','education','sante','sport_loisirs','familles'];
     const docsPlaceholder = docsEnabledModules.includes(type)
       ? (isEditing && item.id
-        ? `<div class="sb-item-docs-placeholder" data-item-id="${escapeAttr(item.id)}"></div>`
-        : `<div class="sb-item-docs-zone sb-item-docs-zone-pending"><h4>📎 Documents attachés</h4><p>Enregistre d’abord cet élément. Tu pourras ensuite le rouvrir et déposer un document lié à cette fiche.</p></div>`)
+        ? `<div class="sb-item-docs-placeholder sb-item-docs-zone" data-item-id="${escapeAttr(item.id)}"><h4>📎 Documents attachés</h4><div id="item-docs-section"><p style="font-size:12px;color:#888;margin:0">Chargement des documents…</p></div></div>`
+        : `<div class="sb-item-docs-zone sb-item-docs-zone-pending"><h4>📎 Documents attachés</h4><p>Enregistre d’abord cet élément. La fenêtre restera ouverte et tu pourras déposer un document lié à cette fiche.</p></div>`)
       : '';
     return `${hiddenRouting}${titleField}${dateField}${hourField}${memberField}${categoryField}${moduleDetails}${notesField}${statusField}${danger}${docsPlaceholder}${visibilityField}`;
   }
