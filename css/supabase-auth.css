@@ -128,6 +128,15 @@
 .sb-health-doc-zone{display:grid;gap:12px;padding:13px;border-radius:20px;background:linear-gradient(135deg,#f6f1ff,#eff6ff);border:1px solid rgba(124,92,207,.18);box-shadow:0 8px 22px rgba(42,54,82,.05)}
 .sb-health-doc-zone.locked{background:#f8fafc}.sb-health-doc-status{display:none;border-radius:14px;padding:10px 12px;font-size:12px;font-weight:800;line-height:1.35}.sb-health-doc-status.info,.sb-health-doc-status.ok,.sb-health-doc-status.error{display:block}.sb-health-doc-status.info{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}.sb-health-doc-status.ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}.sb-health-doc-status.error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;white-space:pre-wrap}.sb-health-doc-list{display:grid;gap:10px}.sb-health-doc-row{display:grid;grid-template-columns:42px minmax(0,1fr);gap:10px;padding:12px;border-radius:18px;background:#fff;border:1px solid rgba(232,220,211,.9);box-shadow:0 6px 16px rgba(42,54,82,.05)}.sb-doc-empty{padding:12px;border-radius:16px;background:#fff;color:var(--muted,#667085);font-size:12px;font-weight:800;text-align:center}
 
-/* Listes documents Supabase — v5.36.15 */
+/* Listes documents Supabase — v5.36.16 */
 .sb-module-docs-panel{display:grid;gap:12px;padding:13px;border-radius:22px;background:linear-gradient(135deg,#fff7ed,#eff6ff);border:1px solid rgba(124,92,207,.16);box-shadow:0 8px 22px rgba(42,54,82,.05)}
 .sb-module-docs-status{display:none;border-radius:14px;padding:10px 12px;font-size:12px;font-weight:800;line-height:1.35}.sb-module-docs-status.info,.sb-module-docs-status.ok,.sb-module-docs-status.error{display:block}.sb-module-docs-status.info{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}.sb-module-docs-status.ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}.sb-module-docs-status.error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;white-space:pre-wrap}.sb-module-docs-list{display:grid;gap:10px}.sb-module-doc-row{border-color:rgba(124,92,207,.16)}
+
+/* Filtres dynamiques documents — v5.36.16 */
+.sb-module-docs-filters{display:grid;gap:10px}
+.sb-doc-filter-group{display:grid;gap:7px;padding:10px;border-radius:18px;background:rgba(255,255,255,.72);border:1px solid rgba(124,92,207,.12)}
+.sb-doc-filter-group>span{font-size:11px;font-weight:950;text-transform:uppercase;letter-spacing:.06em;color:#74829d}
+.sb-doc-filter-group>div{display:flex;flex-wrap:wrap;gap:8px}
+.sb-doc-filter-group button{border:0;border-radius:999px;padding:8px 11px;background:#f4f6fb;color:#526681;font-size:12px;font-weight:900;white-space:nowrap}
+.sb-doc-filter-group button.active{background:#153d79;color:#fff}
+.sb-doc-filter-group.muted p{margin:0;color:#74829d;font-size:12px;font-weight:750;line-height:1.35}

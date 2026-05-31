@@ -406,6 +406,11 @@
 
   // ─── Listes documents visibles : Santé + Familles global ─────────────
   const docsPanelStore = new Map();
+  const docsPanelRawDocs = new Map();
+  const docsPanelState = {
+    sante: {member:'all', category:'all'},
+    global: {member:'all', category:'all'}
+  };
   function docsPanelRoot(mode){ return document.querySelector('[data-sb-docs-panel="' + mode + '"]'); }
   function docsPanelStatus(mode, message, type='info'){
     const root = docsPanelRoot(mode); if(!root) return;
@@ -417,6 +422,10 @@
     const labels = {sante:'Santé', test_documents:'Test accueil', education:'Éducation', maison:'Maison', sport_loisirs:'Sport / Loisir / Voyage', familles:'Familles', courses_repas:'Courses / Repas'};
     return labels[module] || module || 'Module inconnu';
   }
+  function itemTypeLabel(type){
+    const labels = {appointment:'Rendez-vous', rendez_vous_medical:'Rendez-vous', medication:'Traitement', medicament:'Traitement', document_sante:'Document santé', vaccin:'Vaccin', vaccine:'Vaccin', devoir:'Devoir', note:'Note', task:'Tâche', document_famille:'Document famille'};
+    return labels[type] || '';
+  }
   function itemInfoForDoc(doc){
     try {
       const found = window.SuperApp?._findRecord?.(doc.item_id || doc.itemId || '');
@@ -424,28 +433,78 @@
       const data = window.SuperApp?._getData?.() || {};
       const memberId = item.member || item.memberId || item.assignedTo || item.companion || item.childId || item.eleveId || '';
       const member = Array.isArray(data.family) ? data.family.find(m=>m.id===memberId) : null;
+      const title = item.title || item.meal || item.name || item.label || item.category || doc.item_id || 'fiche liée';
+      const category = doc.category || item.documentCategory || item.docCategory || item.category || itemTypeLabel(item.type) || '';
       return {
-        title: item.title || item.meal || item.category || doc.item_id || 'fiche liée',
+        title,
         member: member?.name || (memberId ? memberId : ''),
-        category: item.category || doc.category || '',
-        date: item.date || ''
+        memberId,
+        category,
+        date: item.date || doc.date || ''
       };
     } catch {
-      return {title: doc.item_id || 'fiche liée', member:'', category:'', date:''};
+      return {title: doc.item_id || 'fiche liée', member:'', memberId:'', category: doc.category || '', date:''};
     }
   }
-  function renderDocsPanel(mode, docs){
+  function enrichDocForPanel(doc){
+    const info = itemInfoForDoc(doc);
+    return {...doc, _info: info, _filterMember: info.member || '', _filterCategory: info.category || ''};
+  }
+  function uniqueOptionValues(docs, key){
+    const seen = new Set();
+    const vals = [];
+    docs.forEach(doc=>{
+      const value = String(doc[key] || '').trim();
+      if(value && !seen.has(value)){
+        seen.add(value);
+        vals.push(value);
+      }
+    });
+    return vals.sort((a,b)=>a.localeCompare(b, 'fr', {sensitivity:'base'}));
+  }
+  function filterDocsForPanel(mode, docs){
+    const state = docsPanelState[mode] || {member:'all', category:'all'};
+    return docs.filter(doc=>{
+      if(state.member !== 'all' && doc._filterMember !== state.member) return false;
+      if(state.category !== 'all' && doc._filterCategory !== state.category) return false;
+      return true;
+    });
+  }
+  function safeJsString(value){ return JSON.stringify(String(value || '')).replace(/</g,'\\u003c'); }
+  function renderDocsPanelFilters(mode, docs){
     const root = docsPanelRoot(mode); if(!root) return;
-    const list = root.querySelector('.sb-module-docs-list'); if(!list) return;
+    const el = root.querySelector('.sb-module-docs-filters'); if(!el) return;
+    const state = docsPanelState[mode] || (docsPanelState[mode] = {member:'all', category:'all'});
+    const members = uniqueOptionValues(docs, '_filterMember');
+    const categories = uniqueOptionValues(docs, '_filterCategory');
+    if(state.member !== 'all' && !members.includes(state.member)) state.member = 'all';
+    if(state.category !== 'all' && !categories.includes(state.category)) state.category = 'all';
+    const chip = (group, value, label)=>'<button type="button" class="' + ((state[group]||'all')===value ? 'active' : '') + '" onclick="window.sbSetDocsPanelFilter(\'' + mode + '\',\'' + group + '\',' + safeJsString(value) + ')">' + escH(label) + '</button>';
+    const groupHtml = (title, group, values, allLabel)=>{
+      if(!values.length) return '<div class="sb-doc-filter-group muted"><span>' + escH(title) + '</span><p>Aucun filtre disponible pour le moment.</p></div>';
+      return '<div class="sb-doc-filter-group"><span>' + escH(title) + '</span><div>' + chip(group, 'all', allLabel) + values.map(v=>chip(group, v, v)).join('') + '</div></div>';
+    };
+    el.innerHTML = groupHtml('Personne', 'member', members, 'Toutes') + groupHtml('Catégorie', 'category', categories, 'Toutes');
+  }
+  function renderDocsPanel(mode, docs){
+    const root = docsPanelRoot(mode); if(!root) return {total:0, shown:0};
+    const list = root.querySelector('.sb-module-docs-list'); if(!list) return {total:0, shown:0};
+    const enriched = (docs || []).map(enrichDocForPanel);
+    renderDocsPanelFilters(mode, enriched);
+    const filteredDocs = filterDocsForPanel(mode, enriched);
     [...docsPanelStore.keys()].filter(k=>k.startsWith(mode+'::')).forEach(k=>docsPanelStore.delete(k));
-    if(!docs || !docs.length){
+    if(!enriched.length){
       list.innerHTML = '<div class="sb-doc-empty">Aucun document Supabase trouvé pour cette vue.</div>';
-      return;
+      return {total:0, shown:0};
     }
-    list.innerHTML = docs.map((doc, idx)=>{
+    if(!filteredDocs.length){
+      list.innerHTML = '<div class="sb-doc-empty">Aucun document ne correspond aux filtres sélectionnés.</div>';
+      return {total:enriched.length, shown:0};
+    }
+    list.innerHTML = filteredDocs.map((doc, idx)=>{
       const key = mode + '::' + idx + '::' + Date.now();
       docsPanelStore.set(key, doc);
-      const info = itemInfoForDoc(doc);
+      const info = doc._info || itemInfoForDoc(doc);
       const parts = [moduleNameForDoc(doc.module), info.member, info.category, info.date].filter(Boolean).join(' · ');
       return '<article class="sb-doc-test-row sb-module-doc-row">'
         + '<div class="sb-doc-test-icon">📄</div>'
@@ -458,7 +517,20 @@
         + '<button type="button" class="doc-btn danger" onclick="window.sbDeleteDocsPanelBtn(\'' + key + '\')">Supprimer</button>'
         + '</div></article>';
     }).join('');
+    return {total:enriched.length, shown:filteredDocs.length};
   }
+  function rerenderDocsPanelFromCache(mode){
+    const cleanMode = mode === 'global' ? 'global' : 'sante';
+    const docs = docsPanelRawDocs.get(cleanMode) || [];
+    const counts = renderDocsPanel(cleanMode, docs);
+    docsPanelStatus(cleanMode, counts.total ? counts.shown + ' document(s) affiché(s) sur ' + counts.total + '.' : 'Aucun document trouvé.', 'ok');
+  }
+  window.sbSetDocsPanelFilter = function(mode, group, value){
+    const cleanMode = mode === 'global' ? 'global' : 'sante';
+    if(!docsPanelState[cleanMode]) docsPanelState[cleanMode] = {member:'all', category:'all'};
+    if(group === 'member' || group === 'category') docsPanelState[cleanMode][group] = value || 'all';
+    rerenderDocsPanelFromCache(cleanMode);
+  };
   window.sbHydrateDocsPanel = async function(mode){
     try {
       const cleanMode = mode === 'global' ? 'global' : 'sante';
@@ -471,11 +543,14 @@
         if(typeof sbListModuleDocuments !== 'function') throw new Error('Fonction liste module indisponible.');
         docs = await sbListModuleDocuments('sante');
       }
-      renderDocsPanel(cleanMode, docs);
-      docsPanelStatus(cleanMode, docs.length ? docs.length + ' document(s) affiché(s).' : 'Aucun document trouvé.', 'ok');
+      docsPanelRawDocs.set(cleanMode, docs);
+      const counts = renderDocsPanel(cleanMode, docs);
+      docsPanelStatus(cleanMode, counts.total ? counts.shown + ' document(s) affiché(s) sur ' + counts.total + '.' : 'Aucun document trouvé.', 'ok');
     } catch(e){
-      renderDocsPanel(mode === 'global' ? 'global' : 'sante', []);
-      docsPanelStatus(mode === 'global' ? 'global' : 'sante', e.message || String(e), 'error');
+      const cleanMode = mode === 'global' ? 'global' : 'sante';
+      docsPanelRawDocs.set(cleanMode, []);
+      renderDocsPanel(cleanMode, []);
+      docsPanelStatus(cleanMode, e.message || String(e), 'error');
     }
   };
   window.sbOpenDocsPanelBtn = async function(key){
