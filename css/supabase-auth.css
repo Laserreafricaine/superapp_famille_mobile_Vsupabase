@@ -252,3 +252,38 @@
     padding: 7px 10px;
   }
 }
+
+/* V5.36.10 — Documents : erreurs Supabase visibles au lieu d'un silence trompeur */
+.sb-doc-error {
+  padding: 10px 12px;
+  margin: 0 0 10px;
+  border-radius: 12px;
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #991b1b;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.sb-doc-error b,
+.sb-doc-error small,
+.sb-doc-error p {
+  display: block;
+  margin: 0;
+}
+.sb-doc-error small {
+  margin-top: 4px;
+  color: #7f1d1d;
+  word-break: break-word;
+}
+.sb-doc-error p {
+  margin-top: 6px;
+  color: #9f1239;
+}
+.sb-doc-upload-status {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+}

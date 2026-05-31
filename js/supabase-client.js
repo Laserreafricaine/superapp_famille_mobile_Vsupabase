@@ -73,26 +73,47 @@ async function sbPushData(appData){
 async function sbUploadDocument(file, itemId, module){
   const user = await sbCurrentUser();
   if(!user) throw new Error('Non connecté');
-  const ext  = file.name.split('.').pop();
-  const path = `${user.id}/${itemId}/${Date.now()}_${file.name}`;
-  // Upload dans Storage
+  if(!itemId) throw new Error('Élément introuvable : enregistre d’abord la fiche avant d’ajouter un document.');
+
+  const safeName = String(file.name || 'document')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'document';
+  const path = `${user.id}/${itemId}/${Date.now()}_${safeName}`;
+
+  // 1) Upload dans Storage
   const { error: upErr } = await sbClient()
     .storage.from(STORAGE_BUCKET)
-    .upload(path, file, { upsert: false });
-  if(upErr) throw upErr;
-  // Enregistrer les métadonnées en base
+    .upload(path, file, { upsert: false, contentType: file.type || 'application/octet-stream' });
+  if(upErr) throw new Error('Storage : ' + (upErr.message || 'upload refusé'));
+
+  // 2) Enregistrer les métadonnées en base. Sans cette ligne, le fichier existe mais l'app ne peut pas l'afficher.
+  const payload = {
+    user_id: user.id,
+    item_id: itemId,
+    module,
+    name: file.name,
+    storage_path: path,
+    size: file.size,
+    mime_type: file.type || 'application/octet-stream'
+  };
   const { error: dbErr } = await sbClient()
     .from('family_documents')
-    .insert({
-      user_id: user.id,
-      item_id: itemId,
-      module,
-      name: file.name,
-      storage_path: path,
-      size: file.size,
-      mime_type: file.type || 'application/octet-stream'
-    });
-  if(dbErr){ console.warn('[Supabase] doc meta error:', dbErr.message); }
+    .insert(payload);
+
+  if(dbErr){
+    // Rollback : on évite de laisser un fichier orphelin dans Storage.
+    try {
+      const { error: removeErr } = await sbClient().storage.from(STORAGE_BUCKET).remove([path]);
+      if(removeErr) console.warn('[Supabase] rollback storage impossible:', removeErr.message);
+    } catch(removeException){
+      console.warn('[Supabase] rollback storage exception:', removeException?.message || removeException);
+    }
+    const detail = [dbErr.message, dbErr.details, dbErr.hint, dbErr.code].filter(Boolean).join(' — ');
+    throw new Error('Métadonnées non enregistrées dans family_documents : ' + detail);
+  }
+
   return path;
 }
 
@@ -113,16 +134,18 @@ async function sbListDocuments(itemId){
     .eq('user_id', user.id)
     .eq('item_id', itemId)
     .order('created_at', { ascending: false });
-  if(error){ console.warn('[Supabase] list docs error:', error.message); return []; }
+  if(error){ throw new Error('Lecture family_documents impossible : ' + (error.message || 'accès refusé')); }
   return data || [];
 }
 
 async function sbDeleteDocument(docId, storagePath){
   const user = await sbCurrentUser();
-  if(!user) return;
-  await sbClient().storage.from(STORAGE_BUCKET).remove([storagePath]);
-  await sbClient().from('family_documents').delete()
+  if(!user) throw new Error('Non connecté');
+  const { error: stErr } = await sbClient().storage.from(STORAGE_BUCKET).remove([storagePath]);
+  if(stErr) throw new Error('Suppression Storage impossible : ' + (stErr.message || 'accès refusé'));
+  const { error: dbErr } = await sbClient().from('family_documents').delete()
     .eq('id', docId).eq('user_id', user.id);
+  if(dbErr) throw new Error('Suppression family_documents impossible : ' + (dbErr.message || 'accès refusé'));
 }
 
 // ─── Sync utilitaire ─────────────────────────────────────────────
@@ -145,6 +168,6 @@ async function sbListAllDocuments(){
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
-  if(error){ console.warn('[Supabase] list all docs error:', error.message); return []; }
+  if(error){ throw new Error('Lecture globale family_documents impossible : ' + (error.message || 'accès refusé')); }
   return data || [];
 }

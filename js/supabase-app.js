@@ -153,8 +153,12 @@
       return;
     }
     section.innerHTML = '<p style="font-size:12px;color:#888">Chargement…</p>';
-    const docs = await sbListDocuments(itemId);
-    section.innerHTML = sbDocsListHtml(itemId, docs);
+    try {
+      const docs = await sbListDocuments(itemId);
+      section.innerHTML = sbDocsListHtml(itemId, docs);
+    } catch(e){
+      section.innerHTML = '<div class="sb-doc-error"><b>Documents indisponibles</b><small>' + escHtml(e.message || 'Erreur Supabase') + '</small></div>';
+    }
   };
 
   function sbDocsListHtml(itemId, docs){
@@ -334,14 +338,34 @@
   window.sbHandleUpload = async function(input, itemId, module){
     const file = input.files?.[0]; if(!file) return;
     const label = input.closest('label');
-    if(label){ label.style.opacity='0.5'; label.firstChild.textContent = 'Envoi en cours…'; }
+    const section = document.getElementById('item-docs-section');
+    if(label){
+      label.classList.add('doc-uploading');
+      const txt = label.childNodes && label.childNodes[0];
+      if(txt) txt.textContent = 'Envoi en cours…';
+    }
+    if(section){
+      section.insertAdjacentHTML('afterbegin', '<p class="sb-doc-upload-status">Envoi du document vers Supabase…</p>');
+    }
     try {
       await sbUploadDocument(file, itemId, module);
+      input.value = '';
       window.SuperApp?.toast('📎 Document ajouté !');
       await window.sbLoadItemDocs(itemId);
     } catch(e){
-      window.SuperApp?.toast('Erreur upload : ' + e.message);
-      if(label){ label.style.opacity=''; label.firstChild.textContent = '+ Ajouter un document'; }
+      input.value = '';
+      const msg = e.message || 'Erreur inconnue';
+      window.SuperApp?.toast('Erreur upload : ' + msg);
+      if(section){
+        section.innerHTML = '<div class="sb-doc-error"><b>Document non ajouté</b><small>' + escHtml(msg) + '</small><p>Le fichier n’est pas considéré comme déposé tant que la ligne family_documents n’est pas créée.</p></div>'
+          + sbDocsListHtml(itemId, []);
+      }
+      if(label){
+        label.classList.remove('doc-uploading');
+        label.style.opacity='';
+        const txt = label.childNodes && label.childNodes[0];
+        if(txt) txt.textContent = '+ Ajouter un document (PDF, photo…)';
+      }
     }
   };
 
@@ -398,12 +422,16 @@ window.sbLoadModuleDocs = async function(module){
   const user = await sbCurrentUser();
   if(!user){ section.innerHTML = '<p style="font-size:12px;color:#888">Connecte-toi pour voir les documents.</p>'; return; }
   section.innerHTML = '<p style="font-size:12px;color:#888">Chargement…</p>';
-  const allDocs = await sbListAllDocuments();
-  const isGlobal = (module === 'familles');
-  const SA = window.SuperApp;
-  const enriched = (allDocs || []).map(d => ({...d, _ctx: sbDocContext(d, SA)}));
-  const docs = isGlobal ? enriched : enriched.filter(d => d._ctx.module === module || sbCanonicalModuleId(d.module) === module);
-  section.innerHTML = sbModuleDocsHtml(docs, module, isGlobal);
+  try {
+    const allDocs = await sbListAllDocuments();
+    const isGlobal = (module === 'familles');
+    const SA = window.SuperApp;
+    const enriched = (allDocs || []).map(d => ({...d, _ctx: sbDocContext(d, SA)}));
+    const docs = isGlobal ? enriched : enriched.filter(d => d._ctx.module === module || sbCanonicalModuleId(d.module) === module);
+    section.innerHTML = sbModuleDocsHtml(docs, module, isGlobal);
+  } catch(e){
+    section.innerHTML = '<div class="sb-doc-error"><b>Documents indisponibles</b><small>' + escHtml(e.message || 'Erreur Supabase') + '</small></div>';
+  }
 };
 
 function sbModuleDocsHtml(docs, module, isGlobal){
