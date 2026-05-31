@@ -160,26 +160,102 @@
   function sbDocsListHtml(itemId, docs){
     const SA = window.SuperApp;
     const found = SA?._findRecord(itemId);
-    const module = found?.collection || '';
+    const module = sbCanonicalModuleForFound(found);
     const rows = (docs||[]).map(d => {
       const icon = d.mime_type?.includes('pdf') ? '📄'
         : d.mime_type?.includes('image') ? '🖼️' : '📎';
       const size = d.size
         ? (d.size > 1048576 ? (d.size/1048576).toFixed(1)+' Mo' : Math.round(d.size/1024)+' Ko')
         : '';
+      const ctx = sbDocContext(d, SA);
+      const details = [size, ctx.itemTitle ? 'lié à ' + ctx.itemTitle : '', ctx.memberLabel, ctx.category].filter(Boolean).join(' · ');
       return '<div class="doc-row">'
         + '<span class="doc-row-icon">' + icon + '</span>'
-        + '<div class="doc-row-info"><b>' + escHtml(d.name) + '</b><small>' + size + '</small></div>'
+        + '<div class="doc-row-info"><b>' + escHtml(d.name) + '</b><small>' + escHtml(details) + '</small></div>'
         + '<div class="doc-row-actions">'
-        + '<button class="doc-btn" onclick="window.sbOpenDoc(\'' + d.storage_path + '\')">Ouvrir</button>'
-        + '<button class="doc-btn" onclick="window.sbDeleteDoc(\'' + d.id + '\',\'' + d.storage_path + '\',\'' + itemId + '\')">✕</button>'
+        + '<button class="doc-btn" onclick="window.sbOpenDoc(' + jsArg(d.storage_path) + ')">Ouvrir</button>'
+        + '<button class="doc-btn" onclick="window.sbDownloadDoc(' + jsArg(d.storage_path) + ',' + jsArg(d.name) + ')">Télécharger</button>'
+        + '<button class="doc-btn" onclick="window.sbDeleteDoc(' + jsArg(d.id) + ',' + jsArg(d.storage_path) + ',' + jsArg(itemId) + ')">✕</button>'
         + '</div></div>';
     }).join('');
     return (rows || '<p style="font-size:12px;color:#888;margin:0">Aucun document attaché.</p>')
       + '<label class="doc-upload-btn" style="display:block;margin-top:8px;cursor:pointer">'
       + '+ Ajouter un document (PDF, photo…)'
-      + '<input type="file" accept="image/*,.pdf,.doc,.docx" style="display:none" onchange="window.sbHandleUpload(this,\'' + itemId + '\',\'' + module + '\')">'
+      + '<input type="file" accept="image/*,.pdf,.doc,.docx" style="display:none" onchange="window.sbHandleUpload(this,' + jsArg(itemId) + ',' + jsArg(module) + ')">'
       + '</label>';
+  }
+
+  function jsArg(v){ return JSON.stringify(String(v ?? '')); }
+
+  function sbCanonicalModuleForFound(found){
+    if(!found) return '';
+    const itemModule = found.item?.module;
+    if(itemModule) return sbCanonicalModuleId(itemModule);
+    const map = {
+      tasks:'maison', shopping:'courses_repas', meals:'courses_repas', weeklyMeals:'courses_repas', stock:'courses_repas',
+      homework:'education', schoolDocs:'education',
+      health:'sante', vaccines:'sante', healthDocs:'sante', emergency:'sante',
+      sports:'sport_loisirs', loisirs:'sport_loisirs', voyages:'sport_loisirs', sportGear:'sport_loisirs', loisirGear:'sport_loisirs', voyageGear:'sport_loisirs',
+      family:'familles', familyDocuments:'familles', documents:'calendrier', calendarEvents:'calendrier', notifications:'calendrier'
+    };
+    return map[found.collection] || '';
+  }
+
+  function sbCanonicalModuleId(id){
+    const raw = String(id || '').trim();
+    const map = {
+      home:'maison', maison:'maison', tasks:'maison',
+      courses:'courses_repas', repas:'courses_repas', courses_repas:'courses_repas', shopping:'courses_repas', meals:'courses_repas', weeklyMeals:'courses_repas', stock:'courses_repas',
+      ecole:'education', école:'education', education:'education', homework:'education', schoolDocs:'education',
+      santé:'sante', sante:'sante', health:'sante', vaccines:'sante', healthDocs:'sante', emergency:'sante',
+      sport:'sport_loisirs', sports:'sport_loisirs', loisir:'sport_loisirs', loisirs:'sport_loisirs', voyage:'sport_loisirs', voyages:'sport_loisirs', sport_loisirs:'sport_loisirs', sportGear:'sport_loisirs', loisirGear:'sport_loisirs', voyageGear:'sport_loisirs',
+      famille:'familles', familles:'familles', family:'familles', familyDocuments:'familles',
+      calendrier:'calendrier', calendar:'calendrier', documents:'calendrier', calendarEvents:'calendrier'
+    };
+    return map[raw] || raw;
+  }
+
+  function sbDocContext(doc, SA){
+    const found = doc?.item_id && SA?._findRecord ? SA._findRecord(doc.item_id) : null;
+    const item = found?.item || {};
+    const module = sbCanonicalModuleForFound(found) || sbCanonicalModuleId(doc?.module || '');
+    const moduleLabels = sbModuleLabels();
+    const members = SA?._getData ? (SA._getData().family || []) : [];
+    const memberIds = [];
+    ['member','companion','student','eleve'].forEach(k => { if(item[k]) memberIds.push(String(item[k])); });
+    ['members','students'].forEach(k => {
+      if(item[k]) String(item[k]).split(',').map(x=>x.trim()).filter(Boolean).forEach(x=>memberIds.push(x));
+    });
+    const uniqueMemberIds = [...new Set(memberIds)];
+    const memberLabel = uniqueMemberIds.map(id => members.find(m => String(m.id)===String(id))?.name || '').filter(Boolean).join(', ');
+    const itemTitle = item.title || item.name || item.label || item.category || '';
+    const category = doc?.category || item.category || sbTypeLabel(item.type) || '';
+    return {
+      module,
+      moduleLabel: moduleLabels[module] || module || '',
+      itemTitle,
+      category,
+      date: item.date || item.dueDate || item.startDate || '',
+      memberIds: uniqueMemberIds,
+      memberLabel
+    };
+  }
+
+  function sbModuleLabels(){
+    return {
+      maison:'Maison', courses_repas:'Courses / Repas', education:'Éducation', sante:'Santé',
+      sport_loisirs:'Sport / Loisir / Voyage', familles:'Familles', calendrier:'Calendrier'
+    };
+  }
+
+  function sbTypeLabel(type){
+    const labels = {
+      rendez_vous_medical:'Rendez-vous', traitement:'Traitement', document_sante:'Document santé', vaccin:'Vaccin', urgence_sante:'Urgence',
+      document_ecole:'Document école', devoir:'Devoir', note:'Note',
+      document_sport:'Document sport', materiel_sport:'Matériel sport', materiel_loisir:'Matériel loisir', materiel_voyage:'Matériel voyage',
+      document_famille:'Document famille', tache:'Tâche', evenement:'Événement'
+    };
+    return labels[type] || '';
   }
 
   // Petite version standalone de escapeHtml pour ce fichier
@@ -193,18 +269,56 @@
   };
 
   window.sbOpenDoc = async function(path){
+    // iPhone/Safari bloque souvent les ouvertures lancées après un await.
+    // On ouvre donc l'onglet immédiatement au clic, puis on le redirige vers l'URL signée Supabase.
+    let win = null;
     try {
+      win = window.open('', '_blank');
+      if(win){
+        try {
+          win.document.write('<!doctype html><html><head><title>Ouverture du document…</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;padding:24px;color:#334155"><h3>Ouverture du document…</h3><p>Le lien sécurisé est en préparation.</p></body></html>');
+          win.document.close();
+        } catch {}
+      }
       const url = await sbGetDocumentUrl(path);
-      // Créer un lien temporaire pour contourner le blocage Safari/mobile
-      const a = document.createElement('a');
-      a.href = url;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => document.body.removeChild(a), 200);
+      if(win && !win.closed){
+        win.location.href = url;
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => document.body.removeChild(a), 200);
+        window.SuperApp?.toast('Si le document ne s’ouvre pas, autorise les popups Safari pour cette app.');
+      }
     } catch(e) {
-      window.SuperApp?.toast('Impossible d\'ouvrir le document : ' + e.message);
+      try { if(win && !win.closed) win.close(); } catch {}
+      window.SuperApp?.toast('Impossible d\'ouvrir le document : ' + (e.message || 'accès refusé'));
+    }
+  };
+
+  window.sbDownloadDoc = async function(path, name){
+    let win = null;
+    try {
+      win = window.open('', '_blank');
+      const url = await sbGetDocumentUrl(path);
+      if(win && !win.closed){
+        win.location.href = url;
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name || 'document';
+        a.target = '_blank';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => document.body.removeChild(a), 200);
+      }
+    } catch(e){
+      try { if(win && !win.closed) win.close(); } catch {}
+      window.SuperApp?.toast('Téléchargement impossible : ' + (e.message || 'accès refusé'));
     }
   };
 
@@ -231,6 +345,12 @@
     }
   };
 
+
+  // Exposer les helpers documents pour les vues modules situées hors IIFE
+  window.jsArg = jsArg;
+  window.sbCanonicalModuleId = sbCanonicalModuleId;
+  window.sbDocContext = sbDocContext;
+  window.sbModuleLabels = sbModuleLabels;
 
   // Référencé par app.js via sbUserBarHtml()
   window.sbUserBarExternal = function(){
@@ -261,10 +381,9 @@ window.sbInjectItemDocs = async function(itemId){
 };
 
 // ─── Vue docs par module ─────────────────────────────────────────
-window._sbModuleDocsState = { memberFilter:'all', moduleFilter:'all' };
+window._sbModuleDocsState = { memberFilter:'all', moduleFilter:'all', categoryFilter:'all' };
 
 window.sbLoadModuleDocs = async function(module){
-  // Retry si le DOM n'est pas encore prêt
   let section = document.querySelector('.sb-module-docs-section[data-module="'+module+'"]');
   if(!section){
     setTimeout(()=>window.sbLoadModuleDocs(module), 300);
@@ -276,94 +395,89 @@ window.sbLoadModuleDocs = async function(module){
   section.innerHTML = '<p style="font-size:12px;color:#888">Chargement…</p>';
   const allDocs = await sbListAllDocuments();
   const isGlobal = (module === 'familles');
-  // Filtrer par module si pas global
-  const docs = isGlobal ? allDocs : allDocs.filter(d => d.module === module || d.module === '');
+  const SA = window.SuperApp;
+  const enriched = (allDocs || []).map(d => ({...d, _ctx: sbDocContext(d, SA)}));
+  const docs = isGlobal ? enriched : enriched.filter(d => d._ctx.module === module || sbCanonicalModuleId(d.module) === module);
   section.innerHTML = sbModuleDocsHtml(docs, module, isGlobal);
 };
 
 function sbModuleDocsHtml(docs, module, isGlobal){
   const SA = window.SuperApp;
-  // Construire les membres pour les filtres
-  const memberState = window._sbModuleDocsState;
-  const members = SA ? (window._sbFamilyMembers || []) : [];
-
-  // Récupérer les membres depuis SuperApp si dispo
   if(SA && SA._getData) {
     window._sbFamilyMembers = (SA._getData().family || []).filter(m => m.status !== 'archive');
   }
   const familyMembers = window._sbFamilyMembers || [];
+  const moduleLabels = sbModuleLabels();
+  const state = window._sbModuleDocsState;
+  const activeMember = state.memberFilter || 'all';
+  const activeModule = state.moduleFilter || 'all';
+  const activeCategory = state.categoryFilter || 'all';
 
-  // Modules disponibles pour filtre global
-  const moduleLabels = {
-    sante:'Santé', education:'École', maison:'Maison',
-    sport_loisirs:'Sport/Loisir/Voyage', familles:'Familles', calendrier:'Calendrier'
-  };
+  let base = docs || [];
+  if(isGlobal && activeModule !== 'all') base = base.filter(d => d._ctx.module === activeModule);
+  if(activeMember !== 'all') base = base.filter(d => (d._ctx.memberIds || []).map(String).includes(String(activeMember)));
 
-  // Filtres actifs
-  const activeMember = memberState.memberFilter || 'all';
-  const activeModule = memberState.moduleFilter || 'all';
+  const categories = [...new Set(base.map(d => d._ctx.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  let filtered = base;
+  if(activeCategory !== 'all') filtered = filtered.filter(d => d._ctx.category === activeCategory);
 
-  // Appliquer filtres
-  let filtered = docs;
-  if(activeMember !== 'all') filtered = filtered.filter(d => d.item_id && sbDocBelongsToMember(d, activeMember, SA));
-  if(isGlobal && activeModule !== 'all') filtered = filtered.filter(d => d.module === activeModule);
-
-  // Chips membres
-  const memberChips = ['<button class="sb-docs-filter-chip '+(activeMember==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\',\'all\',\''+module+'\')">Tous</button>']
-    .concat(familyMembers.map(m =>
-      '<button class="sb-docs-filter-chip '+(activeMember===m.id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\',\''+m.id+'\',\''+module+'\')">'
-      + escHtml(m.name.split(' ')[0]) + '</button>'
-    )).join('');
-
-  // Chips modules (seulement en vue globale)
-  const moduleChips = isGlobal ? ['<button class="sb-docs-filter-chip '+(activeModule==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\',\'all\',\''+module+'\')">Tous</button>']
+  const moduleChips = isGlobal ? ['<button class="sb-docs-filter-chip '+(activeModule==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\',\'all\','+jsArg(module)+')">Tous</button>']
     .concat(Object.entries(moduleLabels).map(([id, lbl]) =>
-      '<button class="sb-docs-filter-chip '+(activeModule===id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\',\''+id+'\',\''+module+'\')">'
-      + lbl + '</button>'
+      '<button class="sb-docs-filter-chip '+(activeModule===id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\','+jsArg(id)+','+jsArg(module)+')">'
+      + escHtml(lbl) + '</button>'
     )).join('') : '';
 
-  // Lignes documents
+  const memberChips = ['<button class="sb-docs-filter-chip '+(activeMember==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\',\'all\','+jsArg(module)+')">Tous les membres</button>']
+    .concat(familyMembers.map(m =>
+      '<button class="sb-docs-filter-chip '+(activeMember===m.id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\','+jsArg(m.id)+','+jsArg(module)+')">'
+      + escHtml(String(m.name||'').split(' ')[0] || 'Membre') + '</button>'
+    )).join('');
+
+  const categoryChips = ['<button class="sb-docs-filter-chip '+(activeCategory==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'category\',\'all\','+jsArg(module)+')">Toutes catégories</button>']
+    .concat(categories.map(cat =>
+      '<button class="sb-docs-filter-chip '+(activeCategory===cat?'active':'')+'" onclick="window.sbFilterModuleDocs(\'category\','+jsArg(cat)+','+jsArg(module)+')">'
+      + escHtml(cat) + '</button>'
+    )).join('');
+
   const rows = filtered.map(d => {
+    const ctx = d._ctx || sbDocContext(d, SA);
     const icon = d.mime_type?.includes('pdf') ? '📄' : d.mime_type?.includes('image') ? '🖼️' : '📎';
     const size = d.size ? (d.size > 1048576 ? (d.size/1048576).toFixed(1)+' Mo' : Math.round(d.size/1024)+' Ko') : '';
-    const modLabel = moduleLabels[d.module] || d.module || '';
-    const itemInfo = isGlobal && modLabel ? '<span class="sb-doc-item-link">'+escHtml(modLabel)+'</span>' : '';
+    const meta = [
+      isGlobal ? ctx.moduleLabel : '',
+      ctx.itemTitle ? 'lié à ' + ctx.itemTitle : '',
+      ctx.memberLabel,
+      ctx.category,
+      size
+    ].filter(Boolean).join(' · ');
     return '<div class="sb-doc-row">'
       + '<span class="sb-doc-icon">'+icon+'</span>'
       + '<div class="sb-doc-info">'
       + '<b>'+escHtml(d.name)+'</b>'
-      + '<small>'+size+(size&&itemInfo?' · ':'')+itemInfo+'</small>'
+      + '<small>'+escHtml(meta || 'Document Supabase')+'</small>'
       + '</div>'
       + '<div class="sb-doc-actions">'
-      + '<button class="doc-btn" onclick="window.sbOpenDoc(\''+d.storage_path+'\')">Ouvrir</button>'
-      + '<button class="doc-btn" onclick="window.sbDeleteModuleDoc(\''+d.id+'\',\''+d.storage_path+'\',\''+module+'\')">✕</button>'
+      + '<button class="doc-btn" onclick="window.sbOpenDoc('+jsArg(d.storage_path)+')">Ouvrir</button>'
+      + '<button class="doc-btn" onclick="window.sbDownloadDoc('+jsArg(d.storage_path)+','+jsArg(d.name)+')">Télécharger</button>'
+      + '<button class="doc-btn" onclick="window.sbDeleteModuleDoc('+jsArg(d.id)+','+jsArg(d.storage_path)+','+jsArg(module)+')">✕</button>'
       + '</div></div>';
   }).join('');
 
   const empty = filtered.length === 0
-    ? '<div class="sb-doc-empty">📂 Aucun document'+(activeMember!=='all'||activeModule!=='all' ? ' pour ce filtre' : ' encore')+'. Ouvre un item pour en ajouter.</div>'
+    ? '<div class="sb-doc-empty">📂 Aucun document'+(activeMember!=='all'||activeModule!=='all'||activeCategory!=='all' ? ' pour ce filtre' : ' encore')+'. Ouvre un item pour en ajouter.</div>'
     : '';
 
-  return '<h3>📁 '+(isGlobal ? 'Tous les documents' : 'Documents')+'</h3>'
-    + (isGlobal ? '<div class="sb-docs-filters">'+moduleChips+'</div>' : '')
-    + (familyMembers.length > 0 ? '<div class="sb-docs-filters">'+memberChips+'</div>' : '')
+  return '<h3>📁 '+(isGlobal ? 'Tous les documents' : 'Documents du module')+'</h3>'
+    + (isGlobal ? '<div class="sb-doc-filter-group"><b>Module</b><div class="sb-docs-filters">'+moduleChips+'</div></div>' : '')
+    + (familyMembers.length > 0 ? '<div class="sb-doc-filter-group"><b>Membre</b><div class="sb-docs-filters">'+memberChips+'</div></div>' : '')
+    + (categories.length > 0 ? '<div class="sb-doc-filter-group"><b>Catégorie</b><div class="sb-docs-filters">'+categoryChips+'</div></div>' : '')
     + '<div class="sb-docs-list">'+rows+empty+'</div>';
-}
-
-function sbDocBelongsToMember(doc, memberId, SA){
-  if(!SA || !SA._findRecord) return false;
-  const found = SA._findRecord(doc.item_id);
-  if(!found) return false;
-  const item = found.item;
-  return item.member === memberId
-    || item.companion === memberId
-    || (item.members && String(item.members).split(',').map(s=>s.trim()).includes(memberId))
-    || (item.students && String(item.students).split(',').map(s=>s.trim()).includes(memberId));
 }
 
 window.sbFilterModuleDocs = function(type, value, module){
   if(type === 'member') window._sbModuleDocsState.memberFilter = value;
-  if(type === 'module') window._sbModuleDocsState.moduleFilter = value;
+  if(type === 'module') { window._sbModuleDocsState.moduleFilter = value; window._sbModuleDocsState.categoryFilter = 'all'; }
+  if(type === 'category') window._sbModuleDocsState.categoryFilter = value;
   window.sbLoadModuleDocs(module);
 };
 

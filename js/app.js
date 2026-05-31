@@ -156,7 +156,7 @@
       ['tasks','maison'], ['shopping','courses_repas'], ['meals','courses_repas'], ['weeklyMeals','courses_repas'], ['stock','courses_repas'], ['calendarEvents','calendrier'],
       ['homework','education'], ['schoolDocs','education'],
       ['health','sante'], ['vaccines','sante'], ['healthDocs','sante'], ['emergency','sante'],
-      ['sports','sport_loisirs'], ['sportGear','sport_loisirs'], ['familyDocuments','familles'], ['documents','calendrier']
+      ['sports','sport_loisirs'], ['loisirs','sport_loisirs'], ['voyages','sport_loisirs'], ['sportGear','sport_loisirs'], ['loisirGear','sport_loisirs'], ['voyageGear','sport_loisirs'], ['familyDocuments','familles'], ['documents','calendrier']
     ];
   }
   function findRecord(id){
