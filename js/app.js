@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.18';
+  const APP_VERSION = '5.36.19';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -535,7 +535,7 @@
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
     }
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.18').catch(()=>{}); }
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.19').catch(()=>{}); }
     maybeStartOnboarding();
     setTimeout(()=>maybeFireNotifications(), 800);
     setTimeout(()=>{ if(typeof window.sbInitAuth==="function") window.sbInitAuth(); }, 400);
@@ -650,6 +650,13 @@
       const savedRecord = addItem(type,item);
       const backToList = state.returnList ? {...state.returnList} : null;
       state.preset=null;
+      if(savedRecord && canonicalModuleId(type)==='sport_loisirs' && wantsSlvChecklistAfterSave){
+        // V5.36.19 — priorité à l'ouverture de la checklist demandée depuis le formulaire.
+        // Le maintien de la fenêtre ouverte pour les documents ne doit pas bloquer ce parcours.
+        closeEditDialog();
+        setTimeout(()=>openSlvChecklistLight(savedRecord.id), 90);
+        return;
+      }
       if(savedRecord && wasNewDocModule){
         state.editing = findRecord(savedRecord.id);
         $('#editTitle').textContent = 'Modifier l’élément';
@@ -662,9 +669,7 @@
       }
       closeEditDialog();
       // V5.7 : addItem est autonome (save + render inclus), pas besoin de relancer ici.
-      if(savedRecord && canonicalModuleId(type)==='sport_loisirs' && wantsSlvChecklistAfterSave){
-        setTimeout(()=>openSlvChecklistLight(savedRecord.id), 90);
-      } else {
+      {
         if(backToList) setTimeout(()=>openModuleList(backToList.module, backToList.block), 30);
         if(savedRecord && canonicalModuleId(type)==='sport_loisirs') setTimeout(()=>refreshSlvChecklistDialog(savedRecord.id), 80);
       }
@@ -3061,7 +3066,14 @@
   function ensureSlvChecklistDialog(){ return null; }
   function refreshSlvChecklistDialog(activityId){ if(state.appsView?.kind==='slvChecklist' && state.appsView.id===activityId) paintSlvChecklistPage(activityId); }
   function paintSlvChecklistDialog(activity){ if(activity) paintSlvChecklistPage(activity.id); }
-  function openSlvChecklistLight(activityId){ state.appsView={kind:'slvChecklist', id:activityId}; setView('apps'); }
+  function openSlvChecklistLight(activityId){
+    // V5.36.19 — si l'ouverture est lancée depuis la fenêtre d'édition, fermer la modale
+    // avant de basculer sur la page checklist, sinon la checklist est masquée derrière la fenêtre.
+    closeEditDialog();
+    closeActionDialog();
+    state.appsView={kind:'slvChecklist', id:activityId};
+    setView('apps');
+  }
   function closeSlvChecklistLight(){ if(state.appsView?.kind==='slvChecklist') openModule('sport_loisirs'); }
   function finishSlvChecklist(activityId){ const a=slvActivityById(activityId); if(a){ state.slvTab=slvTabForActivity(a); } state.appsView={kind:'module', id:'sport_loisirs'}; setView('apps'); }
   function addSlvChecklistLine(activityId, forcedTitle=''){
