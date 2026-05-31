@@ -662,7 +662,7 @@
         $('#editFields').innerHTML = fieldsFor(type, savedRecord);
         toast('✅ Élément enregistré. Tu peux maintenant ajouter un document.');
         if(typeof window.sbInjectItemDocs === 'function'){
-          setTimeout(()=>window.sbInjectItemDocs(savedId), 80);
+          setTimeout(()=>window.sbInjectItemDocs(savedId), 300);
         }
         if(backToList) setTimeout(()=>openModuleList(backToList.module, backToList.block), 30);
         if(canonicalModuleId(type)==='sport_loisirs' && wantsSlvChecklistAfterSave){

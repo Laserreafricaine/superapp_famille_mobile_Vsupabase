@@ -145,7 +145,9 @@
   // ─── Section documents sur la page item ──────────────────────
   window.sbLoadItemDocs = async function(itemId){
     if(typeof sbCurrentUser !== 'function') return;
-    const section = document.getElementById('item-docs-section');
+    // Chercher la section par id unique item ou par id générique
+    const section = document.getElementById('item-docs-section-'+itemId)
+      || document.getElementById('item-docs-section');
     if(!section) return;
     const user = await sbCurrentUser();
     if(!user){
@@ -177,11 +179,12 @@
         + '<span class="doc-row-icon">' + icon + '</span>'
         + '<div class="doc-row-info"><b>' + escHtml(d.name) + '</b><small>' + escHtml(details) + '</small></div>'
         + '<div class="doc-row-actions">'
-        + '<button class="doc-btn" onclick="window.sbOpenDoc(' + jsArg(d.storage_path) + ')">Ouvrir</button>'
-        + '<button class="doc-btn" onclick="window.sbDownloadDoc(' + jsArg(d.storage_path) + ',' + jsArg(d.name) + ')">Télécharger</button>'
-        + '<button class="doc-btn" onclick="window.sbDeleteDoc(' + jsArg(d.id) + ',' + jsArg(d.storage_path) + ',' + jsArg(itemId) + ')">✕</button>'
+        + '<button type="button" class="doc-btn" onclick="window.sbOpenDoc(' + jsArg(d.storage_path) + ')">Ouvrir</button>'
+        + '<button type="button" class="doc-btn" onclick="window.sbDownloadDoc(' + jsArg(d.storage_path) + ',' + jsArg(d.name) + ')">Télécharger</button>'
+        + '<button type="button" class="doc-btn" onclick="window.sbDeleteDoc(' + jsArg(d.id) + ',' + jsArg(d.storage_path) + ',' + jsArg(itemId) + ')">✕</button>'
         + '</div></div>';
     }).join('');
+    const uploadId = 'sb-upload-'+itemId;
     return (rows || '<p style="font-size:12px;color:#888;margin:0">Aucun document attaché.</p>')
       + '<label class="doc-upload-btn" style="display:block;margin-top:8px;cursor:pointer">'
       + '+ Ajouter un document (PDF, photo…)'
@@ -273,55 +276,36 @@
   };
 
   window.sbOpenDoc = async function(path){
-    // iPhone/Safari bloque souvent les ouvertures lancées après un await.
-    // On ouvre donc l'onglet immédiatement au clic, puis on le redirige vers l'URL signée Supabase.
-    let win = null;
     try {
-      win = window.open('', '_blank');
-      if(win){
-        try {
-          win.document.write('<!doctype html><html><head><title>Ouverture du document…</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;padding:24px;color:#334155"><h3>Ouverture du document…</h3><p>Le lien sécurisé est en préparation.</p></body></html>');
-          win.document.close();
-        } catch {}
-      }
       const url = await sbGetDocumentUrl(path);
-      if(win && !win.closed){
-        win.location.href = url;
-      } else {
-        const a = document.createElement('a');
-        a.href = url;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => document.body.removeChild(a), 200);
-        window.SuperApp?.toast('Si le document ne s’ouvre pas, autorise les popups Safari pour cette app.');
-      }
+      // Méthode universelle : lien <a> créé dynamiquement
+      // Fonctionne sur Android Chrome, iOS Safari, desktop
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { try { document.body.removeChild(a); } catch {} }, 500);
     } catch(e) {
-      try { if(win && !win.closed) win.close(); } catch {}
       window.SuperApp?.toast('Impossible d\'ouvrir le document : ' + (e.message || 'accès refusé'));
     }
   };
 
   window.sbDownloadDoc = async function(path, name){
-    let win = null;
     try {
-      win = window.open('', '_blank');
       const url = await sbGetDocumentUrl(path);
-      if(win && !win.closed){
-        win.location.href = url;
-      } else {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = name || 'document';
-        a.target = '_blank';
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => document.body.removeChild(a), 200);
-      }
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name || 'document';
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { try { document.body.removeChild(a); } catch {} }, 500);
     } catch(e){
-      try { if(win && !win.closed) win.close(); } catch {}
       window.SuperApp?.toast('Téléchargement impossible : ' + (e.message || 'accès refusé'));
     }
   };
@@ -394,18 +378,20 @@
 })();
 
 // ─── Injection docs dans le placeholder du dialog item ──────────
-window.sbInjectItemDocs = async function(itemId){
+window.sbInjectItemDocs = async function(itemId, attempt){
+  attempt = attempt || 1;
   const placeholder = document.querySelector('.sb-item-docs-placeholder[data-item-id="'+itemId+'"]');
-  if(!placeholder) return;
-  // Transformer le placeholder en zone colorée (innerHTML évite les soucis de outerHTML)
+  if(!placeholder){
+    // Le DOM n'est pas encore prêt — retry jusqu'à 5 fois toutes les 150ms
+    if(attempt < 5) setTimeout(()=>window.sbInjectItemDocs(itemId, attempt+1), 150);
+    return;
+  }
+  // Transformer le placeholder en zone colorée
   placeholder.className = 'sb-item-docs-zone';
   placeholder.innerHTML = '<h4>📎 Documents attachés</h4>'
-    + '<div id="item-docs-section"><p style="font-size:12px;color:#888">Chargement…</p></div>';
+    + '<div id="item-docs-section-'+itemId+'"><p style="font-size:12px;color:#888">Chargement…</p></div>';
   if(typeof window.sbLoadItemDocs === 'function'){
     await window.sbLoadItemDocs(itemId);
-  } else {
-    const section = document.getElementById('item-docs-section');
-    if(section) section.innerHTML = '<p style="font-size:12px;color:#888">Module Supabase non chargé. Connecte Supabase pour déposer ou ouvrir les documents.</p>';
   }
 };
 
@@ -454,21 +440,21 @@ function sbModuleDocsHtml(docs, module, isGlobal){
   let filtered = base;
   if(activeCategory !== 'all') filtered = filtered.filter(d => d._ctx.category === activeCategory);
 
-  const moduleChips = isGlobal ? ['<button class="sb-docs-filter-chip '+(activeModule==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\',\'all\','+jsArg(module)+')">Tous</button>']
+  const moduleChips = isGlobal ? ['<button type="button" class="sb-docs-filter-chip '+(activeModule==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\',\'all\','+jsArg(module)+')">Tous</button>']
     .concat(Object.entries(moduleLabels).map(([id, lbl]) =>
-      '<button class="sb-docs-filter-chip '+(activeModule===id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\','+jsArg(id)+','+jsArg(module)+')">'
+      '<button type="button" class="sb-docs-filter-chip '+(activeModule===id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'module\','+jsArg(id)+','+jsArg(module)+')">'
       + escHtml(lbl) + '</button>'
     )).join('') : '';
 
-  const memberChips = ['<button class="sb-docs-filter-chip '+(activeMember==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\',\'all\','+jsArg(module)+')">Tous les membres</button>']
+  const memberChips = ['<button type="button" class="sb-docs-filter-chip '+(activeMember==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\',\'all\','+jsArg(module)+')">Tous les membres</button>']
     .concat(familyMembers.map(m =>
-      '<button class="sb-docs-filter-chip '+(activeMember===m.id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\','+jsArg(m.id)+','+jsArg(module)+')">'
+      '<button type="button" class="sb-docs-filter-chip '+(activeMember===m.id?'active':'')+'" onclick="window.sbFilterModuleDocs(\'member\','+jsArg(m.id)+','+jsArg(module)+')">'
       + escHtml(String(m.name||'').split(' ')[0] || 'Membre') + '</button>'
     )).join('');
 
-  const categoryChips = ['<button class="sb-docs-filter-chip '+(activeCategory==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'category\',\'all\','+jsArg(module)+')">Toutes catégories</button>']
+  const categoryChips = ['<button type="button" class="sb-docs-filter-chip '+(activeCategory==='all'?'active':'')+'" onclick="window.sbFilterModuleDocs(\'category\',\'all\','+jsArg(module)+')">Toutes catégories</button>']
     .concat(categories.map(cat =>
-      '<button class="sb-docs-filter-chip '+(activeCategory===cat?'active':'')+'" onclick="window.sbFilterModuleDocs(\'category\','+jsArg(cat)+','+jsArg(module)+')">'
+      '<button type="button" class="sb-docs-filter-chip '+(activeCategory===cat?'active':'')+'" onclick="window.sbFilterModuleDocs(\'category\','+jsArg(cat)+','+jsArg(module)+')">'
       + escHtml(cat) + '</button>'
     )).join('');
 
@@ -490,9 +476,9 @@ function sbModuleDocsHtml(docs, module, isGlobal){
       + '<small>'+escHtml(meta || 'Document Supabase')+'</small>'
       + '</div>'
       + '<div class="sb-doc-actions">'
-      + '<button class="doc-btn" onclick="window.sbOpenDoc('+jsArg(d.storage_path)+')">Ouvrir</button>'
-      + '<button class="doc-btn" onclick="window.sbDownloadDoc('+jsArg(d.storage_path)+','+jsArg(d.name)+')">Télécharger</button>'
-      + '<button class="doc-btn" onclick="window.sbDeleteModuleDoc('+jsArg(d.id)+','+jsArg(d.storage_path)+','+jsArg(module)+')">✕</button>'
+      + '<button type="button" class="doc-btn" onclick="window.sbOpenDoc('+jsArg(d.storage_path)+')">Ouvrir</button>'
+      + '<button type="button" class="doc-btn" onclick="window.sbDownloadDoc('+jsArg(d.storage_path)+','+jsArg(d.name)+')">Télécharger</button>'
+      + '<button type="button" class="doc-btn" onclick="window.sbDeleteModuleDoc('+jsArg(d.id)+','+jsArg(d.storage_path)+','+jsArg(module)+')">✕</button>'
       + '</div></div>';
   }).join('');
 
