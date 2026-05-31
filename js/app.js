@@ -863,6 +863,8 @@
       <div class="app-grid visual-grid">
         ${modules.filter(m=>m.id !== 'calendrier').map(moduleTileSmall).join('')}
       </div>`;
+  // Hook test documents Supabase
+  setTimeout(()=>{ if(typeof window.sbDocTestWidget==='function') window.sbDocTestWidget(); }, 50);
   }
   function moduleImage(m,variant='tile'){
     return `<div class="app-icon-large ${variant}" aria-hidden="true"><span>${m.icon}</span></div>`;
