@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.17';
+  const APP_VERSION = '5.36.18';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -535,7 +535,7 @@
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
     }
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.17').catch(()=>{}); }
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.18').catch(()=>{}); }
     maybeStartOnboarding();
     setTimeout(()=>maybeFireNotifications(), 800);
     setTimeout(()=>{ if(typeof window.sbInitAuth==="function") window.sbInitAuth(); }, 400);
@@ -645,18 +645,19 @@
       if(checkedMoments.length) item.doseMoments = [...checkedMoments].map(c=>c.value).join(',');
       if(String(type).startsWith('settings_')){ saveSettingsForm(type,item,e.currentTarget.dataset.id || ''); return; }
       if(type === 'settings' || type === 'reset_confirm'){ closeEditDialog(); return; }
-      const wasNewHealth = canonicalModuleId(type)==='sante' && !e.currentTarget.dataset.id;
+      const docModule = canonicalModuleId(type);
+      const wasNewDocModule = supportsSupabaseDocs(docModule) && !e.currentTarget.dataset.id;
       const savedRecord = addItem(type,item);
       const backToList = state.returnList ? {...state.returnList} : null;
       state.preset=null;
-      if(savedRecord && wasNewHealth){
+      if(savedRecord && wasNewDocModule){
         state.editing = findRecord(savedRecord.id);
         $('#editTitle').textContent = 'Modifier l’élément';
-        $('#editForm').dataset.type = 'sante';
+        $('#editForm').dataset.type = docModule;
         $('#editForm').dataset.id = savedRecord.id;
-        $('#editFields').innerHTML = fieldsFor('sante', savedRecord);
-        toast('✅ Fiche Santé enregistrée. Tu peux maintenant déposer un document.');
-        setTimeout(()=>window.sbHydrateHealthItemDocs?.(savedRecord.id), 120);
+        $('#editFields').innerHTML = fieldsFor(docModule, savedRecord);
+        toast('✅ Fiche enregistrée. Tu peux maintenant déposer un document.');
+        setTimeout(()=>window.sbHydrateHealthItemDocs?.(savedRecord.id, docModule), 120);
         return;
       }
       closeEditDialog();
@@ -980,6 +981,7 @@
       taches_retard:{title:'Tâches Maison — en retard', emoji:'⏰', collection:'tasks', type:'tache', category:'Urgence', filter:x=>!statusIsDone(x) && x.date && daysDiff(today,x.date)<0, help:'Filtre en retard.'},
       taches_par_membre:{title:'Tâches Maison — par membre', emoji:'👨‍👩‍👧‍👦', collection:'tasks', type:'tache', category:'Ménage', sortByMember:true, help:'Vue regroupée par membre.'},
       taches_recurrentes:{title:'Tâches Maison — récurrentes', emoji:'🔁', collection:'tasks', type:'tache', category:'Routine', filter:x=>/routine|récurrent|recurr/i.test(String(x.category||x.title||'')), help:'Routines et tâches récurrentes.'},
+      documents:{title:'Documents Maison', emoji:'📄', collection:'tasks', type:'document_maison', category:'Documents maison', help:'Documents Supabase liés aux tâches et fiches Maison.'},
     },
     courses_repas: {
       // V5.27 — Refonte : 3 chips claires, indépendantes
@@ -996,6 +998,7 @@
     education: {
       ecole:{title:'École', emoji:'📚', collections:['homework','schoolDocs'], collection:'homework', type:'devoir', category:'Devoirs', help:'Devoirs, contrôles, activités et documents dans une seule liste.'},
       ecole_notes:{title:'École — Notes', emoji:'⭐', collection:'homework', type:'note', category:'Notes', filter:x=>x.type==='note' || x.category==='Notes', help:'Notes et appréciations.'},
+      documents:{title:'Documents Éducation', emoji:'📄', collection:'schoolDocs', type:'document_ecole', category:'Documents école', help:'Documents Supabase liés aux devoirs, notes et fiches Éducation.'},
     },
     sante: {
       tous:{title:'Tous', emoji:'🩺', collections:['health','vaccines','healthDocs'], collection:'health', type:'rendez_vous_medical', category:'Santé', help:'Rendez-vous, traitements, documents et alertes santé du foyer.'},
@@ -1015,6 +1018,7 @@
       voyage_checklist:{title:'Checklist Voyage', emoji:'✅', collection:'voyageGear', type:'materiel_voyage', category:'Bagages', special:'checklistView', help:'Bagages.'},
       activites:{title:'Activités', emoji:'⚽', collection:'sports', type:'activite', category:'Sport', aliasOf:'sport_activites', help:'Alias.'},
       materiel:{title:'Matériel', emoji:'🎒', collection:'sportGear', type:'materiel_sport', category:'Matériel', aliasOf:'sport_checklist', special:'checklistView', help:'Alias.'},
+      documents:{title:'Documents Sport / Loisir / Voyage', emoji:'📄', collection:'sportGear', type:'document_sport', category:'Documents', help:'Documents Supabase liés aux activités sport, loisir et voyage.'},
     },
     familles: {
       documents:{title:'Documents importants', emoji:'📁', collection:'familyDocuments', type:'document_famille', category:'Administratif', help:'Identité, passeport, diplômes, santé, scolarité et assurances.'}
@@ -1024,11 +1028,11 @@
   
   function listFilterChips(module, block, cfg){
     const groups = {
-      maison:[['taches','Toutes'],['taches_aujourdhui','Aujourd’hui'],['taches_retard','En retard'],['taches_par_membre','Par membre'],['taches_recurrentes','Récurrentes']],
+      maison:[['taches','Toutes'],['taches_aujourdhui','Aujourd’hui'],['taches_retard','En retard'],['taches_par_membre','Par membre'],['taches_recurrentes','Récurrentes'],['documents','Documents']],
       courses_repas:[['menu_semaine','Semaine'],['menu_jour','Jour'],['courses','Courses'],['stock','Stock'],['stock_faible','Stock faible']],
-      education:[['ecole','École'],['ecole_notes','Notes']],
+      education:[['ecole','École'],['ecole_notes','Notes'],['documents','Documents']],
       sante:[['tous','Tous'],['rendez_vous','Rendez-vous'],['traitements','Traitements'],['documents','Documents'],['alertes','Alertes']],
-      sport_loisirs:[['tout','Tout'],['sport_activites','Sport'],['loisir_activites','Loisir'],['voyage_activites','Voyage']],
+      sport_loisirs:[['tout','Tout'],['sport_activites','Sport'],['loisir_activites','Loisir'],['voyage_activites','Voyage'],['documents','Documents']],
       familles:[['documents','Documents',String.fromCodePoint(0x1F4C1)]]
     }[module] || [];
     if(!groups.length) return '';
@@ -1046,8 +1050,9 @@
       : cfg.special === 'checklistView'
           ? `<div class="management-list">${visibleCollectionItems(cfg).map(x=>shoppingRow(x,{collection:cfg.collection})).join('')||'<div class="empty">Checklist vide.</div>'}</div>`
       : '';
-    const supabaseDocsHtml = (module==='sante' && block==='documents') ? supabaseDocsPanelHtml('sante') : (module==='familles' && block==='documents') ? supabaseDocsPanelHtml('global') : '';
-    if(supabaseDocsHtml) setTimeout(()=>window.sbHydrateDocsPanel?.(module==='sante'?'sante':'global'), 120);
+    const docsMode = (block==='documents' && supportsSupabaseDocs(module)) ? (module==='familles' ? 'global' : module) : '';
+    const supabaseDocsHtml = docsMode ? supabaseDocsPanelHtml(docsMode) : '';
+    if(supabaseDocsHtml) setTimeout(()=>window.sbHydrateDocsPanel?.(docsMode), 120);
     // V5.28 — Les vues spéciales Courses/Repas/Stock gardent leurs vrais écrans, même ouvertes depuis les chips.
     view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openModule('${module}')">← Retour ${m.short}</button></div>
       <div class="sublist-title-bar"><div class="sublist-emoji">${cfg.emoji || m.icon}</div><div><h2>${cfg.title}</h2><small>${cfg.help || ''}</small></div></div>
@@ -1725,8 +1730,8 @@
     $('#editFields').innerHTML = fieldsFor(type,item);
     if($('#editDialog').open) $('#editDialog').close();
     $('#editDialog').showModal();
-    if(type === 'sante' && item.id){
-      setTimeout(()=>window.sbHydrateHealthItemDocs?.(item.id), 120);
+    if(supportsSupabaseDocs(type) && item.id){
+      setTimeout(()=>window.sbHydrateHealthItemDocs?.(item.id, type), 120);
     }
   }
   function openAdd(module,type='',category='',title='',member=''){
@@ -3175,12 +3180,22 @@
   }
 
 
-  function healthDocsFieldHtml(item={}){
+  function documentModuleLabel(module){
+    return ({maison:'Maison', education:'Éducation', sante:'Santé', sport_loisirs:'Sport / Loisir / Voyage', familles:'Familles'}[canonicalModuleId(module)] || moduleLabel(module));
+  }
+  function supportsSupabaseDocs(module){
+    return ['maison','education','sante','sport_loisirs','familles'].includes(canonicalModuleId(module));
+  }
+  function healthDocsFieldHtml(item={}, module='sante'){
+    module = canonicalModuleId(module);
+    const label = documentModuleLabel(module);
     const id = item && item.id ? String(item.id) : '';
     if(!id){
-      return `<section class="sb-health-doc-zone locked"><div class="sb-doc-test-intro"><b>📎 Documents attachés</b><small>Enregistre d’abord cette fiche Santé. La fenêtre restera ouverte et tu pourras ensuite déposer un PDF, une ordonnance, un résultat ou une photo liée à cette fiche.</small></div></section>`;
+      return `<section class="sb-health-doc-zone locked"><div class="sb-doc-test-intro"><b>📎 Documents attachés</b><small>Enregistre d’abord cette fiche ${escapeHtml(label)}. La fenêtre restera ouverte et tu pourras ensuite déposer un PDF, une photo ou un justificatif lié à cette fiche.</small></div></section>`;
     }
-    return `<section class="sb-health-doc-zone" data-sb-health-docs="${escapeAttr(id)}"><div class="sb-doc-test-intro"><b>📎 Documents attachés</b><small>Documents Supabase liés uniquement à cette fiche Santé.</small></div><input id="sb-health-doc-input-${escapeAttr(id)}" type="file" hidden onchange="window.sbUploadHealthItemDocument?.(this,'${escapeAttr(id)}')"><button type="button" class="btn primary sb-doc-test-upload" onclick="document.getElementById('sb-health-doc-input-${escapeAttr(id)}')?.click()">📤 Charger un document</button><div class="sb-health-doc-status info">Chargement des documents…</div><div class="sb-health-doc-list"><div class="empty">Chargement…</div></div></section>`;
+    const safeId = escapeAttr(id);
+    const safeModule = escapeAttr(module);
+    return `<section class="sb-health-doc-zone" data-sb-health-docs="${safeId}" data-sb-doc-module="${safeModule}"><div class="sb-doc-test-intro"><b>📎 Documents attachés</b><small>Documents Supabase liés uniquement à cette fiche ${escapeHtml(label)}.</small></div><input id="sb-health-doc-input-${safeId}" type="file" hidden onchange="window.sbUploadHealthItemDocument?.(this,'${safeId}','${safeModule}')"><button type="button" class="btn primary sb-doc-test-upload" onclick="document.getElementById('sb-health-doc-input-${safeId}')?.click()">📤 Charger un document</button><div class="sb-health-doc-status info">Chargement des documents…</div><div class="sb-health-doc-list"><div class="empty">Chargement…</div></div></section>`;
   }
 
   // V5.8 — Formulaire standardisé : MÊME séquence partout, peu importe le module.
@@ -3224,7 +3239,7 @@
       ? `<div class="danger-actions"><button class="btn ghost" type="button" onclick="SuperApp.archiveItem('${item.id}')">Archiver</button><button class="btn ghost danger" type="button" onclick="SuperApp.deleteItem('${item.id}')">🗑️ Supprimer</button></div>`
       : '';
 
-    const docsField = type === 'sante' ? healthDocsFieldHtml(item) : '';
+    const docsField = supportsSupabaseDocs(type) ? healthDocsFieldHtml(item, type) : '';
     const visibilityField = ['maison','education','sante','sport_loisirs','familles','calendrier'].includes(type) ? setHomeVisibilityFields(item) : '';
     return `${hiddenRouting}${titleField}${dateField}${hourField}${memberField}${categoryField}${moduleDetails}${notesField}${statusField}${danger}${docsField}${visibilityField}`;
   }
@@ -3668,15 +3683,16 @@
   function activeMemberList(){ return getFamilyMembers ? getFamilyMembers() : (data.family||[]).filter(m=>!statusIsHidden(m) && m.active !== false); }
     function listTabsForModule(module){
     const groups = {
-      maison:[['taches','Tâches','🏠'],['taches_aujourdhui','Aujourd’hui','📅'],['taches_retard','En retard','⏰'],['taches_recurrentes','Récurrentes','🔁'],['taches_terminees','Terminées','✅']],
+      maison:[['taches','Tâches','🏠'],['taches_aujourdhui','Aujourd’hui','📅'],['taches_retard','En retard','⏰'],['taches_recurrentes','Récurrentes','🔁'],['taches_terminees','Terminées','✅'],['documents','Documents','📄']],
       courses_repas:[['repas','Repas','🍽️'],['courses','Courses','🛒'],['stock','Stock','🧺']],
-      education:[['ecole','École','📘'],['ecole_notes','Notes','⭐']],
+      education:[['ecole','École','📘'],['ecole_notes','Notes','⭐'],['documents','Documents','📄']],
       sante:[['tous','Tous','▦'],['rendez_vous','Rendez-vous','📅'],['traitements','Traitements','💊'],['documents','Documents','📄'],['alertes','Alertes','🔔']],
       sport_loisirs:[
         ['tout','Tout','▦'],
         ['sport_activites','Sport','⚽'],
         ['loisir_activites','Loisir','🎨'],
         ['voyage_activites','Voyage','✈️'],
+        ['documents','Documents','📄'],
       ],
       familles:[['membres','Membres','👨‍👩‍👧‍👦'],['documents','Documents','📁']]
     }[canonicalModuleId(module)] || [];
@@ -3755,8 +3771,8 @@
     return `${cfg.title}${memberTxt}`;
   }
   function supabaseDocsPanelHtml(mode){
-    const title = mode === 'global' ? 'Documents globaux Supabase' : 'Documents Santé Supabase';
-    const desc = mode === 'global' ? 'Tous les documents déposés depuis les modules sont regroupés ici.' : 'Documents réellement déposés dans Supabase et liés aux fiches Santé.';
+    const title = mode === 'global' ? 'Documents globaux Supabase' : `Documents ${documentModuleLabel(mode)} Supabase`;
+    const desc = mode === 'global' ? 'Tous les documents déposés depuis les modules sont regroupés ici.' : `Documents réellement déposés dans Supabase et liés aux fiches ${documentModuleLabel(mode)}.`;
     return `<section class="sb-module-docs-panel" data-sb-docs-panel="${escapeAttr(mode)}">
       <div class="section-title compact-title v53-list-title"><h2>📁 ${escapeHtml(title)}</h2><button class="link-btn" type="button" onclick="window.sbHydrateDocsPanel?.('${escapeAttr(mode)}')">↻ Actualiser</button></div>
       <div class="sb-doc-test-intro"><b>📎 Liste documentaire</b><small>${escapeHtml(desc)}</small></div>
@@ -3791,20 +3807,13 @@
         ${weeklyMealsTableHtml()}
       </section>`;
     }
-    if(module === 'sante' && block === 'documents'){
-      setTimeout(()=>window.sbHydrateDocsPanel?.('sante'), 120);
-      return `<section class="v53-direct-list health-direct-list" data-block="${escapeAttr(block)}">
-        <section class="filter-zone"><h3>Filtrer la liste</h3>${listTabsForModule(module)}</section>
-        ${memberFilterRow(module)}
-        ${supabaseDocsPanelHtml('sante')}
-      </section>`;
-    }
-    if(module === 'familles' && block === 'documents'){
-      setTimeout(()=>window.sbHydrateDocsPanel?.('global'), 120);
-      return `<section class="v53-direct-list" data-block="${escapeAttr(block)}">
+    if(block === 'documents' && supportsSupabaseDocs(module)){
+      const docsMode = module === 'familles' ? 'global' : module;
+      setTimeout(()=>window.sbHydrateDocsPanel?.(docsMode), 120);
+      return `<section class="v53-direct-list ${module==='sante'?'health-direct-list':''}" data-block="${escapeAttr(block)}">
         <section class="filter-zone"><h3>Filtrer</h3>${listTabsForModule(module)}</section>
         ${memberFilterRow(module)}
-        ${supabaseDocsPanelHtml('global')}
+        ${supabaseDocsPanelHtml(docsMode)}
       </section>`;
     }
     const items = visibleCollectionItems(cfg);
@@ -3847,8 +3856,7 @@
         <section class="palette-soft ${tone}"><div class="v53-recap-head"><b>Récap rapide</b><small>Vue rapide des éléments importants du module.</small></div><div class="v53-summary-grid">${moduleSummary(m.id)}</div></section>
         <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
     }
-    if(m.id==='sante' && activeModuleBlock('sante')==='documents') setTimeout(()=>window.sbHydrateDocsPanel?.('sante'), 120);
-    if(m.id==='familles' && activeModuleBlock('familles')==='documents') setTimeout(()=>window.sbHydrateDocsPanel?.('global'), 120);
+    if(supportsSupabaseDocs(m.id) && activeModuleBlock(m.id)==='documents') setTimeout(()=>window.sbHydrateDocsPanel?.(m.id==='familles'?'global':m.id), 120);
     if(focusKey){ setTimeout(()=>document.querySelector(`[data-block="${focusKey}"]`)?.scrollIntoView({behavior:'smooth',block:'start'}),50); }
   }
   // V5.8 — Boutons "+ Nouvelle ..." spécifiques à chaque module, en haut.

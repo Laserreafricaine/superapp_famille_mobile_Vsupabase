@@ -160,7 +160,7 @@ async function sbTestDeleteDocument(doc){
 
 
 
-// ─── Documents attachés à un item (déploiement progressif Santé) ─────
+// ─── Documents attachés à un item (déploiement modules) ─────
 const SB_ITEM_DOC_BUCKET = 'family-documents';
 
 async function sbUploadItemDocument(file, itemId, module='sante'){

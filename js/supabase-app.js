@@ -288,7 +288,7 @@
 
 
 
-  // ─── Documents attachés aux fiches Santé (test contrôlé) ─────────
+  // ─── Documents attachés aux fiches modules (test contrôlé) ─────────
   const healthDocStore = new Map();
   function healthDocRoot(itemId){
     return [...document.querySelectorAll('[data-sb-health-docs]')].find(el => el.getAttribute('data-sb-health-docs') === String(itemId||'')) || null;
@@ -325,20 +325,21 @@
         + '<div class="sb-doc-test-icon">📄</div>'
         + '<div class="sb-doc-test-info"><b>' + escH(doc.name || 'Document') + '</b>'
         + '<small>' + escH(doc.mime_type || 'type inconnu') + ' · ' + escH(fmtSize(doc.size)) + '</small>'
-        + '<em>Santé · lié à ' + escH(title) + '</em></div>'
+        + '<em>' + escH(moduleNameForDoc(doc.module || root?.getAttribute('data-sb-doc-module') || 'sante')) + ' · lié à ' + escH(title) + '</em></div>'
         + '<div class="sb-doc-test-actions">'
         + '<button type="button" class="doc-btn" onclick="window.sbOpenHealthDocBtn(\'' + key + '\')">Ouvrir</button>'
         + '<button type="button" class="doc-btn" onclick="window.sbDownloadHealthDocBtn(\'' + key + '\')">Télécharger</button>'
-        + '<button type="button" class="doc-btn danger" onclick="window.sbDeleteHealthDocBtn(\'' + key + '\',\'' + escH(itemId) + '\')">Supprimer</button>'
+        + '<button type="button" class="doc-btn danger" onclick="window.sbDeleteHealthDocBtn(\'' + key + '\',\'' + escH(itemId) + '\',\'' + escH(doc.module || root?.getAttribute('data-sb-doc-module') || 'sante') + '\')">Supprimer</button>'
         + '</div></article>';
     }).join('');
   }
-  window.sbHydrateHealthItemDocs = async function(itemId){
+  window.sbHydrateHealthItemDocs = async function(itemId, module='sante'){
     try {
       if(!itemId) return;
-      healthDocStatus(itemId, 'Lecture des documents Santé…', 'info');
-      if(typeof sbListItemDocuments !== 'function') throw new Error('Fonctions documents Santé indisponibles.');
-      const docs = await sbListItemDocuments(itemId, 'sante');
+      module = String(module || 'sante');
+      healthDocStatus(itemId, 'Lecture des documents…', 'info');
+      if(typeof sbListItemDocuments !== 'function') throw new Error('Fonctions documents indisponibles.');
+      const docs = await sbListItemDocuments(itemId, module);
       renderHealthItemDocs(itemId, docs);
       healthDocStatus(itemId, docs.length ? docs.length + ' document(s) attaché(s).' : 'Aucun document attaché pour le moment.', 'ok');
     } catch(e){
@@ -346,16 +347,17 @@
       healthDocStatus(itemId, e.message || String(e), 'error');
     }
   };
-  window.sbUploadHealthItemDocument = async function(input, itemId){
+  window.sbUploadHealthItemDocument = async function(input, itemId, module='sante'){
     try {
+      module = String(module || 'sante');
       const file = input?.files?.[0];
       if(!file) return;
       healthDocStatus(itemId, 'Envoi du fichier vers Supabase…', 'info');
-      if(typeof sbUploadItemDocument !== 'function') throw new Error('Fonction upload Santé indisponible.');
-      await sbUploadItemDocument(file, itemId, 'sante');
+      if(typeof sbUploadItemDocument !== 'function') throw new Error('Fonction upload document indisponible.');
+      await sbUploadItemDocument(file, itemId, module);
       input.value = '';
       healthDocStatus(itemId, 'Document ajouté. Rechargement de la liste…', 'ok');
-      await window.sbHydrateHealthItemDocs(itemId);
+      await window.sbHydrateHealthItemDocs(itemId, module);
     } catch(e){
       if(input) input.value = '';
       healthDocStatus(itemId, e.message || String(e), 'error');
@@ -389,28 +391,27 @@
       healthDocStatus(itemId, e.message || String(e), 'error');
     }
   };
-  window.sbDeleteHealthDocBtn = async function(key, itemId){
+  window.sbDeleteHealthDocBtn = async function(key, itemId, module='sante'){
     const doc = healthDocStore.get(key);
     try {
       if(!doc) throw new Error('Document introuvable dans la liste courante.');
-      if(!confirm('Supprimer ce document Santé ?')) return;
+      module = String(module || 'sante');
+      if(!confirm('Supprimer ce document ?')) return;
       healthDocStatus(itemId, 'Suppression du document…', 'info');
       await sbDeleteItemDocument(doc);
       healthDocStatus(itemId, 'Document supprimé.', 'ok');
-      await window.sbHydrateHealthItemDocs(itemId);
+      await window.sbHydrateHealthItemDocs(itemId, module);
     } catch(e){
       healthDocStatus(itemId, e.message || String(e), 'error');
     }
   };
 
 
-  // ─── Listes documents visibles : Santé + Familles global ─────────────
+  // ─── Listes documents visibles : modules + Familles global ─────────────
   const docsPanelStore = new Map();
   const docsPanelRawDocs = new Map();
-  const docsPanelState = {
-    sante: {member:'all', category:'all'},
-    global: {member:'all', category:'all'}
-  };
+  const docsPanelState = { global: {member:'all', category:'all'} };
+  function cleanDocsMode(mode){ return String(mode || 'sante'); }
   function docsPanelRoot(mode){ return document.querySelector('[data-sb-docs-panel="' + mode + '"]'); }
   function docsPanelStatus(mode, message, type='info'){
     const root = docsPanelRoot(mode); if(!root) return;
@@ -523,20 +524,20 @@
     return {total:enriched.length, shown:filteredDocs.length};
   }
   function rerenderDocsPanelFromCache(mode){
-    const cleanMode = mode === 'global' ? 'global' : 'sante';
+    const cleanMode = cleanDocsMode(mode);
     const docs = docsPanelRawDocs.get(cleanMode) || [];
     const counts = renderDocsPanel(cleanMode, docs);
     docsPanelStatus(cleanMode, counts.total ? counts.shown + ' document(s) affiché(s) sur ' + counts.total + '.' : 'Aucun document trouvé.', 'ok');
   }
   window.sbSetDocsPanelFilter = function(mode, group, value){
-    const cleanMode = mode === 'global' ? 'global' : 'sante';
+    const cleanMode = cleanDocsMode(mode);
     if(!docsPanelState[cleanMode]) docsPanelState[cleanMode] = {member:'all', category:'all'};
     if(group === 'member' || group === 'category') docsPanelState[cleanMode][group] = value || 'all';
     rerenderDocsPanelFromCache(cleanMode);
   };
   window.sbHydrateDocsPanel = async function(mode){
     try {
-      const cleanMode = mode === 'global' ? 'global' : 'sante';
+      const cleanMode = cleanDocsMode(mode);
       docsPanelStatus(cleanMode, 'Lecture des documents Supabase…', 'info');
       let docs = [];
       if(cleanMode === 'global'){
@@ -544,13 +545,13 @@
         docs = await sbListAllFamilyDocuments();
       } else {
         if(typeof sbListModuleDocuments !== 'function') throw new Error('Fonction liste module indisponible.');
-        docs = await sbListModuleDocuments('sante');
+        docs = await sbListModuleDocuments(cleanMode);
       }
       docsPanelRawDocs.set(cleanMode, docs);
       const counts = renderDocsPanel(cleanMode, docs);
       docsPanelStatus(cleanMode, counts.total ? counts.shown + ' document(s) affiché(s) sur ' + counts.total + '.' : 'Aucun document trouvé.', 'ok');
     } catch(e){
-      const cleanMode = mode === 'global' ? 'global' : 'sante';
+      const cleanMode = cleanDocsMode(mode);
       docsPanelRawDocs.set(cleanMode, []);
       renderDocsPanel(cleanMode, []);
       docsPanelStatus(cleanMode, e.message || String(e), 'error');
@@ -597,6 +598,6 @@
     }
   };
 
-  // Documents Supabase réactivés uniquement en test accueil + fiches Santé.
+  // Documents Supabase réactivés uniquement en test accueil + fiches modules.
 
 })();
