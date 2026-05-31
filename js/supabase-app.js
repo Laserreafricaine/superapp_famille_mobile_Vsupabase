@@ -145,7 +145,6 @@
   // ─── Section documents sur la page item ──────────────────────
   window.sbLoadItemDocs = async function(itemId){
     if(typeof sbCurrentUser !== 'function') return;
-    // Chercher la section par id unique item ou par id générique
     const section = document.getElementById('item-docs-section-'+itemId)
       || document.getElementById('item-docs-section');
     if(!section) return;
@@ -157,7 +156,12 @@
     section.innerHTML = '<p style="font-size:12px;color:#888">Chargement…</p>';
     try {
       const docs = await sbListDocuments(itemId);
-      section.innerHTML = sbDocsListHtml(itemId, docs);
+      // Pré-signer toutes les URLs en parallèle — évite l'await au moment du clic
+      const docsWithUrls = await Promise.all((docs||[]).map(async d => {
+        try { d._signedUrl = await sbGetDocumentUrl(d.storage_path); } catch { d._signedUrl = ''; }
+        return d;
+      }));
+      section.innerHTML = sbDocsListHtml(itemId, docsWithUrls);
     } catch(e){
       section.innerHTML = '<div class="sb-doc-error"><b>Documents indisponibles</b><small>' + escHtml(e.message || 'Erreur Supabase') + '</small></div>';
     }
@@ -179,8 +183,9 @@
         + '<span class="doc-row-icon">' + icon + '</span>'
         + '<div class="doc-row-info"><b>' + escHtml(d.name) + '</b><small>' + escHtml(details) + '</small></div>'
         + '<div class="doc-row-actions">'
-        + '<button type="button" class="doc-btn" onclick="window.sbOpenDoc(' + jsArg(d.storage_path) + ')">Ouvrir</button>'
-        + '<button type="button" class="doc-btn" onclick="window.sbDownloadDoc(' + jsArg(d.storage_path) + ',' + jsArg(d.name) + ')">Télécharger</button>'
+        + '// URL pré-signée — lien direct sans await au clic\n'
+        + (d._signedUrl ? '<a href="' + escHtml(d._signedUrl) + '" target="_blank" rel="noopener noreferrer" class="doc-btn">Ouvrir</a>' : '<button type="button" class="doc-btn" disabled>Ouvrir</button>')
+        + (d._signedUrl ? '<a href="' + escHtml(d._signedUrl) + '" download="' + escHtml(d.name) + '" target="_blank" class="doc-btn">Télécharger</a>' : '<button type="button" class="doc-btn" disabled>Télécharger</button>')
         + '<button type="button" class="doc-btn" onclick="window.sbDeleteDoc(' + jsArg(d.id) + ',' + jsArg(d.storage_path) + ',' + jsArg(itemId) + ')">✕</button>'
         + '</div></div>';
     }).join('');
@@ -414,6 +419,10 @@ window.sbLoadModuleDocs = async function(module, block){
     const SA = window.SuperApp;
     const enriched = (allDocs || []).map(d => ({...d, _ctx: sbDocContext(d, SA)}));
     const docs = isGlobal ? enriched : enriched.filter(d => d._ctx.module === module || sbCanonicalModuleId(d.module) === module);
+    // Pré-signer toutes les URLs en parallèle
+    await Promise.all(docs.map(async d => {
+      try { d._signedUrl = await sbGetDocumentUrl(d.storage_path); } catch { d._signedUrl = ''; }
+    }));
     section.innerHTML = sbModuleDocsHtml(docs, module, isGlobal);
   } catch(e){
     section.innerHTML = '<div class="sb-doc-error"><b>Documents indisponibles</b><small>' + escHtml(e.message || 'Erreur Supabase') + '</small></div>';
@@ -476,8 +485,8 @@ function sbModuleDocsHtml(docs, module, isGlobal){
       + '<small>'+escHtml(meta || 'Document Supabase')+'</small>'
       + '</div>'
       + '<div class="sb-doc-actions">'
-      + '<button type="button" class="doc-btn" onclick="window.sbOpenDoc('+jsArg(d.storage_path)+')">Ouvrir</button>'
-      + '<button type="button" class="doc-btn" onclick="window.sbDownloadDoc('+jsArg(d.storage_path)+','+jsArg(d.name)+')">Télécharger</button>'
+      + (d._signedUrl ? '<a href="'+escHtml(d._signedUrl)+'" target="_blank" rel="noopener noreferrer" class="doc-btn">Ouvrir</a>' : '<button type="button" class="doc-btn" disabled>Ouvrir</button>')
+      + (d._signedUrl ? '<a href="'+escHtml(d._signedUrl)+'" download="'+escHtml(d.name)+'" target="_blank" class="doc-btn">Télécharger</a>' : '<button type="button" class="doc-btn" disabled>Télécharger</button>')
       + '<button type="button" class="doc-btn" onclick="window.sbDeleteModuleDoc('+jsArg(d.id)+','+jsArg(d.storage_path)+','+jsArg(module)+')">✕</button>'
       + '</div></div>';
   }).join('');
