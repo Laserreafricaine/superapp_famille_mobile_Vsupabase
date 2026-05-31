@@ -987,7 +987,8 @@
       taches_aujourdhui:{title:'Tâches Maison — aujourd’hui', emoji:'🏠', collection:'tasks', type:'tache', category:'Ménage', filter:x=>x.date===today, help:'Filtre aujourd’hui.'},
       taches_retard:{title:'Tâches Maison — en retard', emoji:'⏰', collection:'tasks', type:'tache', category:'Urgence', filter:x=>!statusIsDone(x) && x.date && daysDiff(today,x.date)<0, help:'Filtre en retard.'},
       taches_par_membre:{title:'Tâches Maison — par membre', emoji:'👨‍👩‍👧‍👦', collection:'tasks', type:'tache', category:'Ménage', sortByMember:true, help:'Vue regroupée par membre.'},
-      taches_recurrentes:{title:'Tâches Maison — récurrentes', emoji:'🔁', collection:'tasks', type:'tache', category:'Routine', filter:x=>/routine|récurrent|recurr/i.test(String(x.category||x.title||'')), help:'Routines et tâches récurrentes.'}
+      taches_recurrentes:{title:'Tâches Maison — récurrentes', emoji:'🔁', collection:'tasks', type:'tache', category:'Routine', filter:x=>/routine|récurrent|recurr/i.test(String(x.category||x.title||'')), help:'Routines et tâches récurrentes.'},
+      documents_maison:{title:'Documents Maison', emoji:'📎', collection:'tasks', type:'tache', category:'Document', special:'sbDocsModule', help:'Documents attachés aux tâches maison.'},
     },
     courses_repas: {
       // V5.27 — Refonte : 3 chips claires, indépendantes
@@ -1004,6 +1005,7 @@
     education: {
       ecole:{title:'École', emoji:'📚', collections:['homework','schoolDocs'], collection:'homework', type:'devoir', category:'Devoirs', help:'Devoirs, contrôles, activités et documents dans une seule liste.'},
       ecole_notes:{title:'École — Notes', emoji:'⭐', collection:'homework', type:'note', category:'Notes', filter:x=>x.type==='note' || x.category==='Notes', help:'Notes et appréciations.'},
+      documents_ecole:{title:'Documents École', emoji:'📎', collection:'schoolDocs', type:'document_ecole', category:'Document', special:'sbDocsModule', help:'Documents attachés aux devoirs.'},
     },
     sante: {
       tous:{title:'Tous', emoji:'🩺', collections:['health','vaccines','healthDocs'], collection:'health', type:'rendez_vous_medical', category:'Santé', help:'Rendez-vous, traitements, documents et alertes santé du foyer.'},
@@ -1022,7 +1024,10 @@
       voyage_activites:{title:'Activités Voyage', emoji:'✈️', collection:'voyages', type:'voyage', category:'Voyage', help:'Voyages et séjours.'},
       voyage_checklist:{title:'Checklist Voyage', emoji:'✅', collection:'voyageGear', type:'materiel_voyage', category:'Bagages', special:'checklistView', help:'Bagages.'},
       activites:{title:'Activités', emoji:'⚽', collection:'sports', type:'activite', category:'Sport', aliasOf:'sport_activites', help:'Alias.'},
-      materiel:{title:'Matériel', emoji:'🎒', collection:'sportGear', type:'materiel_sport', category:'Matériel', aliasOf:'sport_checklist', special:'checklistView', help:'Alias.'}
+      materiel:{title:'Matériel', emoji:'🎒', collection:'sportGear', type:'materiel_sport', category:'Matériel', aliasOf:'sport_checklist', special:'checklistView', help:'Alias.'},
+      documents_sport:{title:'Documents Sport', emoji:'📎', collection:'sports', type:'activite', category:'Sport', special:'sbDocsModule', help:'Documents attachés aux activités sport.'},
+      documents_loisir:{title:'Documents Loisir', emoji:'📎', collection:'loisirs', type:'loisir', category:'Loisir', special:'sbDocsModule', help:'Documents attachés aux loisirs.'},
+      documents_voyage:{title:'Documents Voyage', emoji:'📎', collection:'voyages', type:'voyage', category:'Voyage', special:'sbDocsModule', help:'Documents attachés aux voyages.'},
     },
     familles: {
       documents:{title:'Documents importants', emoji:'📁', collection:'familyDocuments', type:'document_famille', category:'Administratif', help:'Identité, passeport, diplômes, santé, scolarité et assurances.'}
@@ -1032,7 +1037,7 @@
   
   function listFilterChips(module, block, cfg){
     const groups = {
-      maison:[['taches','Toutes'],['taches_aujourdhui','Aujourd’hui'],['taches_retard','En retard'],['taches_par_membre','Par membre'],['taches_recurrentes','Récurrentes']],
+      maison:[['taches','Toutes',['documents_maison','Documents','📎']],['taches_aujourdhui','Aujourd’hui'],['taches_retard','En retard'],['taches_par_membre','Par membre'],['taches_recurrentes','Récurrentes']],
       courses_repas:[['menu_semaine','Semaine'],['menu_jour','Jour'],['courses','Courses'],['stock','Stock'],['stock_faible','Stock faible']],
       education:[['ecole','École'],['ecole_notes','Notes']],
       sante:[['tous','Tous'],['rendez_vous','Rendez-vous'],['traitements','Traitements'],['documents','Documents'],['alertes','Alertes']],
@@ -1797,6 +1802,10 @@
     if(String(id).startsWith('birthday-')){ setView('calendar'); return; }
     const found = findRecord(id);
     if(!found){ toast('Élément introuvable ou déjà archivé.'); return; }
+    // Activités sport/loisir/voyage → page détail avec checklist liée
+    if(['sports','loisirs','voyages'].includes(found.collection)){
+      openSlvActivityDetail(id); return;
+    }
     const module = canonicalModuleId(found.item.module || 'calendrier');
     openEdit(module === 'calendrier' ? 'calendrier' : module, id);
   }
@@ -3669,13 +3678,16 @@
     const groups = {
       maison:[['taches','Tâches','🏠'],['taches_aujourdhui','Aujourd’hui','📅'],['taches_retard','En retard','⏰'],['taches_recurrentes','Récurrentes','🔁'],['taches_terminees','Terminées','✅']],
       courses_repas:[['repas','Repas','🍽️'],['courses','Courses','🛒'],['stock','Stock','🧺']],
-      education:[['ecole','École','📘'],['ecole_notes','Notes','⭐']],
+      education:[['ecole','École','📘'],['ecole_notes','Notes','⭐'],['documents_ecole','Documents','📎']],
       sante:[['tous','Tous','▦'],['rendez_vous','Rendez-vous','📅'],['traitements','Traitements','💊'],['documents','Documents','📄'],['alertes','Alertes','🔔']],
       sport_loisirs:[
         ['tout','Tout','▦'],
         ['sport_activites','Sport','⚽'],
         ['loisir_activites','Loisir','🎨'],
         ['voyage_activites','Voyage','✈️'],
+        ['documents_sport','Docs Sport','📎'],
+        ['documents_loisir','Docs Loisir','📎'],
+        ['documents_voyage','Docs Voyage','📎'],
       ],
       familles:[['membres','Membres','👨‍👩‍👧‍👦'],['documents','Documents','📁']]
     }[canonicalModuleId(module)] || [];
@@ -3790,10 +3802,10 @@
           return managementRow(x,cfg);
         }).join('') : `<article class="empty cute-empty"><b>${cfg.emoji} Rien pour le moment</b><small>Ajoute un premier élément. Tout élément affiché peut ensuite être modifié ou supprimé.</small><button class="btn primary" onclick="${addAction}">+ Ajouter</button></article>`);
     const titleBar = module === 'sante' ? '' : `<div class="section-title compact-title v53-list-title"><h2>${cfg.emoji} ${escapeHtml(moduleListTitle(module, block, cfg))}</h2><button class="link-btn" onclick="${addAction}">+ Ajouter</button></div>`;
-    // Section documents Supabase pour le block 'documents'
-    const isDocsBlock = (block==='documents' || block==='carnet_sante');
-    const sbDocsSection = isDocsBlock ? `<div class="sb-module-docs-section" data-module="${escapeAttr(module)}"><p style="font-size:12px;color:#888">Chargement des documents...</p></div>` : '';
-    if(isDocsBlock) setTimeout(()=>{ if(typeof window.sbLoadModuleDocs==='function') window.sbLoadModuleDocs(module); }, 200);
+    // Section documents Supabase
+    const isDocsBlock = (block==='documents' || block==='carnet_sante' || cfg?.special==='sbDocsModule');
+    const sbDocsSection = isDocsBlock ? `<div class="sb-module-docs-section" data-module="${escapeAttr(module)}" data-block="${escapeAttr(block)}"><p style="font-size:12px;color:#888">Chargement des documents…</p></div>` : '';
+    if(isDocsBlock) setTimeout(()=>{ if(typeof window.sbLoadModuleDocs==='function') window.sbLoadModuleDocs(module, block); }, 200);
     return `<section class="v53-direct-list ${module==='sante'?'health-direct-list':''}" data-block="${escapeAttr(block)}">
       <section class="filter-zone"><h3>${module==='sante'?'Filtrer la liste':'Filtrer'}</h3>${listTabsForModule(module)}</section>
       ${memberFilterRow(module)}

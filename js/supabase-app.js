@@ -412,8 +412,8 @@ window.sbInjectItemDocs = async function(itemId){
 // ─── Vue docs par module ─────────────────────────────────────────
 window._sbModuleDocsState = { memberFilter:'all', moduleFilter:'all', categoryFilter:'all' };
 
-window.sbLoadModuleDocs = async function(module){
-  let section = document.querySelector('.sb-module-docs-section[data-module="'+module+'"]');
+window.sbLoadModuleDocs = async function(module, block){
+  let section = document.querySelector('.sb-module-docs-section[data-module="'+module+'"]'+(block?'[data-block="'+block+'"]':''));
   if(!section){
     setTimeout(()=>window.sbLoadModuleDocs(module), 300);
     return;
