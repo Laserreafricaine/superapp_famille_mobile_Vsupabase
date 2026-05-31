@@ -1704,6 +1704,11 @@
     if(state.editing?.collection==='sportGear' && !item.type) item.type = item.category==='Documents sport' ? 'document_sport' : 'materiel_sport';
     if(state.editing?.collection==='weeklyMeals' && (!item.type || item.type==='repas')) item.type='repas_semaine';
     $('#editFields').innerHTML = fieldsFor(type,item);
+    // Ajouter la section documents Supabase si on consulte un item existant
+    if(id && typeof window.sbDocsSectionHtml === 'function'){
+      $('#editFields').insertAdjacentHTML('beforeend', window.sbDocsSectionHtml(id));
+      setTimeout(()=>{ if(typeof window.sbLoadItemDocs==='function') window.sbLoadItemDocs(id); }, 200);
+    }
     if($('#editDialog').open) $('#editDialog').close();
     $('#editDialog').showModal();
   }
