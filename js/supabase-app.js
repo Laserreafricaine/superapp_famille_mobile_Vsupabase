@@ -8,23 +8,6 @@
 
   // ─── Helpers internes ────────────────────────────────────────
   function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-  function sbIsIOS(){ return /iPad|iPhone|iPod/i.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
-  function sbCreateOpenContext(){
-    if(sbIsIOS()) return window.open('', '_blank');
-    return null;
-  }
-  function sbNavigateToSignedUrl(ctx, url, download=false){
-    if(ctx){ ctx.location.href = url; return; }
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    if(download) a.download = '';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(()=>a.remove(), 50);
-  }
   function syncTime(){ return new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}); }
   let sbLastSyncTime = localStorage.getItem('superapp_last_sync_time') || '';
   let sbLastPushAt = localStorage.getItem('superapp_last_push_at') || '';
@@ -272,7 +255,7 @@
 
 
 
-  // ─── Documents attachés aux fiches modules ─────────
+  // ─── Documents attachés aux fiches modules (test contrôlé) ─────────
   const healthDocStore = new Map();
   function healthDocRoot(itemId){
     return [...document.querySelectorAll('[data-sb-health-docs]')].find(el => el.getAttribute('data-sb-health-docs') === String(itemId||'')) || null;
@@ -348,27 +331,30 @@
     }
   };
   window.sbOpenHealthDocBtn = async function(key){
+    // Dépréciée — utiliser les liens pré-signés dans le HTML
     const doc = healthDocStore.get(key);
-    const win = sbCreateOpenContext();
     try {
       if(!doc) throw new Error('Document introuvable dans la liste courante.');
       const url = await sbItemSignedUrl(doc.storage_path, false);
-      sbNavigateToSignedUrl(win, url, false);
+      const a = document.createElement('a');
+      a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.style.display = 'none'; document.body.appendChild(a); a.click();
+      setTimeout(()=>{ try{ document.body.removeChild(a); }catch{} }, 500);
     } catch(e){
-      if(win) try { win.close(); } catch {}
       const itemId = String(key||'').split('::')[0];
       healthDocStatus(itemId, e.message || String(e), 'error');
     }
   };
   window.sbDownloadHealthDocBtn = async function(key){
     const doc = healthDocStore.get(key);
-    const win = sbCreateOpenContext();
     try {
       if(!doc) throw new Error('Document introuvable dans la liste courante.');
       const url = await sbItemSignedUrl(doc.storage_path, true);
-      sbNavigateToSignedUrl(win, url, true);
+      const a = document.createElement('a');
+      a.href = url; a.download = doc.name||'document'; a.target = '_blank';
+      a.style.display = 'none'; document.body.appendChild(a); a.click();
+      setTimeout(()=>{ try{ document.body.removeChild(a); }catch{} }, 500);
     } catch(e){
-      if(win) try { win.close(); } catch {}
       const itemId = String(key||'').split('::')[0];
       healthDocStatus(itemId, e.message || String(e), 'error');
     }
@@ -402,7 +388,7 @@
     el.textContent = message || '';
   }
   function moduleNameForDoc(module){
-    const labels = {sante:'Santé', education:'Éducation', maison:'Maison', sport_loisirs:'Sport / Loisir / Voyage', familles:'Familles', courses_repas:'Courses / Repas'};
+    const labels = {sante:'Santé', test_documents:'Test accueil', education:'Éducation', maison:'Maison', sport_loisirs:'Sport / Loisir / Voyage', familles:'Familles', courses_repas:'Courses / Repas'};
     return labels[module] || module || 'Module inconnu';
   }
   function itemTypeLabel(type){
@@ -541,11 +527,11 @@
   };
   window.sbOpenDocsPanelBtn = async function(key){
     const doc = docsPanelStore.get(key);
-    const win = sbCreateOpenContext();
+    const win = window.open('', '_blank');
     try {
       if(!doc) throw new Error('Document introuvable dans la liste courante.');
       const url = await sbItemSignedUrl(doc.storage_path, false);
-      sbNavigateToSignedUrl(win, url, false);
+      if(win) win.location.href = url; else window.location.href = url;
     } catch(e){
       if(win) try { win.close(); } catch {}
       const mode = String(key||'').split('::')[0] || 'global';
@@ -554,11 +540,11 @@
   };
   window.sbDownloadDocsPanelBtn = async function(key){
     const doc = docsPanelStore.get(key);
-    const win = sbCreateOpenContext();
+    const win = window.open('', '_blank');
     try {
       if(!doc) throw new Error('Document introuvable dans la liste courante.');
       const url = await sbItemSignedUrl(doc.storage_path, true);
-      sbNavigateToSignedUrl(win, url, true);
+      if(win) win.location.href = url; else window.location.href = url;
     } catch(e){
       if(win) try { win.close(); } catch {}
       const mode = String(key||'').split('::')[0] || 'global';
@@ -580,6 +566,9 @@
     }
   };
 
-  // Documents Supabase des modules.
+  // Documents Supabase réactivés uniquement en test accueil + fiches modules.
 
 })();
+
+// ═════════════════════════════════════════════════════════════════
+// WIDGET TEST DOCUMENTS — position:fixed, survit aux re-renders
