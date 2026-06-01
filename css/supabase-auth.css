@@ -132,3 +132,21 @@
 .sb-doc-filter-group button{border:0;border-radius:999px;padding:8px 11px;background:#f4f6fb;color:#526681;font-size:12px;font-weight:900;white-space:nowrap}
 .sb-doc-filter-group button.active{background:#153d79;color:#fff}
 .sb-doc-filter-group.muted p{margin:0;color:#74829d;font-size:12px;font-weight:750;line-height:1.35}
+
+
+/* V5.36.24 — Carte synchronisation compacte, adaptée mobile */
+.sb-user-bar.sb-user-bar-compact{
+  display:flex;align-items:center;gap:8px;justify-content:flex-start;
+  padding:8px 10px;border-radius:18px;margin:8px 0 12px;
+  background:linear-gradient(135deg,#fff7ec,#f5f0ff);
+  border:1px solid rgba(125,92,255,.14);box-shadow:0 8px 20px rgba(60,44,80,.08);
+  overflow:hidden;white-space:nowrap;
+}
+.sb-user-bar-compact .sb-sync-icon{width:32px;height:32px;display:grid;place-items:center;border-radius:12px;background:#fff;font-size:17px;flex:0 0 auto;box-shadow:0 5px 12px rgba(60,44,80,.08)}
+.sb-user-bar-compact .sb-user-info{min-width:0;flex:1;gap:0;line-height:1.05}
+.sb-user-bar-compact .sb-user-info strong{font-size:12px;color:#342942;display:block;overflow:hidden;text-overflow:ellipsis}
+.sb-user-bar-compact .sb-user-info small{font-size:10px;color:#6e6575;display:block;overflow:hidden;text-overflow:ellipsis}
+.sb-user-bar-compact .sb-sync-ok{color:#16803a;font-weight:900}
+.sb-user-bar-compact .sb-logout-btn{flex:0 0 auto;padding:7px 9px;border-radius:999px;font-size:11px;font-weight:900;background:#fff;border:1px solid rgba(125,92,255,.18);color:#5f43b2;box-shadow:0 4px 10px rgba(60,44,80,.06)}
+.sb-user-bar-compact .sb-logout-compact{width:32px;padding:7px 0;color:#805044}
+@media (max-width:380px){.sb-user-bar-compact .sb-user-info strong{font-size:11px}.sb-user-bar-compact .sb-logout-btn{padding:6px 7px;font-size:10px}.sb-user-bar-compact .sb-sync-icon{width:28px;height:28px}}

@@ -7,6 +7,9 @@
 
   // ─── Helpers internes ────────────────────────────────────────
   function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function syncTime(){ return new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}); }
+  let sbLastSyncTime = localStorage.getItem('superapp_last_sync_time') || '';
+  function setLastSyncNow(){ sbLastSyncTime = syncTime(); try{ localStorage.setItem('superapp_last_sync_time', sbLastSyncTime); }catch{} }
 
   // ─── Init auth ───────────────────────────────────────────────
   window.sbInitAuth = async function(){
@@ -15,6 +18,7 @@
     if(user){
       sbShowSyncBar('syncing', '🔄 Synchronisation…');
       await window.sbPullAndMerge();
+      setLastSyncNow();
       sbShowSyncBar('synced', '✅ Synchronisé', 2500);
       sbUpdateUserBar(user);
       document.addEventListener('visibilitychange', ()=>{
@@ -57,6 +61,7 @@
     try{
       sbShowSyncBar('syncing','🔄 Récupération depuis Supabase…');
       await window.sbPullAndMerge({forceRemote:true});
+      setLastSyncNow();
       sbShowSyncBar('synced','✅ Données récupérées depuis Supabase',3000);
     }catch(e){
       sbShowSyncBar('error','⚠️ Récupération impossible : '+e.message,5000);
@@ -138,6 +143,7 @@
       document.getElementById('sb-auth-overlay').style.display='none';
       sbShowSyncBar('syncing','🔄 Récupération de tes données…');
       await window.sbPullAndMerge();
+      setLastSyncNow();
       sbShowSyncBar('synced','✅ Connecté !',3000);
       const user=await sbCurrentUser();
       sbUpdateUserBar(user);
@@ -161,6 +167,19 @@
     window.SuperApp?.toast('Déconnecté.');
   };
 
+  window.sbForcePushNow = async function(){
+    try{
+      sbShowSyncBar('syncing','🔄 Synchronisation…');
+      if(typeof sbPushData !== 'function') throw new Error('Fonction de synchronisation indisponible.');
+      await sbPushData(window.SuperApp?._getData?.());
+      setLastSyncNow();
+      sbShowSyncBar('synced','✅ Synchronisé',2500);
+      window.SuperApp?.toast('✅ Synchronisé');
+    }catch(e){
+      sbShowSyncBar('error','⚠️ '+(e.message||e),4500);
+    }
+  };
+
   // ─── Bandeau utilisateur (settings) ─────────────────────────
   window.sbUserBarExternal = function(){
     const e=window._sbUserEmail||'';
@@ -168,11 +187,10 @@
     if(!e) return '<div class="sb-user-bar"><div class="sb-user-info"><strong>'
       +ico(0x1F534)+' Hors ligne</strong><small>Appuie pour te connecter</small></div>'
       +'<button class="sb-logout-btn" onclick="window.sbShowAuthOverlay()">'+ico(0x1F511)+' Connexion</button></div>';
-    return '<div class="sb-user-bar"><div class="sb-user-info"><strong>'
-      +ico(0x1F7E2)+' Synchronisé</strong>'
-      +'<small>'+e.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</small></div>'
-      +'<button class="sb-logout-btn" onclick="window.sbForcePullFromServer?.()">'+ico(0x1F4E5)+' Récupérer</button>'
-      +'<button class="sb-logout-btn" onclick="window.sbLogout()">'+ico(0x1F6AA)+' Déconnexion</button></div>';
+    return '<div class="sb-user-bar sb-user-bar-compact"><span class="sb-sync-icon">☁️</span><div class="sb-user-info"><strong>Synchronisation</strong><small><span class="sb-sync-ok">Synchronisé</span>'+(sbLastSyncTime?' · '+escH(sbLastSyncTime):'')+'</small></div>'
+      +'<button class="sb-logout-btn" onclick="window.sbForcePushNow?.()">Sync</button>'
+      +'<button class="sb-logout-btn" onclick="window.sbForcePullFromServer?.()">Récupérer</button>'
+      +'<button class="sb-logout-btn sb-logout-compact" onclick="window.sbLogout()">'+ico(0x1F6AA)+'</button></div>';
   };
 
 

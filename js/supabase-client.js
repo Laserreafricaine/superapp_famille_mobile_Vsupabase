@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────
-// SuperApp Famille — Supabase client v1.0
+// SuperApp Famille — Supabase client v1.1
 // ─────────────────────────────────────────────────────────────────
 
 const SUPABASE_URL  = 'https://kutezmcwivigoerxumhm.supabase.co';
@@ -67,6 +67,36 @@ async function sbPushData(appData){
   if(error) console.warn('[Supabase] push error:', error.message);
 }
 
+
+async function sbDeleteAllCloudData(){
+  const user = await sbCurrentUser();
+  if(!user) throw new Error('Utilisateur non connecté.');
+  try {
+    const { data: docs, error: docsError } = await sbClient()
+      .from('family_documents')
+      .select('storage_path')
+      .eq('user_id', user.id);
+    if(docsError) throw docsError;
+    const paths = (docs || []).map(d => d.storage_path).filter(Boolean);
+    if(paths.length){
+      const { error: storageError } = await sbClient().storage.from(SB_ITEM_DOC_BUCKET).remove(paths);
+      if(storageError) console.warn('[Supabase] storage delete error:', storageError.message);
+    }
+    const { error: docDeleteError } = await sbClient()
+      .from('family_documents')
+      .delete()
+      .eq('user_id', user.id);
+    if(docDeleteError) throw docDeleteError;
+  } catch(e){
+    console.warn('[Supabase] document cloud delete warning:', e.message || e);
+  }
+  const { error } = await sbClient()
+    .from('family_data')
+    .delete()
+    .eq('user_id', user.id);
+  if(error) throw new Error('Suppression family_data impossible : ' + error.message);
+  return true;
+}
 
 // ─── Utilitaires documents ─────────────────────────────────
 function sbSafeFileName(name){

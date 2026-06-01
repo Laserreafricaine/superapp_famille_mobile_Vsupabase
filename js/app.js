@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.23';
+  const APP_VERSION = '5.36.24';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -270,7 +270,7 @@
     if(!data.settings) data.settings={};
     data.settings.lastSaved = new Date().toISOString();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    if(typeof sbPushData === "function") sbPushData(data).catch(()=>{});
+    if(!window._sbPauseAutoPush && typeof sbPushData === "function") sbPushData(data).catch(()=>{});
   }
   function closeEditDialog(){
     state.preset = null;
@@ -535,7 +535,7 @@
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
     }
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.23').catch(()=>{}); }
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.24').catch(()=>{}); }
     maybeStartOnboarding();
     setTimeout(()=>maybeFireNotifications(), 800);
     setTimeout(()=>{ if(typeof window.sbInitAuth==="function") window.sbInitAuth(); }, 400);
@@ -1041,6 +1041,7 @@
       documents:{title:'Documents Sport / Loisir / Voyage', emoji:'📄', collection:'sportGear', type:'document_sport', category:'Documents', help:'Documents Supabase liés aux activités sport, loisir et voyage.'},
     },
     familles: {
+      tout:{title:'Tout', emoji:'▦', collection:'familyDocuments', type:'document_famille', category:'Famille', help:'Membres du foyer et documents.'},
       documents:{title:'Documents importants', emoji:'📁', collection:'familyDocuments', type:'document_famille', category:'Administratif', help:'Identité, passeport, diplômes, santé, scolarité et assurances.'}
     }
   };
@@ -1053,7 +1054,7 @@
       education:[['tout','Tout'],['ecole','École'],['ecole_notes','Notes'],['documents','Documents']],
       sante:[['tous','Tous'],['rendez_vous','Rendez-vous'],['traitements','Traitements'],['documents','Documents'],['alertes','Alertes']],
       sport_loisirs:[['tout','Tout'],['sport_activites','Sport'],['loisir_activites','Loisir'],['voyage_activites','Voyage'],['documents','Documents']],
-      familles:[['documents','Documents',String.fromCodePoint(0x1F4C1)]]
+      familles:[['tout','Tout',String.fromCodePoint(0x25A6)],['membres','Membres',String.fromCodePoint(0x1F46A)],['documents','Documents',String.fromCodePoint(0x1F4C1)]]
     }[module] || [];
     if(!groups.length) return '';
     return `<div class="list-filter-chips">${groups.map(([b,l])=>`<button type="button" class="${b===block?'active':''}" onclick="SuperApp.openModuleList('${module}','${b}')">${l}</button>`).join('')}</div>`;
@@ -1333,6 +1334,7 @@
 
   function managementRow(x,cfg){
     if(String(x.type||'').startsWith('checklist_')) return checklistManagementRow(x,cfg);
+    if((cfg?.module === 'maison' || x.module === 'maison' || cfg?.collection === 'tasks') && !String(x.type||'').startsWith('checklist_')) return maisonTaskRow(x,cfg);
     if((cfg?.collection === 'shopping') || x.type === 'course') return shoppingRow(x,cfg);
     if(['sport_activites','loisir_activites','voyage_activites'].includes(cfg?.key) || ['activite','loisir','voyage'].includes(itemType(x))) return slvActivityCard(x);
     if(cfg?.module === 'education' || x.module === 'education') return schoolItemCard(x,cfg);
@@ -1348,6 +1350,19 @@
       <button type="button" class="shopping-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.toggleGenericChecklistItem('${x.id}')">${done?'✓':''}</button>
       <div class="health-info-main" onclick="SuperApp.openGenericChecklist('${escapeAttr(x.parentId||'')}','${kind}')"><b>${escapeHtml(x.title||'Élément checklist')}</b><small>${escapeHtml(x.category||'Checklist')}${escapeHtml(linked)}</small><em>${qty} unité${qty>1?'s':''}${done?' · Fait':''}</em></div>
       <button type="button" class="row-action del btn-sm ghost danger" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">Supprimer</button>
+    </article>`;
+  }
+
+  function maisonTaskRow(x,cfg={}){
+    const done = statusIsDone(x);
+    const icon = commonTypeIcon(x,{...cfg,module:'maison'});
+    const moduleId = 'maison';
+    return `<article class="health-info-row common-info-row maison-task-row ${done?'done':''}">
+      <button type="button" class="shopping-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')" aria-label="Marquer fait">${done?'✓':''}</button>
+      <div class="health-type-icon">${icon}</div>
+      <div class="health-info-main"><b>${escapeHtml(x.title || 'Tâche')}</b><small>${escapeHtml(commonLine2(x,{...cfg,module:'maison'}))}</small><em>${escapeHtml(commonLine3(x))}</em></div>
+      ${memberBadgeHtml(getItemMemberId(x) || x.member || 'family')}
+      <div class="shopping-row-actions"><button type="button" class="btn-sm ghost" onclick="event.stopPropagation();SuperApp.openEdit('${moduleId}','${x.id}')">✏️</button><button type="button" class="btn-sm ghost danger" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">🗑️</button></div>
     </article>`;
   }
   function schoolUrgencyClass(x){
@@ -2048,8 +2063,8 @@
       <div class="today-grid"><button class="btn ghost" type="button" onclick="SuperApp.exportData()">Exporter JSON</button><button class="btn ghost" type="button" onclick="document.getElementById('importInput').click()">Importer JSON</button></div>`;
   }
   function settingsDataPanel(){
-    return `${settingsVisualHero({title:'Sauvegarde & données', text:'Les données de base se saisissent dans les rubriques visuelles. Ici on garde les outils de sauvegarde, transfert et réinitialisation.', img:'assets/images/cards/settings_data.png', emoji:'🛡️', chips:['Sauvegarde locale','Export JSON','Import JSON']})}
-      <div class="settings-data-actions"><button class="btn ghost" type="button" onclick="SuperApp.exportData()"><span>📤</span><b>Exporter</b><small>Sauvegarde ou transfert</small></button><button class="btn ghost" type="button" onclick="document.getElementById('importInput').click()"><span>📥</span><b>Importer</b><small>Fusion contrôlée</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.clearDemoData()"><span>🧹</span><b>Supprimer les exemples</b><small>Tout effacer et repartir propre</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.resetData()"><span>♻️</span><b>Réinitialiser</b><small>Confirmation obligatoire</small></button></div>`;
+    return `${settingsVisualHero({title:'Sauvegarde & données', text:'Gérer les sauvegardes locales et la récupération depuis Supabase.', img:'assets/images/cards/settings_data.png', emoji:'🛡️', chips:['Export JSON','Import JSON','Supabase']})}
+      <div class="settings-data-actions"><button class="btn ghost" type="button" onclick="SuperApp.exportData()"><span>📤</span><b>Exporter</b><small>Sauvegarde JSON</small></button><button class="btn ghost" type="button" onclick="document.getElementById('importInput').click()"><span>📥</span><b>Importer</b><small>Restaurer JSON</small></button><button class="btn ghost" type="button" onclick="window.sbForcePullFromServer?.()"><span>☁️</span><b>Récupérer Supabase</b><small>Restaurer le cloud</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.clearDemoData()"><span>🧹</span><b>Supprimer les données de cet appareil</b><small>Supabase conservé</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.resetCloudData()"><span>⛔</span><b>Supprimer définitivement</b><small>Appareil + Supabase</small></button></div>`;
   }
     function selectWeatherCity(scope='settings', city='', postalCode='', country='France', lat=null, lon=null){
     const root = scope === 'onboarding' ? document.getElementById('onboarding') : document.getElementById('editFields');
@@ -2323,16 +2338,17 @@
     return clean;
   }
   function resetConfirmContent(mode='reset'){
-    const title = mode === 'demo' ? 'Supprimer les exemples et repartir à zéro' : 'Réinitialiser toute l’application';
+    const isCloud = mode === 'cloud';
+    const title = isCloud ? 'Supprimer définitivement les données' : 'Supprimer les données de cet appareil';
     return `<div class="reset-confirm-card">
-      <div class="reset-confirm-hero"><span>⚠️</span><div><b>${title}</b><small>Cette action vide complètement l’application.</small></div></div>
-      <p>Cette opération supprimera les membres du foyer, le nom du foyer, les tâches, courses, stocks, repas, santé, éducation, sport, documents, notifications et données de démonstration.</p>
+      <div class="reset-confirm-hero"><span>⚠️</span><div><b>${title}</b><small>${isCloud ? 'Suppression locale et Supabase.' : 'Suppression locale uniquement.'}</small></div></div>
+      <p>${isCloud ? 'Cette opération supprime aussi les données Supabase du compte connecté. Elles ne reviendront pas après synchronisation.' : 'Cette opération vide seulement cet appareil. Les données peuvent revenir avec le bouton Récupérer Supabase si elles existent encore dans le cloud.'}</p>
       <div class="reset-import-help"><b>Avant de supprimer</b><ol><li>Cliquer sur <b>Exporter mes données JSON</b>.</li><li>Conserver le fichier sur votre téléphone ou ordinateur.</li><li>Après réinitialisation : <b>Paramètres &gt; Sauvegarde et données &gt; Importer JSON</b>.</li><li>Sélectionner le fichier exporté puis valider l’import pour restaurer les données.</li></ol></div>
-      <div class="reset-confirm-actions"><button class="btn ghost" type="button" onclick="SuperApp.exportData()">📤 Exporter mes données JSON</button><button class="btn ghost" type="button" onclick="SuperApp.closeEditDialog()">Annuler</button><button class="btn primary danger" type="button" onclick="SuperApp.confirmFullReset()">Réinitialiser définitivement</button></div>
+      <div class="reset-confirm-actions"><button class="btn ghost" type="button" onclick="SuperApp.exportData()">📤 Exporter mes données JSON</button><button class="btn ghost" type="button" onclick="SuperApp.closeEditDialog()">Annuler</button><button class="btn primary danger" type="button" onclick="SuperApp.confirmFullReset('${mode}')">${isCloud ? 'Supprimer définitivement' : 'Supprimer sur cet appareil'}</button></div>
     </div>`;
   }
   function openResetConfirmDialog(mode='reset'){
-    $('#editTitle').textContent = mode === 'demo' ? 'Suppression complète' : 'Réinitialisation complète';
+    $('#editTitle').textContent = mode === 'cloud' ? 'Suppression définitive' : 'Suppression locale';
     $('#editForm').dataset.type = 'reset_confirm';
     $('#editForm').dataset.id = '';
     $('#editFields').innerHTML = resetConfirmContent(mode);
@@ -2342,16 +2358,25 @@
     if($('#editDialog').open) $('#editDialog').close();
     $('#editDialog').showModal();
   }
-  function confirmFullReset(){
+  async function confirmFullReset(mode='local'){
+    const cloud = mode === 'cloud';
+    if(cloud && !confirm('Confirmer la suppression définitive des données Supabase ?')) return;
+    if(cloud && typeof sbDeleteAllCloudData === 'function'){
+      try { await sbDeleteAllCloudData(); }
+      catch(e){ toast('⚠️ Suppression Supabase impossible : ' + (e.message || e)); return; }
+    }
     data = emptyApplicationData();
+    if(!cloud) window._sbPauseAutoPush = true;
     save();
+    window._sbPauseAutoPush = false;
     closeEditDialog();
     render();
-    toast('♻️ Application remise à zéro');
+    toast(cloud ? '⛔ Données supprimées définitivement' : '🧹 Données supprimées de cet appareil');
     setTimeout(()=>startOnboarding(true), 120);
   }
-  function clearDemoData(){ openResetConfirmDialog('demo'); }
-  function resetData(){ openResetConfirmDialog('reset'); }
+  function clearDemoData(){ openResetConfirmDialog('local'); }
+  function resetData(){ openResetConfirmDialog('local'); }
+  function resetCloudData(){ openResetConfirmDialog('cloud'); }
   // ---- Accueil guidé : configuration minimale + première action familiale ----------
   function maybeStartOnboarding(){ if(!data.settings || !data.settings.onboarded) startOnboarding(true); }
   function closeOnboarding(){ document.getElementById('onboarding')?.remove(); }
@@ -3771,7 +3796,7 @@
   ------------------------------------------------------------------ */
   function defaultBlockForModule(module){
     module = canonicalModuleId(module);
-    return ({maison:'taches', courses_repas:'repas', education:'ecole', sante:'tous', sport_loisirs:'tout', familles:'membres'}[module] || 'taches');
+    return ({maison:'taches', courses_repas:'repas', education:'ecole', sante:'tous', sport_loisirs:'tout', familles:'tout'}[module] || 'taches');
   }
   function ensureV53State(){
     if(!state.moduleBlocks) state.moduleBlocks = {};
@@ -3817,8 +3842,8 @@
     function listTabsForModule(module){
     const groups = {
       maison:[['taches','Tout','▦'],['taches_aujourdhui','Aujourd’hui','📅'],['taches_retard','En retard','⏰'],['taches_recurrentes','Récurrentes','🔁'],['taches_terminees','Terminées','✅']],
-      courses_repas:[['repas','Repas','🍽️'],['courses','Courses','🛒'],['stock','Stock','🧺']],
-      education:[['ecole','École','📘'],['ecole_notes','Notes','⭐'],['documents','Documents','📄']],
+      courses_repas:[['tout','Tout','▦'],['repas','Repas','🍽️'],['courses','Courses','🛒'],['stock','Stock','🧺']],
+      education:[['tout','Tout','▦'],['ecole','École','📘'],['ecole_notes','Notes','⭐'],['documents','Documents','📄']],
       sante:[['tous','Tous','▦'],['rendez_vous','Rendez-vous','📅'],['traitements','Traitements','💊'],['documents','Documents','📄'],['alertes','Alertes','🔔']],
       sport_loisirs:[
         ['tout','Tout','▦'],
@@ -3827,7 +3852,7 @@
         ['voyage_activites','Voyage','✈️'],
         ['documents','Documents','📄'],
       ],
-      familles:[['membres','Membres','👨‍👩‍👧‍👦'],['documents','Documents','📁']]
+      familles:[['tout','Tout','▦'],['membres','Membres','👨‍👩‍👧‍👦'],['documents','Documents','📁']]
     }[canonicalModuleId(module)] || [];
     const current = activeModuleBlock(module);
     return `<div class="list-filter-chips v53-tabs ${canonicalModuleId(module)==='sante'?'health-filter-tabs':''}">${groups.map(([b,l,icon])=>`<button type="button" class="${b===current?'active':''}" onclick="SuperApp.setModuleBlock('${module}','${b}')"><span>${icon||''}</span>${l}</button>`).join('')}</div>`;
@@ -3891,7 +3916,8 @@
       else arr=getSportActivities('open');
       }
     } else if(module==='familles'){
-      arr = cfg.special === 'members' ? getFamilyMembers() : getFamilyDocuments();
+      if(key === 'tout') arr = [...getFamilyMembers().map(m=>({...m, _kind:'member'})), ...getFamilyDocuments()];
+      else arr = cfg.special === 'members' ? getFamilyMembers().map(m=>({...m, _kind:'member'})) : getFamilyDocuments();
     } else {
       const names = cfg.collections || [cfg.collection];
       arr = names.flatMap(name => (data[name] || []).map(x => ({...x, _sourceCollection:name}))).filter(x=>!statusIsHidden(x));
@@ -3950,6 +3976,9 @@
       </section>`;
     }
     const items = visibleCollectionItems(cfg);
+    const docsModeInline = ((block==='tout' || block==='tous') && supportsSupabaseDocs(module)) ? (module==='familles' ? 'global' : module) : '';
+    const docsPanelInline = docsModeInline ? supabaseDocsPanelHtml(docsModeInline) : '';
+    if(docsModeInline) setTimeout(()=>window.sbHydrateDocsPanel?.(docsModeInline), 120);
     const addAction = cfg.special === 'members'
       ? `SuperApp.openSettingsMember('')`
       : `SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')`;
@@ -3957,6 +3986,7 @@
       ? (items.length ? items.map(manageMemberRow).join('') : `<article class="empty cute-empty"><b>👤 Aucun membre</b><small>Ajoute un premier membre du foyer.</small><button class="btn primary" onclick="SuperApp.openSettingsMember('')">+ Ajouter</button></article>`)
       : (items.length ? items.map(x=>{
           if(module==='sante') return healthInfoRow(x,cfg);
+          if(module==='familles' && x._kind==='member') return manageMemberRow(x);
           if(module==='sport_loisirs'&&!cfg.special&&cfg.collection!=='sportGear'&&cfg.collection!=='loisirGear'&&cfg.collection!=='voyageGear') return slvActivityCard(x);
           return managementRow(x,cfg);
         }).join('') : `<article class="empty cute-empty"><b>${cfg.emoji} Rien pour le moment</b><small>Ajoute un premier élément. Tout élément affiché peut ensuite être modifié ou supprimé.</small><button class="btn primary" onclick="${addAction}">+ Ajouter</button></article>`);
@@ -3966,6 +3996,7 @@
       ${memberFilterRow(module)}
       ${titleBar}
       <div class="management-list">${rows}</div>
+      ${docsPanelInline}
     </section>`;
   }
   function paintModule(id, focusKey=''){
@@ -4497,7 +4528,7 @@
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
-    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, clearDemoData, resetData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
+    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
     handleCategoryChange, handleSubcategoryChange,
     openCreateCategoryDialog, openCreateSubcategoryDialog, confirmCreateCategory,
