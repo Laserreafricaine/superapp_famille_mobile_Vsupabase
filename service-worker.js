@@ -1,4 +1,4 @@
-const CACHE = 'superapp-famille-v5-36-30d';
+const CACHE = 'superapp-famille-v5-36-30e';
 const CORE_ASSETS = [
   './',
   './index.html',

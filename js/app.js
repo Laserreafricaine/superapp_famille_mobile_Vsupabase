@@ -3663,6 +3663,7 @@
             <option value="quotidienne" ${freqMode==='quotidienne'?'selected':''}>Quotidienne</option>
             <option value="hebdomadaire" ${freqMode==='hebdomadaire'?'selected':''}>Hebdomadaire</option>
             <option value="mensuelle" ${freqMode==='mensuelle'?'selected':''}>Mensuelle</option>
+            <option value="annuelle" ${freqMode==='annuelle'?'selected':''}>Annuelle</option>
             <option value="personnalisee" ${freqMode==='personnalisee'?'selected':''}>Personnaliser…</option>
           </select></div>
           <div class="task-freq-section task-freq-hebdo" style="${freqMode==='hebdomadaire'?'':'display:none'}">
@@ -3677,9 +3678,6 @@
             <div class="form-field"><label>Tous les X jours</label>
               <input name="frequenceInterval" type="number" min="1" step="1" value="${item.frequenceInterval||2}" placeholder="Ex : 3">
               <small>Exemple : 3 = tous les 3 jours, 14 = toutes les 2 semaines.</small>
-            </div>
-            <div class="form-field"><label>Ou décrire librement</label>
-              <input name="frequenceLibre" value="${escapeAttr(item.frequenceLibre||'')}" placeholder="Ex : chaque 1er du mois, chaque printemps…">
             </div>
           </div>
         </section>`;
