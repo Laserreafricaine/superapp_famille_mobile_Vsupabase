@@ -3952,7 +3952,7 @@
   function activeMemberFilter(module){ ensureV53State(); return state.memberFilters[canonicalModuleId(module)] || 'all'; }
   function activeMaisonPeriodFilter(){ ensureV53State(); return state.maisonPeriodFilters.maison || 'all'; }
   function setModuleBlock(module, block){
-    ensureV53State(); module = canonicalModuleId(module); state.moduleBlocks[module] = block || defaultBlockForModule(module); if(module === 'maison') state.maisonPeriodFilters.maison = 'all'; state.appsView = {kind:'module', id:module}; setView('apps');
+    ensureV53State(); module = canonicalModuleId(module); state.moduleBlocks[module] = block || defaultBlockForModule(module); if(module === 'maison') state.maisonPeriodFilters.maison = 'all'; state[('filtersExpanded_' + module)] = false; state.appsView = {kind:'module', id:module}; setView('apps');
   }
   function setMemberFilter(module, memberId){
     ensureV53State(); module = canonicalModuleId(module); state.memberFilters[module] = memberId || 'all'; state.appsView = {kind:'module', id:module}; setView('apps');
@@ -3962,6 +3962,12 @@
   }
   function toggleMaisonFilters(){
     ensureV53State(); state.maisonFiltersExpanded = !state.maisonFiltersExpanded; state.appsView = {kind:'module', id:'maison'}; setView('apps');
+  }
+  function toggleModuleFilters(module){
+    ensureV53State(); module = canonicalModuleId(module);
+    const key = 'filtersExpanded_' + module;
+    state[key] = !state[key];
+    state.appsView = {kind:'module', id:module}; setView('apps');
   }
   function updateTaskFrequencyDisplay(select){
     const form = select.closest('form') || document;
@@ -4024,21 +4030,41 @@
         : `<button type="button" class="maison-filter-chip maison-filter-more maison-filter-less" onclick="SuperApp.toggleMaisonFilters()">\u2715 Moins</button>`;
       return `<div class="maison-filter-bar">${chips}${moreBtn}</div>`;
     }
-    const groups = {
-      courses_repas:[['tout','Tout','▦'],['repas','Repas','🍽️'],['courses','Courses','🛒'],['stock','Stock','🧺']],
-      education:[['tout','Tout','▦'],['ecole','École','📘'],['ecole_notes','Notes','⭐'],['documents','Documents','📄']],
-      sante:[['tous','Tous','▦'],['rendez_vous','Rendez-vous','📅'],['traitements','Traitements','💊'],['documents','Documents','📄'],['alertes','Alertes','🔔']],
-      sport_loisirs:[
-        ['tout','Tout','▦'],
-        ['sport_activites','Sport','⚽'],
-        ['loisir_activites','Loisir','🎨'],
-        ['voyage_activites','Voyage','✈️'],
-        ['documents','Documents','📄'],
-      ],
-      familles:[['tout','Tout','▦'],['membres','Membres','👨‍👩‍👧‍👦'],['documents','Documents','📁']]
-    }[module] || [];
+    const allGroups = {
+      courses_repas:{
+        main:[['tout','Tout','▦'],['repas','Repas','🍽️'],['courses','Courses','🛒']],
+        extra:[['stock','Stock','🧺']]
+      },
+      education:{
+        main:[['tout','Tout','▦'],['ecole','École','📘'],['ecole_notes','Notes','⭐']],
+        extra:[['documents','Documents','📄']]
+      },
+      sante:{
+        main:[['tous','Tous','▦'],['rendez_vous','Rendez-vous','📅'],['traitements','Traitements','💊']],
+        extra:[['alertes','Alertes','🔔'],['documents','Documents','📄']]
+      },
+      sport_loisirs:{
+        main:[['tout','Tout','▦'],['sport_activites','Sport','⚽'],['loisir_activites','Loisir','🎨']],
+        extra:[['voyage_activites','Voyage','✈️'],['documents','Documents','📄']]
+      },
+      familles:{
+        main:[['tout','Tout','▦'],['membres','Membres','👨‍👩‍👧‍👦'],['documents','Documents','📁']],
+        extra:[]
+      }
+    }[module] || {main:[],extra:[]};
     const current = activeModuleBlock(module);
-    return `<div class="list-filter-chips v53-tabs ${module==='sante'?'health-filter-tabs':''}">${groups.map(([b,l,icon])=>`<button type="button" class="${b===current?'active':''}" onclick="SuperApp.setModuleBlock('${module}','${b}')"><span>${icon||''}</span>${l}</button>`).join('')}</div>`;
+    const expandedKey = 'filtersExpanded_' + module;
+    const expanded = state[expandedKey] || false;
+    const visibleGroups = expanded ? [...allGroups.main, ...allGroups.extra] : allGroups.main;
+    const chips = visibleGroups.map(([b,l,icon])=>
+      `<button type="button" class="maison-filter-chip ${b===current?'active':''}" onclick="SuperApp.setModuleBlock('${module}','${b}')"><span>${icon||''}</span>${l}</button>`
+    ).join('');
+    const moreBtn = allGroups.extra.length
+      ? (!expanded
+        ? `<button type="button" class="maison-filter-chip maison-filter-more" onclick="SuperApp.toggleModuleFilters('${module}')">⚙ Filtres</button>`
+        : `<button type="button" class="maison-filter-chip maison-filter-more maison-filter-less" onclick="SuperApp.toggleModuleFilters('${module}')">✕ Moins</button>`)
+      : '';
+    return `<div class="maison-filter-bar">${chips}${moreBtn}</div>`;
   }
   function summaryMetric(value, label, emoji){ return `<article class="v53-summary-pill"><span>${emoji}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(label)}</small></article>`; }
   function moduleSummary(module){
@@ -4219,10 +4245,9 @@
     // V5.24 — Chaque page module a 3 paliers de couleur (strong / soft / medium) propres à l'app
     const tone = m.cls || ''; // module-home, module-food, module-edu, etc.
     if(m.id==='sante'){
-      // V5.25 — Santé suit le même schéma que les autres modules
-      // STRONG = zone d'ajout (qui est la zone d'action) / SOFT = urgences (info clé) / MEDIUM = liste
       view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
         ${appHeroBlock(m.id)}
+        <section class="palette-soft ${tone}"><div class="v53-recap-head"><b>Récap rapide</b><small>Vue rapide des éléments importants du module.</small></div><div class="v53-summary-grid">${moduleSummary(m.id)}</div></section>
         <section class="palette-strong ${tone}">${healthQuickActions()}</section>
         <section class="palette-soft ${tone}">${healthEmergencyBlock()}</section>
         <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
@@ -4235,8 +4260,8 @@
     } else {
       view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
         ${appHeroBlock(m.id)}
-        <section class="palette-strong ${tone}">${primaryActionsForModule(m.id)}</section>
         <section class="palette-soft ${tone}"><div class="v53-recap-head"><b>Récap rapide</b><small>Vue rapide des éléments importants du module.</small></div><div class="v53-summary-grid">${moduleSummary(m.id)}</div></section>
+        <section class="palette-strong ${tone}">${primaryActionsForModule(m.id)}</section>
         <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
     }
     if(supportsSupabaseDocs(m.id) && activeModuleBlock(m.id)==='documents') setTimeout(()=>window.sbHydrateDocsPanel?.(m.id==='familles'?'global':m.id), 120);
@@ -4276,15 +4301,13 @@
       ],
       familles: [
         ['👤 Membre',`SuperApp.openSettingsMember('')`,true],
-        ['📁 Document',`SuperApp.openAdd('familles','document_famille','Identité')`,false],
-        ['🎨 Style famille',`SuperApp.openSettings('Famille')`,false]
+        ['📁 Document',`SuperApp.openAdd('familles','document_famille','Identité')`,false]
       ]
     }[id] || [];
-    if(id === 'maison'){
-      const maisonBtns = buttons;
+    if(buttons.length && id !== 'sante'){
       return `<section class="add-zone maison-add-zone">
         <h3 class="maison-add-title">＋ Ajouter</h3>
-        <div class="maison-add-stack">${maisonBtns.map(([label, onclick, primary])=>
+        <div class="maison-add-stack">${buttons.map(([label, onclick, primary])=>
           `<button type="button" class="maison-add-btn ${primary?'maison-add-primary':''}" onclick="${onclick}">
             <span class="maison-add-icon">${label.split(' ')[0]}</span>
             <span class="maison-add-label">${label.split(' ').slice(1).join(' ')}</span>
@@ -4761,7 +4784,7 @@
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
-    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, updateTaskFrequencyDisplay, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
+    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
     handleCategoryChange, handleSubcategoryChange,
     openCreateCategoryDialog, openCreateSubcategoryDialog, confirmCreateCategory,

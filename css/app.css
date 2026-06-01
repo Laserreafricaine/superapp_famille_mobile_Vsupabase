@@ -2522,3 +2522,29 @@ body[data-theme="sombre"] .maison-filter-chip.active {
 .task-freq-section{margin-top:4px}
 .week-days-grid{display:flex;flex-wrap:wrap;gap:6px}
 .week-days-grid .member-check-item.compact{flex:0 0 auto}
+
+
+/* V5.36.30f — Pattern ajout empilé + filtres par module */
+
+/* Couleurs accent par module */
+.palette-strong.module-food  .maison-add-primary { color: var(--food) !important; }
+.palette-strong.module-food  .maison-add-plus { color: var(--food) !important; }
+.palette-strong.module-edu   .maison-add-primary { color: var(--edu) !important; }
+.palette-strong.module-edu   .maison-add-plus { color: var(--edu) !important; }
+.palette-strong.module-health .maison-add-primary { color: var(--health) !important; }
+.palette-strong.module-health .maison-add-plus { color: var(--health) !important; }
+.palette-strong.module-sport .maison-add-primary { color: var(--sport) !important; }
+.palette-strong.module-sport .maison-add-plus { color: var(--sport) !important; }
+.palette-strong.module-family .maison-add-primary { color: #6046b3 !important; }
+.palette-strong.module-family .maison-add-plus { color: #6046b3 !important; }
+
+/* Chips filtres modules — couleur active par module */
+.palette-medium.module-food   .maison-filter-chip.active { background: var(--food) !important; }
+.palette-medium.module-edu    .maison-filter-chip.active { background: var(--edu) !important; }
+.palette-medium.module-health .maison-filter-chip.active { background: var(--health) !important; }
+.palette-medium.module-sport  .maison-filter-chip.active { background: var(--sport) !important; }
+.palette-medium.module-family .maison-filter-chip.active { background: #6046b3 !important; }
+.palette-medium.module-home   .maison-filter-chip.active { background: var(--home) !important; }
+
+/* Sante recap */
+.palette-soft.module-health + .palette-strong { margin-top: 0; }
