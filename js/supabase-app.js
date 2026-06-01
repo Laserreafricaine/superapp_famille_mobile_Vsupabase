@@ -8,6 +8,23 @@
 
   // ─── Helpers internes ────────────────────────────────────────
   function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function sbIsIOS(){ return /iPad|iPhone|iPod/i.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+  function sbCreateOpenContext(){
+    if(sbIsIOS()) return window.open('', '_blank');
+    return null;
+  }
+  function sbNavigateToSignedUrl(ctx, url, download=false){
+    if(ctx){ ctx.location.href = url; return; }
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    if(download) a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>a.remove(), 50);
+  }
   function syncTime(){ return new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}); }
   let sbLastSyncTime = localStorage.getItem('superapp_last_sync_time') || '';
   let sbLastPushAt = localStorage.getItem('superapp_last_push_at') || '';
@@ -255,7 +272,7 @@
 
 
 
-  // ─── Documents attachés aux fiches modules (test contrôlé) ─────────
+  // ─── Documents attachés aux fiches modules ─────────
   const healthDocStore = new Map();
   function healthDocRoot(itemId){
     return [...document.querySelectorAll('[data-sb-health-docs]')].find(el => el.getAttribute('data-sb-health-docs') === String(itemId||'')) || null;
@@ -331,30 +348,27 @@
     }
   };
   window.sbOpenHealthDocBtn = async function(key){
-    // Dépréciée — utiliser les liens pré-signés dans le HTML
     const doc = healthDocStore.get(key);
+    const win = sbCreateOpenContext();
     try {
       if(!doc) throw new Error('Document introuvable dans la liste courante.');
       const url = await sbItemSignedUrl(doc.storage_path, false);
-      const a = document.createElement('a');
-      a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
-      a.style.display = 'none'; document.body.appendChild(a); a.click();
-      setTimeout(()=>{ try{ document.body.removeChild(a); }catch{} }, 500);
+      sbNavigateToSignedUrl(win, url, false);
     } catch(e){
+      if(win) try { win.close(); } catch {}
       const itemId = String(key||'').split('::')[0];
       healthDocStatus(itemId, e.message || String(e), 'error');
     }
   };
   window.sbDownloadHealthDocBtn = async function(key){
     const doc = healthDocStore.get(key);
+    const win = sbCreateOpenContext();
     try {
       if(!doc) throw new Error('Document introuvable dans la liste courante.');
       const url = await sbItemSignedUrl(doc.storage_path, true);
-      const a = document.createElement('a');
-      a.href = url; a.download = doc.name||'document'; a.target = '_blank';
-      a.style.display = 'none'; document.body.appendChild(a); a.click();
-      setTimeout(()=>{ try{ document.body.removeChild(a); }catch{} }, 500);
+      sbNavigateToSignedUrl(win, url, true);
     } catch(e){
+      if(win) try { win.close(); } catch {}
       const itemId = String(key||'').split('::')[0];
       healthDocStatus(itemId, e.message || String(e), 'error');
     }
@@ -388,7 +402,7 @@
     el.textContent = message || '';
   }
   function moduleNameForDoc(module){
-    const labels = {sante:'Santé', test_documents:'Test accueil', education:'Éducation', maison:'Maison', sport_loisirs:'Sport / Loisir / Voyage', familles:'Familles', courses_repas:'Courses / Repas'};
+    const labels = {sante:'Santé', education:'Éducation', maison:'Maison', sport_loisirs:'Sport / Loisir / Voyage', familles:'Familles', courses_repas:'Courses / Repas'};
     return labels[module] || module || 'Module inconnu';
   }
   function itemTypeLabel(type){
@@ -527,11 +541,11 @@
   };
   window.sbOpenDocsPanelBtn = async function(key){
     const doc = docsPanelStore.get(key);
-    const win = window.open('', '_blank');
+    const win = sbCreateOpenContext();
     try {
       if(!doc) throw new Error('Document introuvable dans la liste courante.');
       const url = await sbItemSignedUrl(doc.storage_path, false);
-      if(win) win.location.href = url; else window.location.href = url;
+      sbNavigateToSignedUrl(win, url, false);
     } catch(e){
       if(win) try { win.close(); } catch {}
       const mode = String(key||'').split('::')[0] || 'global';
@@ -540,11 +554,11 @@
   };
   window.sbDownloadDocsPanelBtn = async function(key){
     const doc = docsPanelStore.get(key);
-    const win = window.open('', '_blank');
+    const win = sbCreateOpenContext();
     try {
       if(!doc) throw new Error('Document introuvable dans la liste courante.');
       const url = await sbItemSignedUrl(doc.storage_path, true);
-      if(win) win.location.href = url; else window.location.href = url;
+      sbNavigateToSignedUrl(win, url, true);
     } catch(e){
       if(win) try { win.close(); } catch {}
       const mode = String(key||'').split('::')[0] || 'global';
@@ -566,195 +580,6 @@
     }
   };
 
-  // Documents Supabase réactivés uniquement en test accueil + fiches modules.
-
-})();
-
-// ═════════════════════════════════════════════════════════════════
-// WIDGET TEST DOCUMENTS — position:fixed, survit aux re-renders
-// Injection unique au chargement via sbInitAuth
-// ═════════════════════════════════════════════════════════════════
-
-(function(){
-  'use strict';
-
-  const WIDGET_ITEM_ID = 'home-test-widget';
-  const WIDGET_MODULE  = 'test_documents';
-
-  // ─── Initialiser le widget une seule fois ─────────────────────
-  function initWidget(){
-    const widget = document.getElementById('sb-test-widget');
-    if(!widget || widget._sbInit) return;
-    widget._sbInit = true;
-
-    // Styles inline — position fixe, survit aux re-renders de renderHome
-    widget.style.cssText = [
-      'position:fixed','bottom:80px','left:12px','right:12px','z-index:9000',
-      'background:#fff','border-radius:18px','border:2.5px solid #2D5DA6',
-      'box-shadow:0 8px 32px rgba(45,93,166,.18)','overflow:hidden',
-      'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif'
-    ].join(';');
-
-    widget.innerHTML = [
-      '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 0">',
-      '<b style="font-size:14px;color:#2D5DA6">📎 Test Documents Supabase</b>',
-      '<button id="sb-test-toggle" style="border:none;background:none;font-size:20px;cursor:pointer;padding:0 4px;color:#666">▼</button>',
-      '</div>',
-      '<div id="sb-test-body" style="padding:12px 16px 16px">',
-      '<p id="sb-test-status" style="font-size:12px;color:#888;margin:0 0 8px;min-height:16px"></p>',
-      '<button id="sb-test-upload-btn" style="width:100%;padding:11px;border-radius:12px;border:2px dashed #2D5DA6;background:#eff6ff;color:#2D5DA6;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:10px">',
-      '+ Charger un document</button>',
-      '<div id="sb-test-list"><p style="font-size:12px;color:#aaa;text-align:center;margin:8px 0">Chargement…</p></div>',
-      '</div>'
-    ].join('');
-
-    // Toggle ouvrir/fermer
-    document.getElementById('sb-test-toggle').addEventListener('click', function(){
-      const body = document.getElementById('sb-test-body');
-      const isOpen = body.style.display !== 'none';
-      body.style.display = isOpen ? 'none' : 'block';
-      this.textContent = isOpen ? '▲' : '▼';
-    });
-
-    // Bouton upload → déclenche l'input global
-    document.getElementById('sb-test-upload-btn').addEventListener('click', function(){
-      document.getElementById('sb-test-file-input').click();
-    });
-
-    // Input file global — listener unique
-    const fileInput = document.getElementById('sb-test-file-input');
-    if(fileInput && !fileInput._sbBound){
-      fileInput._sbBound = true;
-      fileInput.addEventListener('change', async function(){
-        const file = this.files?.[0];
-        this.value = ''; // reset pour re-sélection du même fichier
-        if(!file) return;
-        setStatus('📤 Envoi en cours…');
-        try {
-          if(typeof sbUploadItemDocument !== 'function') throw new Error('Supabase non chargé');
-          await sbUploadItemDocument(file, WIDGET_ITEM_ID, WIDGET_MODULE);
-          setStatus('✅ Document ajouté !');
-          await loadDocs();
-        } catch(e){
-          setStatus('❌ ' + (e.message||'Erreur inconnue'));
-          console.error('[sbTestWidget]', e);
-        }
-      });
-    }
-
-    // Charger la liste initiale
-    loadDocs();
-    widget.style.display = 'block';
-  }
-
-  function setStatus(msg){
-    const el = document.getElementById('sb-test-status');
-    if(el) el.textContent = msg;
-  }
-
-  // ─── Charger et afficher la liste des docs ────────────────────
-  async function loadDocs(){
-    const listEl = document.getElementById('sb-test-list');
-    if(!listEl) return;
-    listEl.innerHTML = '<p style="font-size:12px;color:#aaa;text-align:center;margin:8px 0">Chargement…</p>';
-    try {
-      if(typeof sbCurrentUser !== 'function') throw new Error('Supabase non initialisé');
-      const user = await sbCurrentUser();
-      if(!user){ listEl.innerHTML='<p style="font-size:12px;color:#888;margin:0">Connecte-toi pour voir les documents.</p>'; return; }
-
-      const docs = await sbListItemDocuments(WIDGET_ITEM_ID, WIDGET_MODULE);
-
-      if(!docs || docs.length === 0){
-        listEl.innerHTML = '<p style="font-size:12px;color:#aaa;text-align:center;margin:8px 0">Aucun document. Upload-en un !</p>';
-        return;
-      }
-
-      // ── Pré-signer toutes les URLs en parallèle AVANT le rendu ──
-      // Zéro async au moment du clic → compatible Android Chrome + Safari
-      await Promise.all(docs.map(async d => {
-        try {
-          d._openUrl = await sbItemSignedUrl(d.storage_path, false);
-          d._dlUrl   = await sbItemSignedUrl(d.storage_path, true);
-        } catch {
-          d._openUrl = '';
-          d._dlUrl   = '';
-        }
-      }));
-
-      function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
-      function fmtSize(n){ return n ? (n>1048576 ? (n/1048576).toFixed(1)+' Mo' : Math.round(n/1024)+' Ko') : ''; }
-
-      listEl.innerHTML = docs.map((d,i) => {
-        const icon = d.mime_type?.includes('pdf') ? '📄' : d.mime_type?.includes('image') ? '🖼️' : '📎';
-        const size = fmtSize(d.size);
-
-        // Liens <a> directs avec URL pré-signée — vrai clic sur un lien, aucun await
-        const openBtn = d._openUrl
-          ? `<a href="${esc(d._openUrl)}" target="_blank" rel="noopener noreferrer" style="${btnStyle('normal')}">Ouvrir</a>`
-          : `<span style="font-size:11px;color:#c00">URL ✗</span>`;
-        const dlBtn = d._dlUrl
-          ? `<a href="${esc(d._dlUrl)}" download="${esc(d.name)}" style="${btnStyle('normal')}">Télécharger</a>`
-          : '';
-        const delBtn = `<button type="button" data-idx="${i}" onclick="window._sbTestDelete(this)" style="${btnStyle('danger')}">✕ Suppr.</button>`;
-
-        return `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f5f7fa;border-radius:10px;margin-bottom:6px">
-          <span style="font-size:22px;flex-shrink:0">${icon}</span>
-          <div style="flex:1;min-width:0">
-            <b style="display:block;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.name)}</b>
-            <small style="font-size:11px;color:#888">${esc(size)}</small>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px;flex-shrink:0;justify-content:flex-end">
-            ${openBtn}${dlBtn}${delBtn}
-          </div>
-        </div>`;
-      }).join('');
-
-      // Stocker les docs pour la suppression
-      window._sbTestDocs = docs;
-
-    } catch(e){
-      listEl.innerHTML = `<p style="font-size:12px;color:#c00;margin:0">Erreur : ${e.message}</p>`;
-    }
-  }
-
-  function btnStyle(type){
-    const base = 'padding:5px 10px;border-radius:8px;font-size:12px;cursor:pointer;text-decoration:none;display:inline-block;border:1px solid';
-    if(type === 'danger') return base + ' #fca5a5;background:#fef2f2;color:#c00;font-family:inherit';
-    return base + ' #d1d5db;background:#fff;color:#333;font-family:inherit';
-  }
-
-  // ─── Suppression ──────────────────────────────────────────────
-  window._sbTestDelete = async function(btn){
-    if(!confirm('Supprimer ce document ?')) return;
-    const idx = parseInt(btn.dataset.idx, 10);
-    const doc = window._sbTestDocs?.[idx];
-    if(!doc){ setStatus('Document introuvable.'); return; }
-    setStatus('🗑️ Suppression…');
-    try {
-      await sbDeleteItemDocument(doc);
-      setStatus('✅ Supprimé !');
-      await loadDocs();
-    } catch(e){
-      setStatus('❌ ' + (e.message||'Erreur'));
-    }
-  };
-
-  // ─── Lancer le widget après auth ─────────────────────────────
-  // Hook dans sbInitAuth — appelé une seule fois, après connexion
-  const _origInit = window.sbInitAuth;
-  window.sbInitAuth = async function(){
-    await _origInit?.apply(this, arguments);
-    initWidget();
-  };
-
-  // Si déjà connecté au rechargement (session persistée)
-  document.addEventListener('DOMContentLoaded', function(){
-    setTimeout(async ()=>{
-      if(typeof sbCurrentUser === 'function'){
-        const user = await sbCurrentUser().catch(()=>null);
-        if(user) initWidget();
-      }
-    }, 800);
-  });
+  // Documents Supabase des modules.
 
 })();

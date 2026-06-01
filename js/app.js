@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.29';
+  const APP_VERSION = '5.36.30';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -3472,7 +3472,12 @@
     // 5+6. CATÉGORIE + SOUS-CATÉGORIE (lit data.categories — V5.6)
     const categoryField = buildCategoryFieldsHtml(moduleValue, item);
 
-    // 7. DÉTAILS SPÉCIFIQUES (repliés sous "Plus de détails")
+    // 7. FRÉQUENCE pour Maison : une tâche peut être ponctuelle ou récurrente.
+    const frequencyField = type === 'maison'
+      ? `<div class="form-field"><label>Fréquence</label><select name="recurrence"><option value="ponctuelle" ${!item.recurrence || item.recurrence==='ponctuelle' ? 'selected' : ''}>Ponctuelle</option><option value="quotidienne" ${item.recurrence==='quotidienne'?'selected':''}>Tous les jours</option><option value="hebdomadaire" ${item.recurrence==='hebdomadaire'?'selected':''}>Chaque semaine</option><option value="certains_jours" ${item.recurrence==='certains_jours'?'selected':''}>Certains jours</option><option value="mensuelle" ${item.recurrence==='mensuelle'?'selected':''}>Chaque mois</option><option value="personnalisee" ${item.recurrence==='personnalisee'?'selected':''}>Personnalisée</option></select></div>`
+      : '';
+
+    // 8. DÉTAILS SPÉCIFIQUES (repliés sous "Plus de détails")
     const moduleDetails = moduleDetailsHtml(type, item);
 
     // Le module/type cachés (le routage est déterminé par le bouton sur lequel on a cliqué)
@@ -3494,7 +3499,7 @@
     const checklistField = genericChecklistFieldHtml(type, item);
     const docsField = supportsSupabaseDocs(type) ? healthDocsFieldHtml(item, type) : '';
     const visibilityField = ['maison','education','sante','sport_loisirs','familles','calendrier'].includes(type) ? setHomeVisibilityFields(item) : '';
-    return `${hiddenRouting}${titleField}${dateField}${hourField}${memberField}${categoryField}${moduleDetails}${checklistField}${notesField}${statusField}${danger}${docsField}${visibilityField}`;
+    return `${hiddenRouting}${titleField}${dateField}${hourField}${memberField}${categoryField}${frequencyField}${moduleDetails}${checklistField}${notesField}${statusField}${danger}${docsField}${visibilityField}`;
   }
 
   // Champs cachés pour le routage : module + type sont déduits du bouton cliqué, jamais demandés à l'utilisateur (sauf depuis le calendrier).
@@ -3913,10 +3918,11 @@
     ensureV53State(); module = canonicalModuleId(module); state.memberFilters[module] = memberId || 'all'; state.appsView = {kind:'module', id:module}; setView('apps');
   }
   function setMaisonPeriodFilter(period){
-    ensureV53State(); state.maisonPeriodFilters.maison = period || 'all'; state.appsView = {kind:'module', id:'maison'}; setView('apps');
-  }
-  function toggleMaisonFilters(){
-    ensureV53State(); state.maisonFiltersExpanded = !state.maisonFiltersExpanded; state.appsView = {kind:'module', id:'maison'}; setView('apps');
+    ensureV53State();
+    state.maisonPeriodFilters.maison = period || 'all';
+    state.moduleBlocks.maison = 'taches';
+    state.appsView = {kind:'module', id:'maison'};
+    setView('apps');
   }
   function fieldVal(item, keys){
     for(const k of keys){ if(item && item[k] !== undefined && item[k] !== null && String(item[k]).trim() !== '') return item[k]; }
@@ -3950,28 +3956,14 @@
     function listTabsForModule(module){
     module = canonicalModuleId(module);
     if(module === 'maison'){
-      const current = activeModuleBlock(module);
       const period = activeMaisonPeriodFilter();
-      const expanded = state.maisonFiltersExpanded || false;
-      const mainFilters = [
-        ['taches','Toutes','\u25a6',"SuperApp.setModuleBlock('maison','taches')"],
-        ['taches_aujourdhui','Aujourd\u2019hui','\ud83d\udcc5',"SuperApp.setMaisonPeriodFilter('today')"],
-        ['taches_retard','En retard','\u23f0',"SuperApp.setMaisonPeriodFilter('late')"]
+      const quick = [
+        ['all','Tout','▦'],
+        ['today','Aujourd’hui','📅'],
+        ['late','En retard','⏰'],
+        ['recurrent','Récurrent','🔁']
       ];
-      const extraFilters = [
-        ['maison_tache','T\u00e2che','\ud83e\uddf9',"SuperApp.setModuleBlock('maison','maison_tache')"],
-        ['maison_entretien','Entretien','\ud83d\udd27',"SuperApp.setModuleBlock('maison','maison_entretien')"],
-        ['maison_routine','Routine','\ud83d\udd01',"SuperApp.setModuleBlock('maison','maison_routine')"],
-        ['taches_par_membre','Par membre','\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67\u200d\ud83d\udc66',"SuperApp.setModuleBlock('maison','taches_par_membre')"]
-      ];
-      const visibleFilters = expanded ? [...mainFilters, ...extraFilters] : mainFilters;
-      const chips = visibleFilters.map(([b,l,icon,action])=>
-        `<button type="button" class="maison-filter-chip ${b===current||b===period?'active':''}" onclick="${action}"><span>${icon}</span>${l}</button>`
-      ).join('');
-      const moreBtn = !expanded
-        ? `<button type="button" class="maison-filter-chip maison-filter-more" onclick="SuperApp.toggleMaisonFilters()">\u2699 Filtres</button>`
-        : `<button type="button" class="maison-filter-chip maison-filter-more maison-filter-less" onclick="SuperApp.toggleMaisonFilters()">\u2715 Moins</button>`;
-      return `<div class="maison-filter-bar">${chips}${moreBtn}</div>`;
+      return `<div class="list-filter-chips v53-tabs maison-filter-quick">${quick.map(([b,l,icon])=>`<button type="button" class="${b===period ? 'active' : ''}" onclick="SuperApp.setMaisonPeriodFilter('${b}')"><span>${icon||''}</span>${l}</button>`).join('')}<button type="button" class="ghost-filter" onclick="document.querySelector('.compact-member-filter')?.scrollIntoView({behavior:'smooth',block:'center'})"><span>⚙️</span>Filtres +</button></div>`;
     }
     const groups = {
       courses_repas:[['tout','Tout','▦'],['repas','Repas','🍽️'],['courses','Courses','🛒'],['stock','Stock','🧺']],
@@ -4022,7 +4014,7 @@
       else {
         const tasks = visibleItems('tasks');
         const isEntretien = x => itemType(x).includes('entretien') || itemCategory(x).includes('entretien') || itemCategory(x).includes('reparation') || itemCategory(x).includes('réparation');
-        const isRoutine = x => itemType(x).includes('routine') || matchesWords(x,['routine','récurrent','recurrent','quotidien','hebdo']);
+        const isRoutine = x => itemType(x).includes('routine') || String(x.recurrence||'').toLowerCase().includes('quotid') || String(x.recurrence||'').toLowerCase().includes('hebdo') || String(x.recurrence||'').toLowerCase().includes('mens') || String(x.recurrence||'').toLowerCase().includes('certain') || matchesWords(x,['routine','récurrent','recurrent','quotidien','hebdo','mensuel']);
         if(key === 'maison_entretien') arr = tasks.filter(isEntretien);
         else if(key === 'maison_routine') arr = tasks.filter(isRoutine);
         else if(key === 'maison_tache') arr = tasks.filter(x=>!isEntretien(x) && !isRoutine(x));
@@ -4030,7 +4022,7 @@
         const period = activeMaisonPeriodFilter();
         if(period === 'today') arr = arr.filter(x=>!statusIsDone(x) && (x.date === today || (/quotidien|daily/i.test(x.recurrence||''))));
         else if(period === 'late') arr = arr.filter(x=>!statusIsDone(x) && x.date && daysDiff(today,x.date) < 0);
-        else if(period === 'recurrent') arr = arr.filter(x=>matchesWords(x,['routine','récurrent','recurrent','quotidien','hebdo']));
+        else if(period === 'recurrent') arr = arr.filter(x=>String(x.recurrence||'').toLowerCase().includes('quotid') || String(x.recurrence||'').toLowerCase().includes('hebdo') || String(x.recurrence||'').toLowerCase().includes('mens') || String(x.recurrence||'').toLowerCase().includes('certain') || matchesWords(x,['routine','récurrent','recurrent','quotidien','hebdo','mensuel']));
       }
     } else if(module==='courses_repas'){
       if(key==='tout') arr = [...getShoppingItems('all'), ...getMenus(), ...getStockItems()];
@@ -4075,7 +4067,7 @@
     if(canonicalModuleId(module)==='maison'){
       const labels = {all:'Tout', today:'Aujourd’hui', late:'En retard', recurrent:'Récurrent'};
       const period = activeMaisonPeriodFilter();
-      return `${cfg.title}${period && period !== 'all' ? ' · '+labels[period] : ''}${memberTxt}`;
+      return `Maison / Ménage${period && period !== 'all' ? ' · '+labels[period] : ''}${memberTxt}`;
     }
     return `${cfg.title}${memberTxt}`;
   }
@@ -4083,7 +4075,6 @@
     const title = mode === 'global' ? 'Documents' : `Documents ${documentModuleLabel(mode)}`;
     return `<section class="sb-module-docs-panel" data-sb-docs-panel="${escapeAttr(mode)}">
       <div class="section-title compact-title v53-list-title"><h2>📁 ${escapeHtml(title)}</h2><button class="link-btn" type="button" onclick="window.sbHydrateDocsPanel?.('${escapeAttr(mode)}')">↻ Actualiser</button></div>
-      <div class="sb-doc-test-intro"><b>📎 Liste documentaire</b></div>
       <div class="sb-module-docs-status info">Chargement des documents…</div>
       <div class="sb-module-docs-filters"></div>
       <div class="sb-module-docs-list"><div class="sb-doc-empty">Chargement…</div></div>
@@ -4178,8 +4169,8 @@
     } else {
       view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
         ${appHeroBlock(m.id)}
-        <section class="palette-strong ${tone}">${primaryActionsForModule(m.id)}</section>
         <section class="palette-soft ${tone}"><div class="v53-recap-head"><b>Récap rapide</b><small>Vue rapide des éléments importants du module.</small></div><div class="v53-summary-grid">${moduleSummary(m.id)}</div></section>
+        <section class="palette-strong ${tone}">${primaryActionsForModule(m.id)}</section>
         <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
     }
     if(supportsSupabaseDocs(m.id) && activeModuleBlock(m.id)==='documents') setTimeout(()=>window.sbHydrateDocsPanel?.(m.id==='familles'?'global':m.id), 120);
@@ -4188,7 +4179,7 @@
   // V5.8 — Boutons "+ Nouvelle ..." spécifiques à chaque module, en haut.
   function primaryActionsForModule(id){
     const labels = {
-      maison:'Ajouter une action maison',
+      maison:'Ajouter une action',
       courses_repas:'Ajouter courses ou repas',
       education:'Ajouter une information scolaire',
       sante:'Ajouter une information santé',
@@ -4196,7 +4187,7 @@
       familles:'Ajouter au foyer'
     };
     const buttons = {
-      maison: [['🧹 Tâche',`SuperApp.openAdd('maison','tache','Ménage')`,true],['🔧 Entretien',`SuperApp.openAdd('maison','entretien','Entretien')`,false],['🏠 Routine',`SuperApp.openAdd('maison','routine','Routine')`,false]],
+      maison: [['🧹 Ajouter tâche',`SuperApp.openAdd('maison','tache','Ménage')`,true],['🔧 Ajouter entretien',`SuperApp.openAdd('maison','entretien','Entretien')`,false]],
       courses_repas: [
         ['🛒 Course',`SuperApp.openAdd('courses_repas','course','Alimentation')`,true],
         ['🍽️ Repas',`SuperApp.openAdd('courses_repas','repas_semaine','Menu de la semaine')`,false],
@@ -4223,19 +4214,6 @@
         ['🎨 Style famille',`SuperApp.openSettings('Famille')`,false]
       ]
     }[id] || [];
-    if(id === 'maison'){
-      const maisonBtns = buttons;
-      return `<section class="add-zone maison-add-zone">
-        <h3 class="maison-add-title">＋ Ajouter</h3>
-        <div class="maison-add-stack">${maisonBtns.map(([label, onclick, primary])=>
-          `<button type="button" class="maison-add-btn ${primary?'maison-add-primary':''}" onclick="${onclick}">
-            <span class="maison-add-icon">${label.split(' ')[0]}</span>
-            <span class="maison-add-label">${label.split(' ').slice(1).join(' ')}</span>
-            <span class="maison-add-plus">＋</span>
-          </button>`
-        ).join('')}</div>
-      </section>`;
-    }
     return buttons.length ? `<section class="add-zone"><h3>${labels[id] || 'Ajouter'}</h3>${primaryActionBar(buttons)}</section>` : '';
   }
   function openModuleList(module, block){
@@ -4704,7 +4682,7 @@
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
-    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
+    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
     handleCategoryChange, handleSubcategoryChange,
     openCreateCategoryDialog, openCreateSubcategoryDialog, confirmCreateCategory,
