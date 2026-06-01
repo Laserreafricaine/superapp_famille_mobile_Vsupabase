@@ -4,6 +4,7 @@
 
 (function(){
   'use strict';
+  window._sbLocalDeleteGuard = window._sbLocalDeleteGuard || localStorage.getItem('superapp_local_delete_guard') === '1';
 
   // ─── Helpers internes ────────────────────────────────────────
   function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -59,29 +60,52 @@
   window.sbPullAndMerge = async function(options={}){
     try {
       const remote = await sbPullData();
-      if(!remote) return;
       const SA = window.SuperApp;
-      if(!SA) return;
+      if(!SA) return {status:'no_app'};
       const local = SA._getData();
-      const mustRestore = options.forceRemote === true || sbLocalLooksEmpty(local, remote);
+      const forceRemote = options.forceRemote === true;
+      if(!remote || !remote.data){
+        if(forceRemote){
+          sbNotify('ℹ️ Aucune donnée trouvée dans Supabase pour ce compte.');
+          return {status:'empty_remote'};
+        }
+        if(window._sbLocalDeleteGuard){
+          sbShowSyncBar('synced','Données locales vides · Supabase conservé',2500);
+          return {status:'guarded_empty'};
+        }
+        return {status:'no_remote'};
+      }
+      const mustRestore = forceRemote || sbLocalLooksEmpty(local, remote);
       if(mustRestore || sbServerIsNewer(remote.updated_at, local)){
         SA._mergeData(remote.data);
+        try{ localStorage.removeItem('superapp_local_delete_guard'); window._sbLocalDeleteGuard=false; }catch{}
         SA.render();
-        sbNotify(mustRestore ? '✅ Données récupérées depuis Supabase' : '🔄 Données mises à jour depuis le serveur');
-      } else {
-        await sbPushData(local);
+        const msg = mustRestore ? '✅ Données récupérées depuis Supabase' : '🔄 Données mises à jour depuis le serveur';
+        sbNotify(msg);
+        return {status:'restored'};
       }
+      if(window._sbLocalDeleteGuard){
+        sbShowSyncBar('synced','Données locales vides · Supabase conservé',2500);
+        return {status:'guarded'};
+      }
+      await sbPushData(local);
+      return {status:'pushed'};
     } catch(e){
       console.warn('[Sync]', e.message);
       sbShowSyncBar('error', '⚠️ Synchronisation impossible : ' + e.message, 4500);
+      throw e;
     }
   };
   window.sbForcePullFromServer = async function(){
     try{
       sbShowSyncBar('syncing','🔄 Récupération depuis Supabase…');
-      await window.sbPullAndMerge({forceRemote:true});
+      const result = await window.sbPullAndMerge({forceRemote:true});
       setLastSyncNow();
-      sbShowSyncBar('synced','✅ Données récupérées depuis Supabase',3000);
+      if(result?.status === 'empty_remote'){
+        sbShowSyncBar('error','ℹ️ Aucune donnée trouvée dans Supabase pour ce compte.',4500);
+      } else {
+        sbShowSyncBar('synced','✅ Données récupérées depuis Supabase',3000);
+      }
     }catch(e){
       sbShowSyncBar('error','⚠️ Récupération impossible : '+e.message,5000);
     }
@@ -190,6 +214,7 @@
     try{
       sbShowSyncBar('syncing','🔄 Synchronisation…');
       if(typeof sbPushData !== 'function') throw new Error('Fonction de synchronisation indisponible.');
+      if(window._sbLocalDeleteGuard) throw new Error('Données locales supprimées : utilise d’abord Récupérer ou Import JSON.');
       await sbPushData(window.SuperApp?._getData?.());
       setLastSyncNow();
       sbShowSyncBar('synced','✅ Synchronisé',2500);

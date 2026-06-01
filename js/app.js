@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.26';
+  const APP_VERSION = '5.36.27';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -535,7 +535,7 @@
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
     }
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.26').catch(()=>{}); }
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.27').catch(()=>{}); }
     maybeStartOnboarding();
     setTimeout(()=>maybeFireNotifications(), 800);
     setTimeout(()=>{ if(typeof window.sbInitAuth==="function") window.sbInitAuth(); }, 400);
@@ -694,8 +694,16 @@
     });
     $('#importInput').addEventListener('change', async e=>{
       const file = e.target.files[0]; if(!file) return;
-      try { const report = importPayload(JSON.parse(await file.text())); save(); render(); toast(`✅ Import OK — ${report.added} ajouté(s), ${report.updated} mis à jour, ${report.conflicts} conflit(s).`); }
-      catch { infoDialog('Fichier JSON invalide ou incompatible.'); }
+      try {
+        const txt = await file.text();
+        if(!txt || !txt.trim()) throw new Error('Fichier vide.');
+        const report = importPayload(JSON.parse(txt));
+        try{ localStorage.removeItem('superapp_local_delete_guard'); window._sbLocalDeleteGuard=false; }catch{}
+        save(); render();
+        toast(`✅ Import JSON réussi — ${report.added} ajouté(s), ${report.updated} mis à jour.`);
+        setView('home');
+      }
+      catch(err) { infoDialog('Fichier JSON invalide ou incompatible : ' + (err.message || err)); }
       e.target.value='';
     });
   }
@@ -1902,6 +1910,7 @@
     else if(key.includes('sante') && (key.includes('urgence') || key.includes('urgences'))) html = settingsHealthEmergencyPanel();
     else if(key.includes('donnees_par_application')) html = settingsReferencePanel(module);
     else if(key.includes('apparence')) html = settingsAppearancePanel();
+    else if(key.includes('compte')) html = settingsAccountPanel();
     else if(key.includes('synchronisation')) html = settingsSyncPanel();
     else if(key.includes('donnees')) html = settingsDataPanel();
     else html = `<div class="empty">Choisissez une rubrique de paramètres.</div>`;
@@ -2058,14 +2067,25 @@
     return `${settingsVisualHero({title:'Apparence', text:'L’interface reste familiale, douce et mignonne. Ici on règle seulement l’ambiance visuelle.', emoji:'🎨', chips:[a.theme||'clair', a.accent||'familial', a.accueil||'resume']})}
       <div class="settings-choice-grid"><label><span>☀️</span><b>Thème</b><select name="theme"><option value="clair" ${a.theme==='clair'?'selected':''}>Clair</option><option value="auto" ${a.theme==='auto'?'selected':''}>Automatique (suit le système)</option></select></label><label><span>🌈</span><b>Accent visuel</b><input name="accent" value="${escapeAttr(a.accent||'familial')}"></label><label><span>🏠</span><b>Accueil préféré</b><select name="accueil"><option value="resume" ${a.accueil==='resume'?'selected':''}>Résumé familial</option><option value="apps" ${a.accueil==='apps'?'selected':''}>Applications</option><option value="calendrier" ${a.accueil==='calendrier'?'selected':''}>Calendrier</option></select></label></div>`;
   }
+  function settingsAccountPanel(){
+    const email = window._sbUserEmail || '';
+    const connected = !!email;
+    return `${settingsVisualHero({title:'Compte', text:'Connexion du foyer et accès aux données synchronisées.', img:'assets/images/cards/settings_sync.png', emoji:'👤', chips:[connected ? 'Connecté' : 'Hors ligne', connected ? email : 'Connexion requise']})}
+      <div class="settings-account-card">
+        <div class="settings-account-main"><span>👤</span><div><b>${connected ? 'Compte connecté' : 'Aucun compte connecté'}</b><small>${connected ? escapeHtml(email) : 'Connecte-toi pour synchroniser et récupérer tes données.'}</small></div></div>
+        <div class="settings-account-actions">
+          ${connected ? '<button class="btn ghost" type="button" onclick="window.sbLogout?.()">Se déconnecter</button>' : '<button class="btn primary" type="button" onclick="window.sbShowAuthOverlay?.()">Se connecter</button>'}
+        </div>
+      </div>`;
+  }
   function settingsSyncPanel(){
     return `${settingsVisualHero({title:'Synchronisation', text:'Cette zone sert à connecter les supports, importer, exporter, fusionner et traiter les conflits. Elle ne remplace pas la saisie mobile.', img:'assets/images/cards/settings_sync.png', emoji:'🔄', chips:[`Mode : ${data.offer?.syncMode || 'mobile_only'}`, data.offer?.syncEnabled ? 'Synchro active' : 'Mobile seul', data.offer?.cockpitOrdinateur ? 'Ordinateur acheté' : 'Ordinateur non acheté']})}
       <div class="settings-sync-grid"><article><span>📱</span><b>Cockpit mobile</b><small>Actif et autonome</small></article><article><span>💻</span><b>Cockpit ordinateur</b><small>${data.offer?.cockpitOrdinateur ? 'Acheté' : 'Non connecté'}</small></article><article><span>🔐</span><b>Conflits</b><small>Gérés à l’import/export</small></article></div>
-      <div class="today-grid"><button class="btn ghost" type="button" onclick="SuperApp.exportData()">Exporter JSON</button><button class="btn ghost" type="button" onclick="document.getElementById('importInput').click()">Importer JSON</button></div>`;
+      <div class="today-grid"><button class="btn ghost" type="button" onclick="SuperApp.exportData()">Exporter JSON</button><button class="btn ghost" type="button" onclick="SuperApp.importData()">Importer JSON</button></div>`;
   }
   function settingsDataPanel(){
     return `${settingsVisualHero({title:'Sauvegarde & données', text:'Gérer les sauvegardes locales et la récupération depuis Supabase.', img:'assets/images/cards/settings_data.png', emoji:'🛡️', chips:['Export JSON','Import JSON','Supabase']})}
-      <div class="settings-data-actions"><button class="btn ghost" type="button" onclick="SuperApp.exportData()"><span>📤</span><b>Exporter</b><small>Sauvegarde JSON</small></button><button class="btn ghost" type="button" onclick="document.getElementById('importInput').click()"><span>📥</span><b>Importer</b><small>Restaurer JSON</small></button><button class="btn ghost" type="button" onclick="window.sbForcePullFromServer?.()"><span>☁️</span><b>Récupérer Supabase</b><small>Restaurer le cloud</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.clearDemoData()"><span>🧹</span><b>Supprimer les données de cet appareil</b><small>Supabase conservé</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.resetCloudData()"><span>⛔</span><b>Supprimer définitivement</b><small>Appareil + Supabase</small></button></div>`;
+      <div class="settings-data-actions"><button class="btn ghost" type="button" onclick="SuperApp.exportData()"><span>📤</span><b>Exporter</b><small>Sauvegarde JSON</small></button><button class="btn ghost" type="button" onclick="SuperApp.importData()"><span>📥</span><b>Importer</b><small>Restaurer JSON</small></button><button class="btn ghost" type="button" onclick="window.sbForcePullFromServer?.()"><span>☁️</span><b>Récupérer Supabase</b><small>Restaurer le cloud</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.clearDemoData()"><span>🧹</span><b>Supprimer les données de cet appareil</b><small>Supabase conservé</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.resetCloudData()"><span>⛔</span><b>Supprimer définitivement</b><small>Appareil + Supabase</small></button></div>`;
   }
     function selectWeatherCity(scope='settings', city='', postalCode='', country='France', lat=null, lon=null){
     const root = scope === 'onboarding' ? document.getElementById('onboarding') : document.getElementById('editFields');
@@ -2248,14 +2268,25 @@
       synchronisation: {sourceCollections, generatedFrom:'superapp_famille_mobile_v5_12_menage_visuel', rule:'merge_by_id_updatedAt_no_calendar_duplication_apps_registry_parametres_autonomes'}
     };
   }
+  function importData(){
+    const input = document.getElementById('importInput');
+    if(!input){ toast('Import indisponible.'); return; }
+    input.click();
+  }
   function exportData(){
     const payload = {
       schema:'superapp_famille', schemaVersion:'1.1.0', exportId:'exp_'+Date.now(), exportedAt:nowISO(), exportedFrom:'application_mobile', appVersion:APP_VERSION,
       offer: structuredClone(data.offer || defaultOffer), appsRegistry: structuredClone(data.appsRegistry || makeAppsRegistry()), data: buildExportData()
     };
     const blob = new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
     a.download = `superapp-famille-v${APP_VERSION}-export-${new Date().toISOString().slice(0,10)}.json`;
-    a.click(); URL.revokeObjectURL(a.href);
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ try{ URL.revokeObjectURL(url); a.remove(); }catch{} }, 800);
+    toast('📤 Export JSON lancé.');
   }
   function normalizeImportPayload(json){
     const payload = json?.schema === 'superapp_famille' ? {...(json.data||{}), offer:json.offer, appsRegistry:json.appsRegistry || json.data?.socle?.appsRegistry} : json;
@@ -2367,12 +2398,16 @@
       catch(e){ toast('⚠️ Suppression Supabase impossible : ' + (e.message || e)); return; }
     }
     data = emptyApplicationData();
-    if(!cloud) window._sbPauseAutoPush = true;
+    if(!cloud){
+      window._sbPauseAutoPush = true;
+      window._sbLocalDeleteGuard = true;
+      try{ localStorage.setItem('superapp_local_delete_guard','1'); }catch{}
+    }
     save();
     window._sbPauseAutoPush = false;
     closeEditDialog();
     render();
-    toast(cloud ? '⛔ Données supprimées définitivement' : '🧹 Données supprimées de cet appareil');
+    toast(cloud ? '⛔ Données supprimées définitivement' : '🧹 Données locales supprimées. Utilise Récupérer Supabase ou Import JSON pour restaurer.');
     setTimeout(()=>startOnboarding(true), 120);
   }
   function clearDemoData(){ openResetConfirmDialog('local'); }
@@ -4106,6 +4141,7 @@
       ]},
       {title:'Apparence & données', emoji:'✨', items:[
         ['🎨','Apparence', 'Apparence', 'Thème et couleurs'],
+        ['👤','Compte', 'Compte', window._sbUserEmail ? 'Connecté' : 'Hors ligne'],
         ['🔄','Synchronisation', 'Synchronisation', data.offer?.syncEnabled ? 'Cockpit connecté' : 'Mobile seul'],
         ['🛡️','Sauvegarde & données', 'Données', 'Export, import, sauvegarde']
       ]}
@@ -4529,7 +4565,7 @@
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
-    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
+    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
     handleCategoryChange, handleSubcategoryChange,
     openCreateCategoryDialog, openCreateSubcategoryDialog, confirmCreateCategory,
