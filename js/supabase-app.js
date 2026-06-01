@@ -26,20 +26,41 @@
   };
 
   // ─── Pull & Merge ────────────────────────────────────────────
-  window.sbPullAndMerge = async function(){
+  function sbDataItemCount(d){
+    const keys = ['family','tasks','shopping','meals','weeklyMeals','stock','homework','schoolDocs','health','vaccines','healthDocs','emergency','sports','loisirs','voyages','sportGear','loisirGear','voyageGear','familyDocuments','documents','calendarEvents','notifications'];
+    return keys.reduce((sum,k)=>sum + (Array.isArray(d?.[k]) ? d[k].filter(x=>x && x.status!=='archive' && x.statut!=='archive' && x.status!=='supprime' && x.statut!=='supprime').length : 0), 0);
+  }
+  function sbLocalLooksEmpty(local, remote){
+    return sbDataItemCount(remote?.data || remote) > 0 && sbDataItemCount(local) === 0;
+  }
+  window.sbPullAndMerge = async function(options={}){
     try {
       const remote = await sbPullData();
       if(!remote) return;
       const SA = window.SuperApp;
       if(!SA) return;
-      if(sbServerIsNewer(remote.updated_at, SA._getData())){
+      const local = SA._getData();
+      const mustRestore = options.forceRemote === true || sbLocalLooksEmpty(local, remote);
+      if(mustRestore || sbServerIsNewer(remote.updated_at, local)){
         SA._mergeData(remote.data);
         SA.render();
-        SA.toast('🔄 Données mises à jour depuis le serveur');
+        SA.toast(mustRestore ? '✅ Données récupérées depuis Supabase' : '🔄 Données mises à jour depuis le serveur');
       } else {
-        await sbPushData(SA._getData());
+        await sbPushData(local);
       }
-    } catch(e){ console.warn('[Sync]', e.message); }
+    } catch(e){
+      console.warn('[Sync]', e.message);
+      sbShowSyncBar('error', '⚠️ Synchronisation impossible : ' + e.message, 4500);
+    }
+  };
+  window.sbForcePullFromServer = async function(){
+    try{
+      sbShowSyncBar('syncing','🔄 Récupération depuis Supabase…');
+      await window.sbPullAndMerge({forceRemote:true});
+      sbShowSyncBar('synced','✅ Données récupérées depuis Supabase',3000);
+    }catch(e){
+      sbShowSyncBar('error','⚠️ Récupération impossible : '+e.message,5000);
+    }
   };
 
   // ─── Sync bar ────────────────────────────────────────────────
@@ -150,6 +171,7 @@
     return '<div class="sb-user-bar"><div class="sb-user-info"><strong>'
       +ico(0x1F7E2)+' Synchronisé</strong>'
       +'<small>'+e.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</small></div>'
+      +'<button class="sb-logout-btn" onclick="window.sbForcePullFromServer?.()">'+ico(0x1F4E5)+' Récupérer</button>'
       +'<button class="sb-logout-btn" onclick="window.sbLogout()">'+ico(0x1F6AA)+' Déconnexion</button></div>';
   };
 

@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.22';
+  const APP_VERSION = '5.36.23';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -535,7 +535,7 @@
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
     }
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.22').catch(()=>{}); }
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.23').catch(()=>{}); }
     maybeStartOnboarding();
     setTimeout(()=>maybeFireNotifications(), 800);
     setTimeout(()=>{ if(typeof window.sbInitAuth==="function") window.sbInitAuth(); }, 400);
@@ -1332,10 +1332,23 @@
   }
 
   function managementRow(x,cfg){
+    if(String(x.type||'').startsWith('checklist_')) return checklistManagementRow(x,cfg);
     if((cfg?.collection === 'shopping') || x.type === 'course') return shoppingRow(x,cfg);
     if(['sport_activites','loisir_activites','voyage_activites'].includes(cfg?.key) || ['activite','loisir','voyage'].includes(itemType(x))) return slvActivityCard(x);
     if(cfg?.module === 'education' || x.module === 'education') return schoolItemCard(x,cfg);
     return commonInfoRow(x,cfg);
+  }
+  function checklistManagementRow(x,cfg={}){
+    const done = statusIsDone(x);
+    const qty = parseInt(x.quantity || x.qty || 1, 10) || 1;
+    const kind = String(x.type||'').includes('devoir') ? 'education' : 'maison';
+    const parent = genericChecklistActivity(x.parentId) || {};
+    const linked = parent.title ? ` · lié à ${parent.title}` : '';
+    return `<article class="common-info-row checklist-list-row ${done?'done':''}">
+      <button type="button" class="shopping-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.toggleGenericChecklistItem('${x.id}')">${done?'✓':''}</button>
+      <div class="health-info-main" onclick="SuperApp.openGenericChecklist('${escapeAttr(x.parentId||'')}','${kind}')"><b>${escapeHtml(x.title||'Élément checklist')}</b><small>${escapeHtml(x.category||'Checklist')}${escapeHtml(linked)}</small><em>${qty} unité${qty>1?'s':''}${done?' · Fait':''}</em></div>
+      <button type="button" class="row-action del btn-sm ghost danger" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">Supprimer</button>
+    </article>`;
   }
   function schoolUrgencyClass(x){
     if(statusIsDone(x)||!x.date) return '';
@@ -2597,6 +2610,12 @@
     if(filter === 'done') arr = arr.filter(statusIsDone);
     return arr;
   }
+  function getGenericChecklistItems(kind='all', parentId=''){
+    let arr = visibleItems('documents').filter(x=>String(x.type||'').startsWith('checklist_'));
+    if(kind && kind !== 'all') arr = arr.filter(x=>String(x.type||'').includes(kind) || canonicalModuleId(x.module) === canonicalModuleId(kind));
+    if(parentId) arr = arr.filter(x=>String(x.parentId||'') === String(parentId));
+    return arr;
+  }
   function getMenus(filter='all'){
     let arr = [...visibleItems('meals'), ...visibleItems('weeklyMeals')].map(x=>({...x,module:'courses_repas'}));
     if(filter === 'today') arr = arr.filter(x=>x.date === today || Number(x.day) === ((todayObj.getDay()+6)%7));
@@ -3071,7 +3090,7 @@
   }
   function genericChecklistLineHtml(x){
     const done=statusIsDone(x); const qty=parseInt(x.quantity||x.qty||1,10)||1;
-    return `<article class="slv-check-row ${done?'done':''}"><label><input type="checkbox" ${done?'checked':''} onchange="SuperApp.toggleGenericChecklistItem('${x.id}')"><span><b>${escapeHtml(x.title)}</b><small>${escapeHtml(x.category||'Checklist')}</small></span></label><div class="slv-stepper" aria-label="Quantité"><button type="button" onclick="event.stopPropagation();SuperApp.changeGenericChecklistQty('${x.id}',-1)">−</button><strong>${qty}</strong><button type="button" onclick="event.stopPropagation();SuperApp.changeGenericChecklistQty('${x.id}',1)">+</button></div><button type="button" class="row-action del" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">Supprimer</button></article>`;
+    return `<article class="slv-check-row ${done?'done':''}"><label><input type="checkbox" ${done?'checked':''} onchange="SuperApp.toggleGenericChecklistItem('${x.id}')"><span><b>${escapeHtml(x.title)}</b><small>${escapeHtml(x.category||'Checklist')}</small></span></label><div class="slv-stepper" aria-label="Quantité"><button type="button" onclick="event.stopPropagation();SuperApp.changeGenericChecklistQty('${x.id}',-1)">−</button><strong>${qty}</strong><button type="button" onclick="event.stopPropagation();SuperApp.changeGenericChecklistQty('${x.id}',1)">+</button></div><button type="button" class="row-action del btn-sm ghost danger" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">Supprimer</button></article>`;
   }
   function paintGenericChecklistPage(parentId, kind='maison'){
     const parent = genericChecklistActivity(parentId); if(!parent){ paintModule(kind==='education'?'education':'maison'); return; }
@@ -3797,7 +3816,7 @@
   function activeMemberList(){ return getFamilyMembers ? getFamilyMembers() : (data.family||[]).filter(m=>!statusIsHidden(m) && m.active !== false); }
     function listTabsForModule(module){
     const groups = {
-      maison:[['taches','Tâches','🏠'],['taches_aujourdhui','Aujourd’hui','📅'],['taches_retard','En retard','⏰'],['taches_recurrentes','Récurrentes','🔁'],['taches_terminees','Terminées','✅'],['documents','Documents','📄']],
+      maison:[['taches','Tout','▦'],['taches_aujourdhui','Aujourd’hui','📅'],['taches_retard','En retard','⏰'],['taches_recurrentes','Récurrentes','🔁'],['taches_terminees','Terminées','✅']],
       courses_repas:[['repas','Repas','🍽️'],['courses','Courses','🛒'],['stock','Stock','🧺']],
       education:[['ecole','École','📘'],['ecole_notes','Notes','⭐'],['documents','Documents','📄']],
       sante:[['tous','Tous','▦'],['rendez_vous','Rendez-vous','📅'],['traitements','Traitements','💊'],['documents','Documents','📄'],['alertes','Alertes','🔔']],
@@ -3817,7 +3836,7 @@
   function moduleSummary(module){
     module = canonicalModuleId(module);
     const scoped = arr => applyMemberFilter(arr, module);
-    if(module==='maison') return [summaryMetric(scoped(getMaisonTasks('open')).length,'tâches actives','🏠'), summaryMetric(scoped(getMaisonTasks('today')).length,'aujourd’hui','📅'), summaryMetric(scoped(getMaisonTasks('late')).length,'en retard','⏰')].join('');
+    if(module==='maison') return [summaryMetric(scoped([...getMaisonTasks('open'), ...getGenericChecklistItems('maison')]).length,'éléments actifs','🏠'), summaryMetric(scoped(getMaisonTasks('today')).length,'aujourd’hui','📅'), summaryMetric(scoped(getMaisonTasks('late')).length,'en retard','⏰')].join('');
     if(module==='courses_repas') return [summaryMetric(scoped(getMenus()).length,'menus','🍽️'), summaryMetric(scoped(getShoppingItems('open')).length,'courses','🛒'), summaryMetric(scoped(getStockItems('low')).length,'stock faible','⚠️')].join('');
     if(module==='education') return [summaryMetric(scoped(getSchoolItems('open')).length,'école','📚'), summaryMetric(scoped(getSchoolItems('open').filter(x=>x.type==='note' || x.category==='Notes')).length,'notes','⭐'), summaryMetric(scoped(getSchoolItems('today')).length,'aujourd’hui','📅')].join('');
     if(module==='sante') return [summaryMetric(scoped(getHealthTreatments('open')).length,'traitements','💊'), summaryMetric(scoped(getHealthAppointments('open')).length,'rendez-vous','🩺'), summaryMetric(scoped(getHealthBookItems()).length,'carnet','📘')].join('');
@@ -3843,7 +3862,7 @@
       else if(key==='taches_retard' || cfg.filterName==='late') arr = getMaisonTasks('late');
       else if(['taches_recurrentes','routines'].includes(key)) arr = getMaisonTasks('recurrent');
       else if(['taches_terminees'].includes(key)) arr = getMaisonTasks('done');
-      else arr = visibleItems('tasks');
+      else arr = [...visibleItems('tasks'), ...getGenericChecklistItems('maison')];
     } else if(module==='courses_repas'){
       if(key==='tout') arr = [...getShoppingItems('all'), ...getMenus(), ...getStockItems()];
       else if(key==='menus' || (cfg.collections||[]).includes('weeklyMeals')) arr = getMenus();
@@ -3852,7 +3871,7 @@
       else if(cfg.collection==='shopping') arr = getShoppingItems('all');
       else arr = getShoppingItems('open');
     } else if(module==='education'){
-      arr = getSchoolItems('all');
+      arr = [...getSchoolItems('all'), ...getGenericChecklistItems('education')];
       if(cfg.filter) arr = arr.filter(cfg.filter);          // V5.6 : honorer le filtre (Notes…)
     } else if(module==='sante'){
       if(key==='tous') arr = [...getHealthAppointments('open'), ...getHealthTreatments('open'), ...getHealthBookItems()];
