@@ -11,6 +11,25 @@
   let sbLastSyncTime = localStorage.getItem('superapp_last_sync_time') || '';
   function setLastSyncNow(){ sbLastSyncTime = syncTime(); try{ localStorage.setItem('superapp_last_sync_time', sbLastSyncTime); }catch{} }
 
+  function sbNotify(msg){
+    try{
+      if(window.SuperApp && typeof window.SuperApp.toast === 'function'){
+        window.SuperApp.toast(msg);
+        return;
+      }
+    }catch{}
+    try{
+      const bar = document.getElementById('sb-sync-bar');
+      if(bar){
+        bar.className = 'visible synced';
+        bar.textContent = msg;
+        setTimeout(()=>{ if(bar.textContent === msg) bar.className = ''; }, 2200);
+        return;
+      }
+    }catch{}
+    console.log('[SuperApp]', msg);
+  }
+
   // ─── Init auth ───────────────────────────────────────────────
   window.sbInitAuth = async function(){
     if(typeof sbClient !== 'function') return;
@@ -48,7 +67,7 @@
       if(mustRestore || sbServerIsNewer(remote.updated_at, local)){
         SA._mergeData(remote.data);
         SA.render();
-        SA.toast(mustRestore ? '✅ Données récupérées depuis Supabase' : '🔄 Données mises à jour depuis le serveur');
+        sbNotify(mustRestore ? '✅ Données récupérées depuis Supabase' : '🔄 Données mises à jour depuis le serveur');
       } else {
         await sbPushData(local);
       }
@@ -147,7 +166,7 @@
       sbShowSyncBar('synced','✅ Connecté !',3000);
       const user=await sbCurrentUser();
       sbUpdateUserBar(user);
-        window.SuperApp?.toast('👋 Bienvenue ! Données synchronisées.');
+        sbNotify('👋 Bienvenue ! Données synchronisées.');
     } catch(e){
       const msg=e.message||'';
       if(msg.includes('Invalid login')) showErr('Email ou mot de passe incorrect.');
@@ -164,7 +183,7 @@
     await sbSignOut();
     window._sbUser=null; window._sbUserEmail='';
     sbShowAuthOverlay();
-    window.SuperApp?.toast('Déconnecté.');
+    sbNotify('Déconnecté.');
   };
 
   window.sbForcePushNow = async function(){
@@ -174,7 +193,7 @@
       await sbPushData(window.SuperApp?._getData?.());
       setLastSyncNow();
       sbShowSyncBar('synced','✅ Synchronisé',2500);
-      window.SuperApp?.toast('✅ Synchronisé');
+      sbNotify('✅ Synchronisé');
     }catch(e){
       sbShowSyncBar('error','⚠️ '+(e.message||e),4500);
     }

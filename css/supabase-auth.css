@@ -134,7 +134,7 @@
 .sb-doc-filter-group.muted p{margin:0;color:#74829d;font-size:12px;font-weight:750;line-height:1.35}
 
 
-/* V5.36.24 — Carte synchronisation compacte, adaptée mobile */
+/* V5.36.26 — Carte synchronisation compacte, adaptée mobile */
 .sb-user-bar.sb-user-bar-compact{
   display:flex;align-items:center;gap:8px;justify-content:flex-start;
   padding:8px 10px;border-radius:18px;margin:8px 0 12px;

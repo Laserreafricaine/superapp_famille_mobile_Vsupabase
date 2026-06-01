@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.24';
+  const APP_VERSION = '5.36.26';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -535,7 +535,7 @@
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
     }
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.24').catch(()=>{}); }
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.26').catch(()=>{}); }
     maybeStartOnboarding();
     setTimeout(()=>maybeFireNotifications(), 800);
     setTimeout(()=>{ if(typeof window.sbInitAuth==="function") window.sbInitAuth(); }, 400);
@@ -886,6 +886,7 @@
         <div class="hero-copy"><span>SUPERAPP FAMILLE</span><h2>${greeting}</h2><p>${isMemberProfile()?'Voici ta journée. Touche pour changer de profil.':'Voici les informations importantes de votre foyer aujourd’hui.'}</p></div>
         <img src="${profileAvatar()}" alt="" onerror="this.style.display='none'" />
       </article>
+      ${sbUserBarHtml()}
       <article class="card weather weather-premium clickable-card" onclick="SuperApp.openSettings('localisation')">
         <div class="sun" aria-label="Icône météo">${currentWeatherIcon()}</div><div><strong>${weatherTemperatureText()}</strong><br><small>${weatherMainLine()}</small></div>
         <div class="right"><b>${weatherCityLabel()}</b><br><small>${weatherSummary()}</small><br><small>${weatherUpdatedText()}</small></div>
@@ -4521,7 +4522,7 @@
   window.SuperApp = {
     _getData: ()=>data,
     _mergeData: (d)=>{ const m=ensureDataShape(d); Object.assign(data,m); localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); },
-    _findRecord: findRecord,
+    _findRecord: findRecord, toast,
     setView, openModule, openItem, openCalendarDate, openCalendarModule, setCalendarFilter, setNotificationFilter,
     renderAppsHome:()=>{ state.appsView=null; setView('apps'); }, render:()=>render(),
     setActiveProfile, openProfilePicker, closeProfileSheet, requestNotify,

@@ -1,5 +1,5 @@
-const CACHE = 'superapp-famille-v5-36-24';
-const CORE_ASSETS = ['./', './index.html', './css/app.css?v=5.36.24', './js/app.js?v=5.36.24', './js/supabase-client.js?v=5.36.24', './js/supabase-app.js?v=5.36.24', './css/supabase-auth.css?v=5.36.24', './manifest.json?v=5.36.24', './assets/icons/superapp-famille-icon-180.png?v=5.36.24', './assets/icons/superapp-famille-icon-192.png?v=5.36.24', './assets/icons/superapp-famille-icon-512.png?v=5.36.24'];
+const CACHE = 'superapp-famille-v5-36-26';
+const CORE_ASSETS = ['./', './index.html', './css/app.css?v=5.36.26', './js/app.js?v=5.36.26', './js/supabase-client.js?v=5.36.26', './js/supabase-app.js?v=5.36.26', './css/supabase-auth.css?v=5.36.26', './manifest.json?v=5.36.26', './assets/icons/superapp-famille-icon-180.png?v=5.36.26', './assets/icons/superapp-famille-icon-192.png?v=5.36.26', './assets/icons/superapp-famille-icon-512.png?v=5.36.26'];
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE_ASSETS)).catch(()=>{}));
