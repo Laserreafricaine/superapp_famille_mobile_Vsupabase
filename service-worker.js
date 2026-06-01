@@ -1,5 +1,5 @@
 const CACHE = 'superapp-famille-v5-36-21';
-const CORE_ASSETS = ['./', './index.html', './css/app.css?v=5.36.20', './js/app.js?v=5.36.20', './js/supabase-client.js?v=5.36.20', './js/supabase-app.js?v=5.36.20', './css/supabase-auth.css?v=5.36.20', './manifest.json?v=5.36.21'];
+const CORE_ASSETS = ['./', './index.html', './css/app.css?v=5.36.21', './js/app.js?v=5.36.21', './js/supabase-client.js?v=5.36.21', './js/supabase-app.js?v=5.36.21', './css/supabase-auth.css?v=5.36.21', './manifest.json?v=5.36.21', './assets/icons/superapp-famille-icon-180.png?v=5.36.21', './assets/icons/superapp-famille-icon-192.png?v=5.36.21', './assets/icons/superapp-famille-icon-512.png?v=5.36.21'];
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE_ASSETS)).catch(()=>{}));
@@ -15,7 +15,7 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   const url = new URL(req.url);
   if (req.method !== 'GET') return;
-  const isAppShell = url.pathname.endsWith('/') || url.pathname.endsWith('/index.html') || url.pathname.endsWith('/app.js') || url.pathname.endsWith('/app.css') || url.pathname.endsWith('/manifest.json');
+  const isAppShell = url.pathname.endsWith('/') || url.pathname.endsWith('/index.html') || url.pathname.endsWith('/app.js') || url.pathname.endsWith('/app.css') || url.pathname.endsWith('/manifest.json') || url.pathname.endsWith('/service-worker.js');
   if (isAppShell) {
     event.respondWith(
       fetch(req, {cache:'no-store'})

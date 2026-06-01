@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.19';
+  const APP_VERSION = '5.36.21';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -535,7 +535,7 @@
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
     }
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.19').catch(()=>{}); }
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.21').catch(()=>{}); }
     maybeStartOnboarding();
     setTimeout(()=>maybeFireNotifications(), 800);
     setTimeout(()=>{ if(typeof window.sbInitAuth==="function") window.sbInitAuth(); }, 400);
@@ -650,13 +650,6 @@
       const savedRecord = addItem(type,item);
       const backToList = state.returnList ? {...state.returnList} : null;
       state.preset=null;
-      if(savedRecord && canonicalModuleId(type)==='sport_loisirs' && wantsSlvChecklistAfterSave){
-        // V5.36.19 — priorité à l'ouverture de la checklist demandée depuis le formulaire.
-        // Le maintien de la fenêtre ouverte pour les documents ne doit pas bloquer ce parcours.
-        closeEditDialog();
-        setTimeout(()=>openSlvChecklistLight(savedRecord.id), 90);
-        return;
-      }
       if(savedRecord && wasNewDocModule){
         state.editing = findRecord(savedRecord.id);
         $('#editTitle').textContent = 'Modifier l’élément';
@@ -669,7 +662,9 @@
       }
       closeEditDialog();
       // V5.7 : addItem est autonome (save + render inclus), pas besoin de relancer ici.
-      {
+      if(savedRecord && canonicalModuleId(type)==='sport_loisirs' && wantsSlvChecklistAfterSave){
+        setTimeout(()=>openSlvChecklistLight(savedRecord.id), 90);
+      } else {
         if(backToList) setTimeout(()=>openModuleList(backToList.module, backToList.block), 30);
         if(savedRecord && canonicalModuleId(type)==='sport_loisirs') setTimeout(()=>refreshSlvChecklistDialog(savedRecord.id), 80);
       }
@@ -3067,10 +3062,10 @@
   function refreshSlvChecklistDialog(activityId){ if(state.appsView?.kind==='slvChecklist' && state.appsView.id===activityId) paintSlvChecklistPage(activityId); }
   function paintSlvChecklistDialog(activity){ if(activity) paintSlvChecklistPage(activity.id); }
   function openSlvChecklistLight(activityId){
-    // V5.36.19 — si l'ouverture est lancée depuis la fenêtre d'édition, fermer la modale
-    // avant de basculer sur la page checklist, sinon la checklist est masquée derrière la fenêtre.
-    closeEditDialog();
-    closeActionDialog();
+    // V5.36.20 — ferme les modales avant d'afficher la checklist.
+    // Cela garde les boutons visibles et évite que la fiche reste au-dessus de la page checklist.
+    try{ closeEditDialog(); }catch{}
+    try{ closeActionDialog(); }catch{}
     state.appsView={kind:'slvChecklist', id:activityId};
     setView('apps');
   }
@@ -3393,8 +3388,8 @@
     if(type==='sport_loisirs' && !['materiel_sport','materiel_loisir','materiel_voyage','document_sport'].includes(item.type||'')){
       const label = (item.type==='voyage') ? 'Voyage' : (item.type==='loisir' ? 'Loisir' : 'Sport');
       extraAfterDetails = item.id
-        ? `<details class="form-collapse slv-checklist-form-panel"><summary>✅ Checklist</summary><div class="slv-mini-help"><b>Checklist liée à cette activité.</b><small>Ajout et modification utilisent exactement la même page checklist : objet, quantité, catégorie, suggestions, statut barré et suppression manuelle.</small></div><button type="button" class="btn primary" onclick="SuperApp.openSlvChecklistLight('${escapeAttr(item.id)}')">✅ Ouvrir la checklist ${escapeHtml(label)}</button></details>`
-        : `<details class="form-collapse slv-checklist-form-panel"><summary>✅ Checklist</summary><div class="slv-mini-help"><b>Checklist liée à cette activité.</b><small>Aucun champ texte multiligne : crée l’activité puis ouvre la même page checklist structurée que pour la modification.</small></div><button type="submit" class="btn primary" name="openChecklistAfterSave" value="1" data-open-checklist="1">✅ Créer l’activité et ouvrir la checklist ${escapeHtml(label)}</button></details>`;
+        ? `<section class="slv-checklist-form-panel always-visible-checklist"><div class="slv-mini-help"><b>✅ Checklist liée à cette activité</b><small>Ajout et modification utilisent exactement la même page checklist : objet, quantité, catégorie, suggestions, statut barré et suppression manuelle.</small></div><button type="button" class="btn primary" onclick="SuperApp.openSlvChecklistLight('${escapeAttr(item.id)}')">✅ Ouvrir la checklist ${escapeHtml(label)}</button></section>`
+        : `<section class="slv-checklist-form-panel always-visible-checklist"><div class="slv-mini-help"><b>✅ Checklist liée à cette activité</b><small>Aucun champ texte multiligne : crée l’activité puis ouvre la même page checklist structurée que pour la modification.</small></div><button type="submit" class="btn primary" name="openChecklistAfterSave" value="1" data-open-checklist="1">✅ Créer l’activité et ouvrir la checklist ${escapeHtml(label)}</button></section>`;
     }
     if(!inside) return extraAfterDetails;
     return `<details class="form-collapse"><summary>＋ Plus de détails</summary>${inside}</details>${extraAfterDetails}`;
