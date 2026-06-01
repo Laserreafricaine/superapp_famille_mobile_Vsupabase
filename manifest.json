@@ -1,8 +1,8 @@
 {
   "name": "SuperApp Famille Mobile",
   "short_name": "SuperFamille",
-  "description": "SuperApp Famille Mobile V5.36.19 — synchronisée avec Supabase.",
-  "start_url": "./superapp_famille_mobile_Vsupabase/index.html?v=5.36.19",
+  "description": "SuperApp Famille Mobile V5.36.21 — synchronisée avec Supabase.",
+  "start_url": "./index.html?v=5.36.21",
   "display": "standalone",
   "background_color": "#fff8f1",
   "theme_color": "#fff8f1",
@@ -19,5 +19,5 @@
       "type": "image/svg+xml"
     }
   ],
-  "scope": "./superapp_famille_mobile_Vsupabase/"
+  "scope": "./"
 }
