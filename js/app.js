@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.21';
+  const APP_VERSION = '5.36.22';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -535,7 +535,7 @@
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
     }
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.21').catch(()=>{}); }
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.22').catch(()=>{}); }
     maybeStartOnboarding();
     setTimeout(()=>maybeFireNotifications(), 800);
     setTimeout(()=>{ if(typeof window.sbInitAuth==="function") window.sbInitAuth(); }, 400);
@@ -629,6 +629,8 @@
       const form = new FormData(e.currentTarget);
       const type = e.currentTarget.dataset.type;
       const wantsSlvChecklistAfterSave = e.submitter && (e.submitter.name === 'openChecklistAfterSave' || e.submitter.dataset?.openChecklist === '1');
+      const wantsGenericChecklistAfterSave = e.submitter && e.submitter.dataset?.openGenericChecklist === '1';
+      const genericChecklistKind = e.submitter?.dataset?.checklistKind || '';
       const item = Object.fromEntries(form.entries());
       const multiStudents = e.currentTarget.querySelector('select[name="students"][multiple]');
       if(multiStudents) item.students = [...multiStudents.selectedOptions].map(o=>o.value).join(',');
@@ -650,6 +652,11 @@
       const savedRecord = addItem(type,item);
       const backToList = state.returnList ? {...state.returnList} : null;
       state.preset=null;
+      if(savedRecord && wantsGenericChecklistAfterSave){
+        closeEditDialog();
+        setTimeout(()=>openGenericChecklist(savedRecord.id, genericChecklistKind || (docModule==='education' ? 'education' : 'maison')), 90);
+        return;
+      }
       if(savedRecord && wasNewDocModule){
         state.editing = findRecord(savedRecord.id);
         $('#editTitle').textContent = 'Modifier l’élément';
@@ -667,6 +674,22 @@
       } else {
         if(backToList) setTimeout(()=>openModuleList(backToList.module, backToList.block), 30);
         if(savedRecord && canonicalModuleId(type)==='sport_loisirs') setTimeout(()=>refreshSlvChecklistDialog(savedRecord.id), 80);
+      }
+    });
+
+    // Sélection exclusive : Toute la famille OU membres individuels, jamais les deux.
+    $('#editForm').addEventListener('change', e=>{
+      const box = e.target?.closest?.('input[type="checkbox"][name="students_cb"], input[type="checkbox"][name="members_cb"]');
+      if(!box) return;
+      const name = box.name;
+      const all = [...$('#editForm').querySelectorAll(`input[name="${name}"]`)];
+      if(box.value === 'family' && box.checked){ all.forEach(c=>{ if(c!==box) c.checked=false; }); }
+      else if(box.checked){ const fam = all.find(c=>c.value==='family'); if(fam) fam.checked=false; }
+      const hidden = document.getElementById(name === 'students_cb' ? 'studentsHidden' : 'membersHidden');
+      if(hidden){
+        const checked = all.filter(c=>c.checked);
+        const vals = checked.map(c=>c.value).filter(v=>v && v!=='family');
+        hidden.value = checked.some(c=>c.value==='family') || !vals.length ? 'family' : vals.join(',');
       }
     });
     $('#importInput').addEventListener('change', async e=>{
@@ -746,6 +769,7 @@
     else if(v.kind==='budget') paintBudgetBoard();
     else if(v.kind==='slvDetail') paintSlvActivityDetail(v.id);
     else if(v.kind==='slvChecklist') paintSlvChecklistPage(v.id);
+    else if(v.kind==='genericChecklist') paintGenericChecklistPage(v.id, v.checklistKind || 'maison');
   }
   function updateBadges(){
     const count = forActiveProfile(getNotifications()).filter(n=>!n.done).length;
@@ -868,11 +892,6 @@
       </article>
       ${mealsCardHtml}
       ${shoppingHintHtml}
-      <article class="home-doc-test-card clickable-card" onclick="window.sbOpenDocumentTest?.()">
-        <span class="ico">📎</span>
-        <div><b>Test documents Supabase</b><small>Charger, ouvrir, télécharger et supprimer un fichier.</small></div>
-        <span class="chev">›</span>
-      </article>
       <div class="section-title"><h2>${isMemberProfile()?'Ma journée':'Aujourd’hui pour la famille'}</h2><span>${displayDate(today).replace(/^./,c=>c.toUpperCase())}</span></div>
       <div class="digest-list">${digestRows}</div>
       <div class="section-title"><h2>Mes apps</h2><button class="link-btn" onclick="SuperApp.setView('apps')">Voir tout</button></div>
@@ -976,15 +995,15 @@
 
   const MODULE_LISTS = {
     maison: {
-      taches:{title:'Tâches Maison', emoji:'🏠', collection:'tasks', type:'tache', category:'Ménage', help:'Toutes les tâches de la maison. Filtre par Aujourd’hui, En retard, Par membre ou Récurrentes.'},
+      taches:{title:'Tout', emoji:'🏠', collection:'tasks', type:'tache', category:'Ménage', help:'Tâches, entretien et routines.'},
       taches_aujourdhui:{title:'Tâches Maison — aujourd’hui', emoji:'🏠', collection:'tasks', type:'tache', category:'Ménage', filter:x=>x.date===today, help:'Filtre aujourd’hui.'},
       taches_retard:{title:'Tâches Maison — en retard', emoji:'⏰', collection:'tasks', type:'tache', category:'Urgence', filter:x=>!statusIsDone(x) && x.date && daysDiff(today,x.date)<0, help:'Filtre en retard.'},
       taches_par_membre:{title:'Tâches Maison — par membre', emoji:'👨‍👩‍👧‍👦', collection:'tasks', type:'tache', category:'Ménage', sortByMember:true, help:'Vue regroupée par membre.'},
       taches_recurrentes:{title:'Tâches Maison — récurrentes', emoji:'🔁', collection:'tasks', type:'tache', category:'Routine', filter:x=>/routine|récurrent|recurr/i.test(String(x.category||x.title||'')), help:'Routines et tâches récurrentes.'},
-      documents:{title:'Documents Maison', emoji:'📄', collection:'tasks', type:'document_maison', category:'Documents maison', help:'Documents Supabase liés aux tâches et fiches Maison.'},
     },
     courses_repas: {
       // V5.27 — Refonte : 3 chips claires, indépendantes
+      tout:{title:'Tout', emoji:'🍽️', collections:['shopping','weeklyMeals','stock'], collection:'shopping', type:'course', category:'Courses', help:'Courses, repas et stock.'},
       repas:{title:'Repas', emoji:'🍽️', collection:'weeklyMeals', type:'repas_semaine', category:'Repas', help:'Repas du jour en vedette et menu de la semaine.', special:'mealsView'},
       courses:{title:'Courses', emoji:'🛒', collection:'shopping', type:'course', category:'Alimentation', help:'Liste de courses cochable, ajout manuel.'},
       stock:{title:'Stock', emoji:'🧺', collection:'stock', type:'stock', category:'Stock', help:'Frigo, congélateur, placards.', special:'stockView'},
@@ -996,7 +1015,8 @@
       menus:{title:'Repas', emoji:'🍽️', collection:'weeklyMeals', type:'repas_semaine', category:'Repas', special:'mealsView', aliasOf:'repas'}
     },
     education: {
-      ecole:{title:'École', emoji:'📚', collections:['homework','schoolDocs'], collection:'homework', type:'devoir', category:'Devoirs', help:'Devoirs, contrôles, activités et documents dans une seule liste.'},
+      tout:{title:'Tout', emoji:'📚', collections:['homework','schoolDocs'], collection:'homework', type:'devoir', category:'Devoirs', help:'École, notes et documents.'},
+      ecole:{title:'École', emoji:'📚', collections:['homework','schoolDocs'], collection:'homework', type:'devoir', category:'Devoirs', help:'Devoirs, contrôles et activités.'},
       ecole_notes:{title:'École — Notes', emoji:'⭐', collection:'homework', type:'note', category:'Notes', filter:x=>x.type==='note' || x.category==='Notes', help:'Notes et appréciations.'},
       documents:{title:'Documents Éducation', emoji:'📄', collection:'schoolDocs', type:'document_ecole', category:'Documents école', help:'Documents Supabase liés aux devoirs, notes et fiches Éducation.'},
     },
@@ -1028,9 +1048,9 @@
   
   function listFilterChips(module, block, cfg){
     const groups = {
-      maison:[['taches','Toutes'],['taches_aujourdhui','Aujourd’hui'],['taches_retard','En retard'],['taches_par_membre','Par membre'],['taches_recurrentes','Récurrentes'],['documents','Documents']],
-      courses_repas:[['menu_semaine','Semaine'],['menu_jour','Jour'],['courses','Courses'],['stock','Stock'],['stock_faible','Stock faible']],
-      education:[['ecole','École'],['ecole_notes','Notes'],['documents','Documents']],
+      maison:[['taches','Tout'],['taches_aujourdhui','Aujourd’hui'],['taches_retard','En retard'],['taches_par_membre','Par membre'],['taches_recurrentes','Récurrentes']],
+      courses_repas:[['tout','Tout'],['menu_semaine','Semaine'],['menu_jour','Jour'],['courses','Checklist courses'],['stock','Stock'],['stock_faible','Stock faible']],
+      education:[['tout','Tout'],['ecole','École'],['ecole_notes','Notes'],['documents','Documents']],
       sante:[['tous','Tous'],['rendez_vous','Rendez-vous'],['traitements','Traitements'],['documents','Documents'],['alertes','Alertes']],
       sport_loisirs:[['tout','Tout'],['sport_activites','Sport'],['loisir_activites','Loisir'],['voyage_activites','Voyage'],['documents','Documents']],
       familles:[['documents','Documents',String.fromCodePoint(0x1F4C1)]]
@@ -1050,7 +1070,7 @@
       : cfg.special === 'checklistView'
           ? `<div class="management-list">${visibleCollectionItems(cfg).map(x=>shoppingRow(x,{collection:cfg.collection})).join('')||'<div class="empty">Checklist vide.</div>'}</div>`
       : '';
-    const docsMode = (block==='documents' && supportsSupabaseDocs(module)) ? (module==='familles' ? 'global' : module) : '';
+    const docsMode = ((block==='documents' || ['tout','tous'].includes(block)) && supportsSupabaseDocs(module)) ? (module==='familles' ? 'global' : module) : '';
     const supabaseDocsHtml = docsMode ? supabaseDocsPanelHtml(docsMode) : '';
     if(supabaseDocsHtml) setTimeout(()=>window.sbHydrateDocsPanel?.(docsMode), 120);
     // V5.28 — Les vues spéciales Courses/Repas/Stock gardent leurs vrais écrans, même ouvertes depuis les chips.
@@ -1058,7 +1078,7 @@
       <div class="sublist-title-bar"><div class="sublist-emoji">${cfg.emoji || m.icon}</div><div><h2>${cfg.title}</h2><small>${cfg.help || ''}</small></div></div>
       ${chips}
       <div class="list-toolbar-card"><button class="btn ghost" onclick="SuperApp.openModule('${module}')">← Retour ${m.short}</button><button class="btn primary" onclick="SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')">${cfg.emoji} + Ajouter</button></div>
-      ${supabaseDocsHtml || specialHtml || `<div class="management-list">${items.length ? items.map(x=>module==='sante' ? healthInfoRow(x,cfg) : managementRow(x,cfg)).join('') : `<article class="empty cute-empty"><b>${cfg.emoji} Rien pour le moment</b><small>Ajoute un premier élément. Tout élément affiché peut ensuite être vu, modifié, marqué fait ou supprimé.</small><button class="btn primary" onclick="SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')">+ Ajouter</button></article>`}</div>`}`;
+      ${block==='documents' ? supabaseDocsHtml : `${specialHtml || `<div class="management-list">${items.length ? items.map(x=>module==='sante' ? healthInfoRow(x,cfg) : managementRow(x,cfg)).join('') : `<article class="empty cute-empty"><b>${cfg.emoji} Rien pour le moment</b><button class="btn primary" onclick="SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')">+ Ajouter</button></article>`}</div>`}${supabaseDocsHtml && block!=='documents' ? supabaseDocsHtml : ''}`}`;
   }
   function emergencyNumbers(){
     return data.settings?.emergencyNumbers || {pompiers:'', police:'', samu:''};
@@ -2951,7 +2971,7 @@
       ${fusedBlock('sport_loisirs',cfg.actKey,cfg.label+' — activités',cfg.emoji,cfg.tone,'Page complète '+cfg.label,
         `<div class="agenda-list">${cfg.acts.map(x=>slvActivityCard(x)).join('')||'<div class="empty">Aucune activité. Ajoute une première fiche.</div>'}</div>`,
         `<button class="link-btn" onclick="SuperApp.openAdd('sport_loisirs','${cfg.type}','${cfg.label}')">+ Ajouter</button>`)}
-      <div class="module-secondary-note">✅ Chaque activité ouvre sa propre page avec sa carte en haut et sa checklist liée en dessous. Les éléments cochés restent visibles et barrés jusqu’à suppression manuelle.</div>
+
     `;
   }
   function slvActivityCard(x){
@@ -3004,6 +3024,73 @@
       </section>`;
   }
   function openSlvActivityDetail(id){ state.appsView={kind:'slvDetail', id}; setView('apps'); }
+  function genericChecklistConfig(kind='maison'){
+    return kind === 'education'
+      ? {kind:'education', module:'education', title:'Checklist devoirs', emoji:'📚', itemPlaceholder:'Étape du devoir', type:'checklist_devoir', category:'Devoirs', suggestions:['Lire la consigne','Faire les exercices','Relire','Mettre dans le cartable']}
+      : {kind:'maison', module:'maison', title:'Checklist ménage', emoji:'🧹', itemPlaceholder:'Étape ou objet', type:'checklist_maison', category:'Ménage', suggestions:['Préparer','Nettoyer','Ranger','Vérifier']};
+  }
+  function genericChecklistRows(parentId){
+    return (data.documents || []).filter(x=>!statusIsHidden(x) && String(x.parentId||'')===String(parentId||'') && String(x.type||'').startsWith('checklist_'));
+  }
+  function genericChecklistActivity(parentId){
+    const found = findRecord(parentId);
+    return found?.item || null;
+  }
+  function openGenericChecklist(parentId, kind='maison'){
+    const parent = genericChecklistActivity(parentId);
+    if(!parent){ toast('Élément introuvable.'); return; }
+    try { closeEditDialog(); } catch {}
+    state.appsView = {kind:'genericChecklist', id:parentId, checklistKind:kind};
+    setView('apps');
+  }
+  function addGenericChecklistLine(parentId, kind='maison', forcedTitle=''){
+    const cfg = genericChecklistConfig(kind);
+    const titleEl = document.getElementById('genericChecklistTitleInput');
+    const qtyEl = document.getElementById('genericChecklistQtyInput');
+    const catEl = document.getElementById('genericChecklistCatInput');
+    const title = (forcedTitle || titleEl?.value || '').trim();
+    if(!title){ toast('Renseigne un élément.'); return; }
+    data.documents = Array.isArray(data.documents) ? data.documents : [];
+    const parent = genericChecklistActivity(parentId) || {};
+    data.documents.push(decorateSync({
+      id:uid(), module:cfg.module, type:cfg.type, category:catEl?.value || cfg.category,
+      title, quantity:qtyEl?.value || '1', unit:'unité', qty:qtyEl?.value ? `${qtyEl.value} unité` : '1 unité',
+      status:'a_faire', parentId, member:parent.member || 'family', members:parent.members || parent.students || parent.member || 'family'
+    }));
+    save(); paintGenericChecklistPage(parentId, kind);
+  }
+  function addGenericChecklistSuggestion(parentId, kind, title){ addGenericChecklistLine(parentId, kind, title); }
+  function toggleGenericChecklistItem(id){ markDone(id); const found=findRecord(id); const parentId=found?.item?.parentId; const kind=String(found?.item?.type||'').includes('devoir')?'education':'maison'; if(parentId) setTimeout(()=>paintGenericChecklistPage(parentId, kind),30); }
+  function changeGenericChecklistQty(id, delta){
+    const found = findRecord(id); if(!found) return;
+    const cur = parseInt(found.item.quantity || found.item.qty || 1, 10) || 1;
+    const next = Math.max(1, cur + delta);
+    found.item.quantity = next; found.item.qty = `${next} unité`; touchSync(found.item); save();
+    const kind = String(found.item.type||'').includes('devoir') ? 'education' : 'maison';
+    paintGenericChecklistPage(found.item.parentId, kind);
+  }
+  function genericChecklistLineHtml(x){
+    const done=statusIsDone(x); const qty=parseInt(x.quantity||x.qty||1,10)||1;
+    return `<article class="slv-check-row ${done?'done':''}"><label><input type="checkbox" ${done?'checked':''} onchange="SuperApp.toggleGenericChecklistItem('${x.id}')"><span><b>${escapeHtml(x.title)}</b><small>${escapeHtml(x.category||'Checklist')}</small></span></label><div class="slv-stepper" aria-label="Quantité"><button type="button" onclick="event.stopPropagation();SuperApp.changeGenericChecklistQty('${x.id}',-1)">−</button><strong>${qty}</strong><button type="button" onclick="event.stopPropagation();SuperApp.changeGenericChecklistQty('${x.id}',1)">+</button></div><button type="button" class="row-action del" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">Supprimer</button></article>`;
+  }
+  function paintGenericChecklistPage(parentId, kind='maison'){
+    const parent = genericChecklistActivity(parentId); if(!parent){ paintModule(kind==='education'?'education':'maison'); return; }
+    const cfg = genericChecklistConfig(kind);
+    const rows = genericChecklistRows(parentId);
+    const done = rows.filter(statusIsDone).length;
+    const suggestions = cfg.suggestions;
+    $('#view-apps').innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openEdit('${cfg.module}','${parentId}')">← Retour fiche</button></div>
+      <section class="slv-checklist-page ${escapeAttr(cfg.module)}">
+        <article class="slv-detail-hero"><div class="slv-detail-icon">${cfg.emoji}</div><div class="slv-detail-main"><span>${escapeHtml(cfg.title)}</span><h2>${escapeHtml(parent.title||'Élément')}</h2><p>${done}/${rows.length} fait(s)</p></div></article>
+        <section class="slv-checklist-board">
+          <div class="slv-add-object-card"><input id="genericChecklistTitleInput" type="text" placeholder="${escapeAttr(cfg.itemPlaceholder)}"><input id="genericChecklistQtyInput" type="number" min="1" step="1" value="1" aria-label="Quantité"><select id="genericChecklistCatInput"><option>${escapeHtml(cfg.category)}</option><option>Préparation</option><option>À faire</option><option>Autre</option></select><button type="button" class="btn primary" onclick="SuperApp.addGenericChecklistLine('${parentId}','${cfg.kind}')">+ Ajouter</button></div>
+          <div class="slv-suggestions"><b>Suggestions rapides</b><div>${suggestions.map(v=>`<button type="button" onclick="SuperApp.addGenericChecklistSuggestion('${parentId}','${cfg.kind}','${escapeAttr(v)}')">＋ ${escapeHtml(v)}</button>`).join('')}</div></div>
+          <div class="slv-checklist-light-rows">${rows.length ? rows.map(genericChecklistLineHtml).join('') : '<div class="empty cute-empty"><b>Checklist vide</b></div>'}</div>
+          <footer class="dialog-actions slv-checklist-actions"><button type="button" class="btn ghost" onclick="SuperApp.openEdit('${cfg.module}','${parentId}')">Retour fiche</button><button type="button" class="btn primary" onclick="SuperApp.openModule('${cfg.module}')">Valider</button></footer>
+        </section>
+      </section>`;
+  }
+
   function openAddSlvChecklist(activityId){
     const activity=slvActivityById(activityId);
     if(!activity){ toast('Activité introuvable.'); return; }
@@ -3191,18 +3278,32 @@
     return ({maison:'Maison', education:'Éducation', sante:'Santé', sport_loisirs:'Sport / Loisir / Voyage', familles:'Familles'}[canonicalModuleId(module)] || moduleLabel(module));
   }
   function supportsSupabaseDocs(module){
-    return ['maison','education','sante','sport_loisirs','familles'].includes(canonicalModuleId(module));
+    return ['education','sante','sport_loisirs','familles'].includes(canonicalModuleId(module));
   }
   function healthDocsFieldHtml(item={}, module='sante'){
     module = canonicalModuleId(module);
     const label = documentModuleLabel(module);
     const id = item && item.id ? String(item.id) : '';
     if(!id){
-      return `<section class="sb-health-doc-zone locked"><div class="sb-doc-test-intro"><b>📎 Documents attachés</b><small>Enregistre d’abord cette fiche ${escapeHtml(label)}. La fenêtre restera ouverte et tu pourras ensuite déposer un PDF, une photo ou un justificatif lié à cette fiche.</small></div></section>`;
+      return `<section class="sb-health-doc-zone locked"><div class="sb-doc-test-intro"><b>📎 Documents attachés</b></div></section>`;
     }
     const safeId = escapeAttr(id);
     const safeModule = escapeAttr(module);
-    return `<section class="sb-health-doc-zone" data-sb-health-docs="${safeId}" data-sb-doc-module="${safeModule}"><div class="sb-doc-test-intro"><b>📎 Documents attachés</b><small>Documents Supabase liés uniquement à cette fiche ${escapeHtml(label)}.</small></div><input id="sb-health-doc-input-${safeId}" type="file" hidden onchange="window.sbUploadHealthItemDocument?.(this,'${safeId}','${safeModule}')"><button type="button" class="btn primary sb-doc-test-upload" onclick="document.getElementById('sb-health-doc-input-${safeId}')?.click()">📤 Charger un document</button><div class="sb-health-doc-status info">Chargement des documents…</div><div class="sb-health-doc-list"><div class="empty">Chargement…</div></div></section>`;
+    return `<section class="sb-health-doc-zone" data-sb-health-docs="${safeId}" data-sb-doc-module="${safeModule}"><div class="sb-doc-test-intro"><b>📎 Documents attachés</b></div><input id="sb-health-doc-input-${safeId}" type="file" hidden onchange="window.sbUploadHealthItemDocument?.(this,'${safeId}','${safeModule}')"><button type="button" class="btn primary sb-doc-test-upload" onclick="document.getElementById('sb-health-doc-input-${safeId}')?.click()">📤 Charger un document</button><div class="sb-health-doc-status info">Chargement des documents…</div><div class="sb-health-doc-list"><div class="empty">Chargement…</div></div></section>`;
+  }
+
+  function genericChecklistFieldHtml(type, item={}){
+    const module = canonicalModuleId(type);
+    const isMaison = module === 'maison';
+    const isEducation = module === 'education' && String(item.type || 'devoir') !== 'note';
+    if(!isMaison && !isEducation) return '';
+    const kind = isEducation ? 'education' : 'maison';
+    const label = isEducation ? 'devoir' : 'tâche';
+    const title = isEducation ? 'Checklist devoirs' : 'Checklist';
+    if(item.id){
+      return `<section class="slv-checklist-form-panel always-visible-checklist"><div class="slv-mini-help"><b>✅ ${title}</b></div><button type="button" class="btn primary" onclick="SuperApp.openGenericChecklist('${escapeAttr(item.id)}','${kind}')">✅ Ouvrir la checklist ${label}</button></section>`;
+    }
+    return `<section class="slv-checklist-form-panel always-visible-checklist"><div class="slv-mini-help"><b>✅ ${title}</b></div><button type="submit" class="btn primary" data-open-generic-checklist="1" data-checklist-kind="${kind}">✅ Créer et ouvrir la checklist ${label}</button></section>`;
   }
 
   // V5.8 — Formulaire standardisé : MÊME séquence partout, peu importe le module.
@@ -3234,7 +3335,7 @@
     const hiddenRouting = hiddenRoutingHtml(type, moduleValue, item) + hiddenParentHtml(item);
 
     // 8. NOTES (toujours dépliable)
-    const notesField = `<details class="form-collapse"><summary>📝 Ajouter une note</summary><div class="form-field"><textarea name="notes" rows="3" placeholder="Notes utiles">${escapeHtml(item.notes||item.desc||'')}</textarea></div></details>`;
+    const notesField = `<details class="form-collapse"><summary>📝 Ajouter une note</summary><div class="form-field"><textarea name="notes" rows="3" placeholder="Notes">${escapeHtml(item.notes||item.desc||'')}</textarea></div></details>`;
 
     // 9. STATUT (uniquement en modification, sinon "à faire" par défaut)
     const statusField = isEditing
@@ -3246,9 +3347,10 @@
       ? `<div class="danger-actions"><button class="btn ghost" type="button" onclick="SuperApp.archiveItem('${item.id}')">Archiver</button><button class="btn ghost danger" type="button" onclick="SuperApp.deleteItem('${item.id}')">🗑️ Supprimer</button></div>`
       : '';
 
+    const checklistField = genericChecklistFieldHtml(type, item);
     const docsField = supportsSupabaseDocs(type) ? healthDocsFieldHtml(item, type) : '';
     const visibilityField = ['maison','education','sante','sport_loisirs','familles','calendrier'].includes(type) ? setHomeVisibilityFields(item) : '';
-    return `${hiddenRouting}${titleField}${dateField}${hourField}${memberField}${categoryField}${moduleDetails}${notesField}${statusField}${danger}${docsField}${visibilityField}`;
+    return `${hiddenRouting}${titleField}${dateField}${hourField}${memberField}${categoryField}${moduleDetails}${checklistField}${notesField}${statusField}${danger}${docsField}${visibilityField}`;
   }
 
   // Champs cachés pour le routage : module + type sont déduits du bouton cliqué, jamais demandés à l'utilisateur (sauf depuis le calendrier).
@@ -3319,7 +3421,7 @@
         </div>
         <div class="form-field"><label>Matière</label><input name="subject" value="${escapeAttr(item.subject||item.category||'')}" placeholder="Ex : Maths, Français"></div>
         ${item.type==='note'||item.category==='Notes'?`<div class="form-grid-2"><div class="form-field"><label>Note obtenue</label><input name="score" type="number" min="0" max="20" step="0.5" value="${escapeAttr(item.score||'')}" placeholder="Ex : 14"></div><div class="form-field"><label>Sur combien</label><input name="scoreMax" type="number" min="1" max="100" step="1" value="${escapeAttr(item.scoreMax||'20')}" placeholder="20"></div></div>`:''}
-        <div class="form-field"><label>Durée</label><input name="duration" value="${escapeAttr(item.duration||'')}" placeholder="Ex : 1 h, 45 min"></div>`;
+        <div class="form-grid-2"><div class="form-field"><label>Début</label><input name="eduWindowStart" type="time" value="${escapeAttr(item.eduWindowStart||item.startTime||'')}"></div><div class="form-field"><label>Fin</label><input name="eduWindowEnd" type="time" value="${escapeAttr(item.eduWindowEnd||item.endTime||'')}"></div></div><input type="hidden" name="duration" value="${escapeAttr(item.duration||'')}">`;
     }
     if(type === 'sante'){
       const _isAppt=isAppointment(item);
@@ -3388,8 +3490,8 @@
     if(type==='sport_loisirs' && !['materiel_sport','materiel_loisir','materiel_voyage','document_sport'].includes(item.type||'')){
       const label = (item.type==='voyage') ? 'Voyage' : (item.type==='loisir' ? 'Loisir' : 'Sport');
       extraAfterDetails = item.id
-        ? `<section class="slv-checklist-form-panel always-visible-checklist"><div class="slv-mini-help"><b>✅ Checklist liée à cette activité</b><small>Ajout et modification utilisent exactement la même page checklist : objet, quantité, catégorie, suggestions, statut barré et suppression manuelle.</small></div><button type="button" class="btn primary" onclick="SuperApp.openSlvChecklistLight('${escapeAttr(item.id)}')">✅ Ouvrir la checklist ${escapeHtml(label)}</button></section>`
-        : `<section class="slv-checklist-form-panel always-visible-checklist"><div class="slv-mini-help"><b>✅ Checklist liée à cette activité</b><small>Aucun champ texte multiligne : crée l’activité puis ouvre la même page checklist structurée que pour la modification.</small></div><button type="submit" class="btn primary" name="openChecklistAfterSave" value="1" data-open-checklist="1">✅ Créer l’activité et ouvrir la checklist ${escapeHtml(label)}</button></section>`;
+        ? `<section class="slv-checklist-form-panel always-visible-checklist"><div class="slv-mini-help"><b>✅ Checklist</b></div><button type="button" class="btn primary" onclick="SuperApp.openSlvChecklistLight('${escapeAttr(item.id)}')">✅ Ouvrir la checklist ${escapeHtml(label)}</button></section>`
+        : `<section class="slv-checklist-form-panel always-visible-checklist"><div class="slv-mini-help"><b>✅ Checklist</b></div><button type="submit" class="btn primary" name="openChecklistAfterSave" value="1" data-open-checklist="1">✅ Créer et ouvrir la checklist ${escapeHtml(label)}</button></section>`;
     }
     if(!inside) return extraAfterDetails;
     return `<details class="form-collapse"><summary>＋ Plus de détails</summary>${inside}</details>${extraAfterDetails}`;
@@ -3593,6 +3695,11 @@
     }
     if(item.startDate) item.startDate = normalizeDateInput(item.startDate);
     if(item.endDate) item.endDate = normalizeDateInput(item.endDate);
+    if(targetModule==='education' && item.eduWindowStart && item.eduWindowEnd){
+      const mins = Math.max(0, timeToMinutes(item.eduWindowEnd) - timeToMinutes(item.eduWindowStart));
+      item.duration = mins ? `${Math.floor(mins/60)} h${mins%60 ? ' '+(mins%60)+' min' : ''}`.replace(/^0 h /,'') : item.duration;
+      item.startTime = item.eduWindowStart; item.endTime = item.eduWindowEnd;
+    }
     if(targetModule==='sante' && !isAppointment(item)){
       item.startDate = item.startDate || item.date || today;
       item.endDate = item.endDate || item.startDate;
@@ -3738,7 +3845,8 @@
       else if(['taches_terminees'].includes(key)) arr = getMaisonTasks('done');
       else arr = visibleItems('tasks');
     } else if(module==='courses_repas'){
-      if(key==='menus' || (cfg.collections||[]).includes('weeklyMeals')) arr = getMenus();
+      if(key==='tout') arr = [...getShoppingItems('all'), ...getMenus(), ...getStockItems()];
+      else if(key==='menus' || (cfg.collections||[]).includes('weeklyMeals')) arr = getMenus();
       else if(key==='stock_faible') arr = getStockItems('low');
       else if(cfg.collection==='stock') arr = getStockItems();
       else if(cfg.collection==='shopping') arr = getShoppingItems('all');
@@ -3778,11 +3886,10 @@
     return `${cfg.title}${memberTxt}`;
   }
   function supabaseDocsPanelHtml(mode){
-    const title = mode === 'global' ? 'Documents globaux Supabase' : `Documents ${documentModuleLabel(mode)} Supabase`;
-    const desc = mode === 'global' ? 'Tous les documents déposés depuis les modules sont regroupés ici.' : `Documents réellement déposés dans Supabase et liés aux fiches ${documentModuleLabel(mode)}.`;
+    const title = mode === 'global' ? 'Documents' : `Documents ${documentModuleLabel(mode)}`;
     return `<section class="sb-module-docs-panel" data-sb-docs-panel="${escapeAttr(mode)}">
       <div class="section-title compact-title v53-list-title"><h2>📁 ${escapeHtml(title)}</h2><button class="link-btn" type="button" onclick="window.sbHydrateDocsPanel?.('${escapeAttr(mode)}')">↻ Actualiser</button></div>
-      <div class="sb-doc-test-intro"><b>📎 Liste documentaire</b><small>${escapeHtml(desc)}</small></div>
+      <div class="sb-doc-test-intro"><b>📎 Liste documentaire</b></div>
       <div class="sb-module-docs-status info">Chargement des documents…</div>
       <div class="sb-module-docs-filters"></div>
       <div class="sb-module-docs-list"><div class="sb-doc-empty">Chargement…</div></div>
@@ -4123,7 +4230,18 @@
   function avatarPickerGrid(selected=''){
     const pack = FAMILY_PACKS.find(p=>p.id===currentFamilyPack()) || FAMILY_PACKS[0];
     const ids = rolesForPack(pack.id).map(r=>`${pack.id}_${r}`);
-    return `<div class="avatar-choice-grid">${ids.map(id=>`<label class="avatar-choice ${selected===id?'active':''}"><input type="radio" name="avatarId" value="${id}" ${selected===id?'checked':''}><img src="${avatarPathForId(id)}" alt=""><span>${roleLabel(id.replace(pack.id+'_',''))}</span></label>`).join('')}</div>`;
+    return `<div class="avatar-choice-grid">${ids.map(id=>`<label class="avatar-choice ${selected===id?'active':''}" onclick="SuperApp.selectAvatarChoice(this,'${escapeAttr(id)}')"><input type="radio" name="avatarId" value="${id}" ${selected===id?'checked':''}><img src="${avatarPathForId(id)}" alt=""><span>${roleLabel(id.replace(pack.id+'_',''))}</span></label>`).join('')}</div>`;
+  }
+  function selectAvatarChoice(label, id){
+    const field = label?.closest?.('.avatar-field') || document;
+    field.querySelectorAll('.avatar-choice').forEach(el=>el.classList.remove('active'));
+    label.classList.add('active');
+    const radio = label.querySelector('input[name="avatarId"]');
+    if(radio) radio.checked = true;
+    const fallback = field.querySelector('.avatar-select-fallback');
+    if(fallback){ fallback.name = 'avatarIdFallback'; fallback.value = id; }
+    const preview = document.querySelector('.member-edit-preview .settings-member-avatar img');
+    if(preview) preview.src = avatarPathForId(id);
   }
   function refreshFamilyPackSelectionUI(){
     const current = currentFamilyPack();
@@ -4360,11 +4478,11 @@
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
-    openEdit, openAdd, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, clearDemoData, resetData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
+    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, clearDemoData, resetData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
     handleCategoryChange, handleSubcategoryChange,
     openCreateCategoryDialog, openCreateSubcategoryDialog, confirmCreateCategory,
-    openStyleFamillePanel,
+    openStyleFamillePanel, selectAvatarChoice,
     openAddWeeklyMeal,
     openStockToCoursesConfirm, confirmAddStockToCourses, addStockToCourses, consumeStock, confirmConsumeStock, updateConsumeStockPreview, updateQuantityStep, useActivityPosition, openActivityInMaps
   };

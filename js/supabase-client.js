@@ -68,11 +68,7 @@ async function sbPushData(appData){
 }
 
 
-// ─── Laboratoire documents accueil (test isolé) ─────────────────
-const SB_TEST_DOC_BUCKET = 'family-documents';
-const SB_TEST_DOC_MODULE = 'test_documents';
-const SB_TEST_DOC_ITEM_ID = 'accueil_test';
-
+// ─── Utilitaires documents ─────────────────────────────────
 function sbSafeFileName(name){
   const base = String(name || 'document').trim() || 'document';
   return base
@@ -81,83 +77,6 @@ function sbSafeFileName(name){
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '') || 'document';
 }
-
-async function sbTestUploadDocument(file){
-  const user = await sbCurrentUser();
-  if(!user) throw new Error('Utilisateur non connecté.');
-  if(!file) throw new Error('Aucun fichier sélectionné.');
-  const safeName = sbSafeFileName(file.name);
-  const storagePath = `${user.id}/${SB_TEST_DOC_ITEM_ID}/${Date.now()}_${safeName}`;
-
-  const { error: uploadError } = await sbClient()
-    .storage
-    .from(SB_TEST_DOC_BUCKET)
-    .upload(storagePath, file, { upsert: false, contentType: file.type || 'application/octet-stream' });
-  if(uploadError) throw new Error('Storage upload impossible : ' + uploadError.message);
-
-  const payload = {
-    user_id: user.id,
-    item_id: SB_TEST_DOC_ITEM_ID,
-    module: SB_TEST_DOC_MODULE,
-    name: file.name,
-    storage_path: storagePath,
-    size: file.size || 0,
-    mime_type: file.type || 'application/octet-stream'
-  };
-
-  const { data, error: dbError } = await sbClient()
-    .from('family_documents')
-    .insert(payload)
-    .select('*')
-    .single();
-
-  if(dbError){
-    try { await sbClient().storage.from(SB_TEST_DOC_BUCKET).remove([storagePath]); } catch {}
-    throw new Error('Métadonnées family_documents non enregistrées : ' + dbError.message);
-  }
-  return data || payload;
-}
-
-async function sbTestListDocuments(){
-  const user = await sbCurrentUser();
-  if(!user) throw new Error('Utilisateur non connecté.');
-  const { data, error } = await sbClient()
-    .from('family_documents')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('module', SB_TEST_DOC_MODULE)
-    .eq('item_id', SB_TEST_DOC_ITEM_ID);
-  if(error) throw new Error('Lecture family_documents impossible : ' + error.message);
-  return Array.isArray(data) ? data.sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))) : [];
-}
-
-async function sbTestSignedUrl(storagePath, download=false){
-  if(!storagePath) throw new Error('Chemin Storage manquant.');
-  const options = download ? { download: true } : undefined;
-  const { data, error } = await sbClient()
-    .storage
-    .from(SB_TEST_DOC_BUCKET)
-    .createSignedUrl(storagePath, 3600, options);
-  if(error) throw new Error('URL signée impossible : ' + error.message);
-  if(!data?.signedUrl) throw new Error('URL signée vide.');
-  return data.signedUrl;
-}
-
-async function sbTestDeleteDocument(doc){
-  const user = await sbCurrentUser();
-  if(!user) throw new Error('Utilisateur non connecté.');
-  const storagePath = doc?.storage_path || doc?.storagePath || '';
-  if(!storagePath) throw new Error('Chemin Storage manquant.');
-  const { error: storageError } = await sbClient().storage.from(SB_TEST_DOC_BUCKET).remove([storagePath]);
-  if(storageError) throw new Error('Suppression Storage impossible : ' + storageError.message);
-
-  let query = sbClient().from('family_documents').delete().eq('user_id', user.id).eq('storage_path', storagePath);
-  if(doc?.id) query = query.eq('id', doc.id);
-  const { error: dbError } = await query;
-  if(dbError) throw new Error('Suppression family_documents impossible : ' + dbError.message);
-  return true;
-}
-
 
 
 // ─── Documents attachés à un item (déploiement modules) ─────
