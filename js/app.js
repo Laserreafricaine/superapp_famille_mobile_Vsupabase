@@ -3658,8 +3658,7 @@
           <option value="À prévoir" ${item.priorite==='À prévoir'?'selected':''}>🟢 À prévoir</option>
         </select></div>
         <section class="task-frequency-planner">
-          <h4>🔁 Fréquence</h4>
-          <div class="form-field"><label>Récurrence</label><select name="frequenceMode" onchange="SuperApp.updateTaskFrequencyDisplay(this)">
+          <div class="form-field"><label>Fréquence</label><select name="frequenceMode" onchange="SuperApp.updateTaskFrequencyDisplay(this)">
             <option value="ponctuelle" ${freqMode==='ponctuelle'?'selected':''}>Ponctuelle (une seule fois)</option>
             <option value="quotidienne" ${freqMode==='quotidienne'?'selected':''}>Quotidienne</option>
             <option value="hebdomadaire" ${freqMode==='hebdomadaire'?'selected':''}>Hebdomadaire</option>
@@ -3671,6 +3670,7 @@
               <div class="member-checkbox-list week-days-grid">
                 ${dayBtn('1','Lun')}${dayBtn('2','Mar')}${dayBtn('3','Mer')}${dayBtn('4','Jeu')}${dayBtn('5','Ven')}${dayBtn('6','Sam')}${dayBtn('0','Dim')}
               </div>
+              <small>Cochez un ou plusieurs jours.</small>
             </div>
           </div>
           <div class="task-freq-section task-freq-custom" style="${freqMode==='personnalisee'?'':'display:none'}">
@@ -3954,7 +3954,7 @@
   function activeMemberFilter(module){ ensureV53State(); return state.memberFilters[canonicalModuleId(module)] || 'all'; }
   function activeMaisonPeriodFilter(){ ensureV53State(); return state.maisonPeriodFilters.maison || 'all'; }
   function setModuleBlock(module, block){
-    ensureV53State(); module = canonicalModuleId(module); state.moduleBlocks[module] = block || defaultBlockForModule(module); state.appsView = {kind:'module', id:module}; setView('apps');
+    ensureV53State(); module = canonicalModuleId(module); state.moduleBlocks[module] = block || defaultBlockForModule(module); if(module === 'maison') state.maisonPeriodFilters.maison = 'all'; state.appsView = {kind:'module', id:module}; setView('apps');
   }
   function setMemberFilter(module, memberId){
     ensureV53State(); module = canonicalModuleId(module); state.memberFilters[module] = memberId || 'all'; state.appsView = {kind:'module', id:module}; setView('apps');
@@ -4019,7 +4019,7 @@
       ];
       const visibleFilters = expanded ? [...mainFilters, ...extraFilters] : mainFilters;
       const chips = visibleFilters.map(([b,l,icon,action])=>
-        `<button type="button" class="maison-filter-chip ${b===current||b===period?'active':''}" onclick="${action}"><span>${icon}</span>${l}</button>`
+        `<button type="button" class="maison-filter-chip ${(period!=='all' ? b===period : b===current)?'active':''}" onclick="${action}"><span>${icon}</span>${l}</button>`
       ).join('');
       const moreBtn = !expanded
         ? `<button type="button" class="maison-filter-chip maison-filter-more" onclick="SuperApp.toggleMaisonFilters()">\u2699 Filtres</button>`
