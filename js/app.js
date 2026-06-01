@@ -3915,6 +3915,9 @@
   function setMaisonPeriodFilter(period){
     ensureV53State(); state.maisonPeriodFilters.maison = period || 'all'; state.appsView = {kind:'module', id:'maison'}; setView('apps');
   }
+  function toggleMaisonFilters(){
+    ensureV53State(); state.maisonFiltersExpanded = !state.maisonFiltersExpanded; state.appsView = {kind:'module', id:'maison'}; setView('apps');
+  }
   function fieldVal(item, keys){
     for(const k of keys){ if(item && item[k] !== undefined && item[k] !== null && String(item[k]).trim() !== '') return item[k]; }
     return '';
@@ -3949,20 +3952,26 @@
     if(module === 'maison'){
       const current = activeModuleBlock(module);
       const period = activeMaisonPeriodFilter();
-      const row = (items, cls='') => `<div class="list-filter-chips v53-tabs ${cls}">${items.map(([b,l,icon,action])=>`<button type="button" class="${b===current || b===period ? 'active' : ''}" onclick="${action}"><span>${icon||''}</span>${l}</button>`).join('')}</div>`;
-      const typeRow = row([
-        ['taches','Tout','▦',"SuperApp.setModuleBlock('maison','taches')"],
-        ['maison_tache','Tâche','🧹',"SuperApp.setModuleBlock('maison','maison_tache')"],
-        ['maison_entretien','Entretien','🔧',"SuperApp.setModuleBlock('maison','maison_entretien')"],
-        ['maison_routine','Routine','🔁',"SuperApp.setModuleBlock('maison','maison_routine')"]
-      ], 'maison-filter-type');
-      const periodRow = row([
-        ['all','Tout','▦',"SuperApp.setMaisonPeriodFilter('all')"],
-        ['today','Aujourd’hui','📅',"SuperApp.setMaisonPeriodFilter('today')"],
-        ['late','En retard','⏰',"SuperApp.setMaisonPeriodFilter('late')"],
-        ['recurrent','Récurrent','🔁',"SuperApp.setMaisonPeriodFilter('recurrent')"]
-      ], 'maison-filter-period');
-      return `<div class="maison-filter-levels"><small>Type</small>${typeRow}<small>Statut</small>${periodRow}</div>`;
+      const expanded = state.maisonFiltersExpanded || false;
+      const mainFilters = [
+        ['taches','Toutes','\u25a6',"SuperApp.setModuleBlock('maison','taches')"],
+        ['taches_aujourdhui','Aujourd\u2019hui','\ud83d\udcc5',"SuperApp.setMaisonPeriodFilter('today')"],
+        ['taches_retard','En retard','\u23f0',"SuperApp.setMaisonPeriodFilter('late')"]
+      ];
+      const extraFilters = [
+        ['maison_tache','T\u00e2che','\ud83e\uddf9',"SuperApp.setModuleBlock('maison','maison_tache')"],
+        ['maison_entretien','Entretien','\ud83d\udd27',"SuperApp.setModuleBlock('maison','maison_entretien')"],
+        ['maison_routine','Routine','\ud83d\udd01',"SuperApp.setModuleBlock('maison','maison_routine')"],
+        ['taches_par_membre','Par membre','\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67\u200d\ud83d\udc66',"SuperApp.setModuleBlock('maison','taches_par_membre')"]
+      ];
+      const visibleFilters = expanded ? [...mainFilters, ...extraFilters] : mainFilters;
+      const chips = visibleFilters.map(([b,l,icon,action])=>
+        `<button type="button" class="maison-filter-chip ${b===current||b===period?'active':''}" onclick="${action}"><span>${icon}</span>${l}</button>`
+      ).join('');
+      const moreBtn = !expanded
+        ? `<button type="button" class="maison-filter-chip maison-filter-more" onclick="SuperApp.toggleMaisonFilters()">\u2699 Filtres</button>`
+        : `<button type="button" class="maison-filter-chip maison-filter-more maison-filter-less" onclick="SuperApp.toggleMaisonFilters()">\u2715 Moins</button>`;
+      return `<div class="maison-filter-bar">${chips}${moreBtn}</div>`;
     }
     const groups = {
       courses_repas:[['tout','Tout','▦'],['repas','Repas','🍽️'],['courses','Courses','🛒'],['stock','Stock','🧺']],
@@ -4214,6 +4223,19 @@
         ['🎨 Style famille',`SuperApp.openSettings('Famille')`,false]
       ]
     }[id] || [];
+    if(id === 'maison'){
+      const maisonBtns = buttons;
+      return `<section class="add-zone maison-add-zone">
+        <h3 class="maison-add-title">＋ Ajouter</h3>
+        <div class="maison-add-stack">${maisonBtns.map(([label, onclick, primary])=>
+          `<button type="button" class="maison-add-btn ${primary?'maison-add-primary':''}" onclick="${onclick}">
+            <span class="maison-add-icon">${label.split(' ')[0]}</span>
+            <span class="maison-add-label">${label.split(' ').slice(1).join(' ')}</span>
+            <span class="maison-add-plus">＋</span>
+          </button>`
+        ).join('')}</div>
+      </section>`;
+    }
     return buttons.length ? `<section class="add-zone"><h3>${labels[id] || 'Ajouter'}</h3>${primaryActionBar(buttons)}</section>` : '';
   }
   function openModuleList(module, block){
@@ -4682,7 +4704,7 @@
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
-    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
+    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
     handleCategoryChange, handleSubcategoryChange,
     openCreateCategoryDialog, openCreateSubcategoryDialog, confirmCreateCategory,
