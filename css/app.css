@@ -2350,3 +2350,17 @@ body[data-theme="sombre"] .notif-summary-card b{color:var(--ink)!important}
 .settings-notif-card.compact small{font-size:.78rem;line-height:1.25}
 .form-field label{line-height:1.15}
 .form-field input,.form-field select,.form-field textarea{line-height:1.25}
+
+
+/* V5.36.29 — Correctifs Android PWA : modales, z-index, scroll et gestes tactiles */
+dialog.dialog-card:not([open]){display:none!important;}
+dialog.dialog-card[open]{display:flex!important;flex-direction:column!important;position:fixed!important;inset:auto!important;margin:auto!important;max-width:min(92vw,420px)!important;width:min(92vw,420px)!important;max-height:min(90dvh,90vh)!important;overflow:hidden!important;z-index:9999!important;pointer-events:auto!important;}
+#modalBackdrop[hidden]{display:none!important;pointer-events:none!important;}
+.dialog-card form{display:flex!important;flex-direction:column!important;min-height:0!important;max-height:min(90dvh,90vh)!important;overflow:hidden!important;}
+.dialog-card .form-stack,.dialog-card .quick-actions{-webkit-overflow-scrolling:touch!important;overscroll-behavior:contain!important;touch-action:pan-y!important;min-height:0!important;max-height:calc(min(90dvh,90vh) - 124px)!important;}
+.dialog-actions{position:sticky!important;bottom:0!important;background:linear-gradient(180deg,rgba(255,255,255,.92),#fff)!important;border-top:1px solid rgba(232,220,211,.72)!important;padding:10px 16px calc(14px + env(safe-area-inset-bottom))!important;z-index:3!important;}
+.dialog-actions .btn,.dialog-head .icon-btn,#cancelEdit,#closeEdit,#closeAction,.avatar-choice,.btn,.chip{touch-action:manipulation!important;-webkit-tap-highlight-color:rgba(232,116,95,.18)!important;}
+.avatar-choice{pointer-events:auto!important;cursor:pointer;}
+.avatar-choice input{pointer-events:none!important;}
+@supports (-webkit-touch-callout:none){.dialog-card .form-stack{padding-bottom:18px!important;}}
+@media(max-width:520px){dialog.dialog-card[open]{width:calc(100vw - 20px)!important;max-height:calc(100dvh - 28px)!important;}.dialog-card .form-stack,.dialog-card .quick-actions{max-height:calc(100dvh - 156px)!important;}.dialog-actions{justify-content:space-between!important;gap:10px!important;}.dialog-actions .btn{flex:1 1 auto!important;min-height:46px!important;}}

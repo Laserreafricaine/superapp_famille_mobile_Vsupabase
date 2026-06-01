@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.28';
+  const APP_VERSION = '5.36.29';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -526,16 +526,73 @@
     if(unit === 'unité') input.value = normalizeQuantityForUnit(input.value, unit);
   }
   
+  let deferredInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    document.body.classList.add('pwa-install-available');
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    document.body.classList.remove('pwa-install-available');
+    try{ toast('✅ Application installée.'); }catch{}
+  });
+  async function installPwa(){
+    if(deferredInstallPrompt){
+      try{
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        document.body.classList.remove('pwa-install-available');
+        return;
+      }catch(err){ console.warn('Installation PWA impossible', err); }
+    }
+    toast('Sur Android : ouvre le menu Chrome ⋮ puis choisis “Installer l’application” ou “Ajouter à l’écran d’accueil”.');
+  }
+  function isAndroidDevice(){
+    return /Android/i.test(navigator.userAgent || '');
+  }
+  function bindAndroidDialogSafety(){
+    const closeIf = (selector, handler) => {
+      document.addEventListener('pointerup', event => {
+        if(!isAndroidDevice()) return;
+        const btn = event.target?.closest?.(selector);
+        if(!btn) return;
+        event.preventDefault();
+        event.stopPropagation();
+        handler(event, btn);
+      }, {capture:true});
+      document.addEventListener('touchend', event => {
+        if(!isAndroidDevice()) return;
+        const btn = event.target?.closest?.(selector);
+        if(!btn) return;
+        event.preventDefault();
+        event.stopPropagation();
+        handler(event, btn);
+      }, {capture:true, passive:false});
+    };
+    closeIf('#cancelEdit,#closeEdit', () => closeEditDialog());
+    closeIf('#closeAction', () => closeActionDialog());
+    closeIf('#editForm button[type="submit"]', (event, btn) => {
+      const form = btn.closest('form');
+      if(!form || form.dataset.androidSubmitting === '1') return;
+      form.dataset.androidSubmitting = '1';
+      setTimeout(()=>{ delete form.dataset.androidSubmitting; }, 700);
+      if(typeof form.requestSubmit === 'function') form.requestSubmit(btn);
+      else form.dispatchEvent(new Event('submit', {bubbles:true, cancelable:true}));
+    });
+  }
+
   function init(){
     applyAppearance();
     sanitizeLegacyPersonalDemoData();
     normaliseCalendarProjections();
-    bindNavigation(); bindDialogs(); render();
+    bindNavigation(); bindDialogs(); bindAndroidDialogSafety(); render();
     autoRefreshWeatherOnOpen();
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
     }
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.28').catch(()=>{}); }
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js', {scope:'./'}).catch(()=>{}); }
     maybeStartOnboarding();
     setTimeout(()=>maybeFireNotifications(), 800);
     setTimeout(()=>{ if(typeof window.sbInitAuth==="function") window.sbInitAuth(); }, 400);
@@ -2085,7 +2142,7 @@
     const meta = window.sbSyncMetaExternal ? window.sbSyncMetaExternal() : '<div class="settings-sync-dates"><small>Dates Supabase indisponibles pour le moment.</small></div>';
     return `${settingsVisualHero({title:'Synchronisation', text:'Envoyer ou récupérer explicitement les données Supabase.', img:'assets/images/cards/settings_sync.png', emoji:'🔄', chips:[`Mode : ${data.offer?.syncMode || 'mobile_only'}`, data.offer?.syncEnabled ? 'Synchro active' : 'Mobile seul', data.offer?.cockpitOrdinateur ? 'Ordinateur acheté' : 'Ordinateur non acheté']})}
       ${meta}
-      <div class="settings-data-actions sync-explicit-actions"><button class="btn ghost" type="button" onclick="window.sbForcePushNow?.()"><span>☁️</span><b>Exporter les données vers Supabase</b><small>Envoie les données de cet appareil</small></button><button class="btn ghost" type="button" onclick="window.sbForcePullFromServer?.()"><span>📥</span><b>Récupérer les données depuis Supabase</b><small>Remplace le local par le cloud</small></button></div>
+      <div class="settings-data-actions sync-explicit-actions"><button class="btn ghost" type="button" onclick="window.sbForcePushNow?.()"><span>☁️</span><b>Exporter les données vers Supabase</b><small>Envoie les données de cet appareil</small></button><button class="btn ghost" type="button" onclick="window.sbForcePullFromServer?.()"><span>📥</span><b>Récupérer les données depuis Supabase</b><small>Remplace le local par le cloud</small></button><button class="btn ghost android-install-action" type="button" onclick="SuperApp.installPwa()"><span>📱</span><b>Installer sur Android</b><small>Ouvre le prompt Chrome si disponible</small></button></div>
       <div class="today-grid"><button class="btn ghost" type="button" onclick="SuperApp.exportData()">Exporter JSON</button><button class="btn ghost" type="button" onclick="SuperApp.importData()">Importer JSON</button></div>`;
   }
   function settingsDataPanel(){
@@ -4028,7 +4085,7 @@
     module = canonicalModuleId(module);
     const block = activeModuleBlock(module);
     const cfg = listConfig(module, block) || listConfig(module, defaultBlockForModule(module));
-    // V5.36.28 — Courses/Repas > Tout : repas en tableau + courses + stock.
+    // V5.36.29 — Courses/Repas > Tout : repas en tableau + courses + stock.
     if(cfg.special === 'coursesAllView'){
       const shoppingStock = [...getShoppingItems('all'), ...getStockItems()];
       const rows = shoppingStock.length ? shoppingStock.map(x=>managementRow(x,cfg)).join('') : `<article class="empty cute-empty"><b>🛒 Aucun article ou stock</b><small>Ajoute des courses ou du stock.</small></article>`;
@@ -4630,6 +4687,7 @@
     handleCategoryChange, handleSubcategoryChange,
     openCreateCategoryDialog, openCreateSubcategoryDialog, confirmCreateCategory,
     openStyleFamillePanel, selectAvatarChoice,
+    installPwa,
     openAddWeeklyMeal,
     openStockToCoursesConfirm, confirmAddStockToCourses, addStockToCourses, consumeStock, confirmConsumeStock, updateConsumeStockPreview, updateQuantityStep, useActivityPosition, openActivityInMaps
   };
