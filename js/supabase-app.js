@@ -10,7 +10,19 @@
   function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function syncTime(){ return new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}); }
   let sbLastSyncTime = localStorage.getItem('superapp_last_sync_time') || '';
+  let sbLastPushAt = localStorage.getItem('superapp_last_push_at') || '';
+  let sbLastPullAt = localStorage.getItem('superapp_last_pull_at') || '';
+  function formatDateTime(iso){
+    if(!iso) return 'Jamais';
+    try { return new Date(iso).toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}); }
+    catch { return iso; }
+  }
   function setLastSyncNow(){ sbLastSyncTime = syncTime(); try{ localStorage.setItem('superapp_last_sync_time', sbLastSyncTime); }catch{} }
+  function setLastPushNow(){ sbLastPushAt = new Date().toISOString(); setLastSyncNow(); try{ localStorage.setItem('superapp_last_push_at', sbLastPushAt); }catch{} }
+  function setLastPullNow(){ sbLastPullAt = new Date().toISOString(); setLastSyncNow(); try{ localStorage.setItem('superapp_last_pull_at', sbLastPullAt); }catch{} }
+  window.sbSyncMetaExternal = function(){
+    return '<div class="settings-sync-dates"><article><span>☁️</span><div><b>Dernier envoi vers Supabase</b><small>' + escH(formatDateTime(sbLastPushAt)) + '</small></div></article><article><span>📥</span><div><b>Dernière récupération depuis Supabase</b><small>' + escH(formatDateTime(sbLastPullAt)) + '</small></div></article></div>';
+  };
 
   function sbNotify(msg){
     try{
@@ -79,8 +91,9 @@
       if(mustRestore || sbServerIsNewer(remote.updated_at, local)){
         SA._mergeData(remote.data);
         try{ localStorage.removeItem('superapp_local_delete_guard'); window._sbLocalDeleteGuard=false; }catch{}
+        setLastPullNow();
         SA.render();
-        const msg = mustRestore ? '✅ Données récupérées depuis Supabase' : '🔄 Données mises à jour depuis le serveur';
+        const msg = mustRestore ? '✅ Données récupérées depuis Supabase le ' + formatDateTime(sbLastPullAt) : '🔄 Données mises à jour depuis le serveur';
         sbNotify(msg);
         return {status:'restored'};
       }
@@ -89,6 +102,7 @@
         return {status:'guarded'};
       }
       await sbPushData(local);
+      setLastPushNow();
       return {status:'pushed'};
     } catch(e){
       console.warn('[Sync]', e.message);
@@ -216,9 +230,9 @@
       if(typeof sbPushData !== 'function') throw new Error('Fonction de synchronisation indisponible.');
       if(window._sbLocalDeleteGuard) throw new Error('Données locales supprimées : utilise d’abord Récupérer ou Import JSON.');
       await sbPushData(window.SuperApp?._getData?.());
-      setLastSyncNow();
-      sbShowSyncBar('synced','✅ Synchronisé',2500);
-      sbNotify('✅ Synchronisé');
+      setLastPushNow();
+      sbShowSyncBar('synced','✅ Données envoyées vers Supabase',3000);
+      sbNotify('✅ Données envoyées vers Supabase le ' + formatDateTime(sbLastPushAt));
     }catch(e){
       sbShowSyncBar('error','⚠️ '+(e.message||e),4500);
     }
@@ -232,8 +246,8 @@
       +ico(0x1F534)+' Hors ligne</strong><small>Appuie pour te connecter</small></div>'
       +'<button class="sb-logout-btn" onclick="window.sbShowAuthOverlay()">'+ico(0x1F511)+' Connexion</button></div>';
     return '<div class="sb-user-bar sb-user-bar-compact"><span class="sb-sync-icon">☁️</span><div class="sb-user-info"><strong>Synchronisation</strong><small><span class="sb-sync-ok">Synchronisé</span>'+(sbLastSyncTime?' · '+escH(sbLastSyncTime):'')+'</small></div>'
-      +'<button class="sb-logout-btn" onclick="window.sbForcePushNow?.()">Sync</button>'
-      +'<button class="sb-logout-btn" onclick="window.sbForcePullFromServer?.()">Récupérer</button>'
+      +'<button class="sb-logout-btn" title="Exporter les données vers Supabase" onclick="window.sbForcePushNow?.()">Exporter</button>'
+      +'<button class="sb-logout-btn" title="Récupérer les données depuis Supabase" onclick="window.sbForcePullFromServer?.()">Récupérer</button>'
       +'<button class="sb-logout-btn sb-logout-compact" onclick="window.sbLogout()">'+ico(0x1F6AA)+'</button></div>';
   };
 

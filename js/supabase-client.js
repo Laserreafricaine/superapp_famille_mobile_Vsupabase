@@ -64,7 +64,8 @@ async function sbPushData(appData){
   const { error } = await sbClient()
     .from('family_data')
     .upsert(payload, { onConflict: 'user_id' });
-  if(error) console.warn('[Supabase] push error:', error.message);
+  if(error) throw new Error('Envoi Supabase impossible : ' + error.message);
+  return true;
 }
 
 

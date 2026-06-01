@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.27';
+  const APP_VERSION = '5.36.28';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -113,7 +113,7 @@
   };
 
   let data = load();
-  let state = { view:'home', calendarMode:'month', selectedDate: today, notifFilter:'all', calendarFilter:'all', activeModule:null, editing:null, preset:null, returnList:null, appsView:null, slvTab:'sport' }; 
+  let state = { view:'home', calendarMode:'month', selectedDate: today, notifFilter:'all', calendarFilter:'all', activeModule:null, editing:null, preset:null, returnList:null, appsView:null, slvTab:'sport', maisonPeriodFilters:{} }; 
 
   const $ = sel => document.querySelector(sel);
   const $$ = sel => [...document.querySelectorAll(sel)];
@@ -535,7 +535,7 @@
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
     }
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.27').catch(()=>{}); }
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js?v=5.36.28').catch(()=>{}); }
     maybeStartOnboarding();
     setTimeout(()=>maybeFireNotifications(), 800);
     setTimeout(()=>{ if(typeof window.sbInitAuth==="function") window.sbInitAuth(); }, 400);
@@ -1004,7 +1004,10 @@
 
   const MODULE_LISTS = {
     maison: {
-      taches:{title:'Tout', emoji:'🏠', collection:'tasks', type:'tache', category:'Ménage', help:'Tâches, entretien et routines.'},
+      taches:{title:'Tout', emoji:'🏠', collection:'tasks', type:'tache', category:'Ménage', help:'Tâches, entretien, routines et checklists.'},
+      maison_tache:{title:'Tâches', emoji:'🧹', collection:'tasks', type:'tache', category:'Ménage', help:'Tâches maison.'},
+      maison_entretien:{title:'Entretiens', emoji:'🔧', collection:'tasks', type:'entretien', category:'Entretien', help:'Entretiens et réparations.'},
+      maison_routine:{title:'Routines', emoji:'🔁', collection:'tasks', type:'routine', category:'Routine', help:'Routines récurrentes.'},
       taches_aujourdhui:{title:'Tâches Maison — aujourd’hui', emoji:'🏠', collection:'tasks', type:'tache', category:'Ménage', filter:x=>x.date===today, help:'Filtre aujourd’hui.'},
       taches_retard:{title:'Tâches Maison — en retard', emoji:'⏰', collection:'tasks', type:'tache', category:'Urgence', filter:x=>!statusIsDone(x) && x.date && daysDiff(today,x.date)<0, help:'Filtre en retard.'},
       taches_par_membre:{title:'Tâches Maison — par membre', emoji:'👨‍👩‍👧‍👦', collection:'tasks', type:'tache', category:'Ménage', sortByMember:true, help:'Vue regroupée par membre.'},
@@ -1012,7 +1015,7 @@
     },
     courses_repas: {
       // V5.27 — Refonte : 3 chips claires, indépendantes
-      tout:{title:'Tout', emoji:'🍽️', collections:['shopping','weeklyMeals','stock'], collection:'shopping', type:'course', category:'Courses', help:'Courses, repas et stock.'},
+      tout:{title:'Tout', emoji:'🍽️', collections:['shopping','weeklyMeals','stock'], collection:'shopping', type:'course', category:'Courses', help:'Courses, repas et stock.', special:'coursesAllView'},
       repas:{title:'Repas', emoji:'🍽️', collection:'weeklyMeals', type:'repas_semaine', category:'Repas', help:'Repas du jour en vedette et menu de la semaine.', special:'mealsView'},
       courses:{title:'Courses', emoji:'🛒', collection:'shopping', type:'course', category:'Alimentation', help:'Liste de courses cochable, ajout manuel.'},
       stock:{title:'Stock', emoji:'🧺', collection:'stock', type:'stock', category:'Stock', help:'Frigo, congélateur, placards.', special:'stockView'},
@@ -2079,13 +2082,17 @@
       </div>`;
   }
   function settingsSyncPanel(){
-    return `${settingsVisualHero({title:'Synchronisation', text:'Cette zone sert à connecter les supports, importer, exporter, fusionner et traiter les conflits. Elle ne remplace pas la saisie mobile.', img:'assets/images/cards/settings_sync.png', emoji:'🔄', chips:[`Mode : ${data.offer?.syncMode || 'mobile_only'}`, data.offer?.syncEnabled ? 'Synchro active' : 'Mobile seul', data.offer?.cockpitOrdinateur ? 'Ordinateur acheté' : 'Ordinateur non acheté']})}
-      <div class="settings-sync-grid"><article><span>📱</span><b>Cockpit mobile</b><small>Actif et autonome</small></article><article><span>💻</span><b>Cockpit ordinateur</b><small>${data.offer?.cockpitOrdinateur ? 'Acheté' : 'Non connecté'}</small></article><article><span>🔐</span><b>Conflits</b><small>Gérés à l’import/export</small></article></div>
+    const meta = window.sbSyncMetaExternal ? window.sbSyncMetaExternal() : '<div class="settings-sync-dates"><small>Dates Supabase indisponibles pour le moment.</small></div>';
+    return `${settingsVisualHero({title:'Synchronisation', text:'Envoyer ou récupérer explicitement les données Supabase.', img:'assets/images/cards/settings_sync.png', emoji:'🔄', chips:[`Mode : ${data.offer?.syncMode || 'mobile_only'}`, data.offer?.syncEnabled ? 'Synchro active' : 'Mobile seul', data.offer?.cockpitOrdinateur ? 'Ordinateur acheté' : 'Ordinateur non acheté']})}
+      ${meta}
+      <div class="settings-data-actions sync-explicit-actions"><button class="btn ghost" type="button" onclick="window.sbForcePushNow?.()"><span>☁️</span><b>Exporter les données vers Supabase</b><small>Envoie les données de cet appareil</small></button><button class="btn ghost" type="button" onclick="window.sbForcePullFromServer?.()"><span>📥</span><b>Récupérer les données depuis Supabase</b><small>Remplace le local par le cloud</small></button></div>
       <div class="today-grid"><button class="btn ghost" type="button" onclick="SuperApp.exportData()">Exporter JSON</button><button class="btn ghost" type="button" onclick="SuperApp.importData()">Importer JSON</button></div>`;
   }
   function settingsDataPanel(){
-    return `${settingsVisualHero({title:'Sauvegarde & données', text:'Gérer les sauvegardes locales et la récupération depuis Supabase.', img:'assets/images/cards/settings_data.png', emoji:'🛡️', chips:['Export JSON','Import JSON','Supabase']})}
-      <div class="settings-data-actions"><button class="btn ghost" type="button" onclick="SuperApp.exportData()"><span>📤</span><b>Exporter</b><small>Sauvegarde JSON</small></button><button class="btn ghost" type="button" onclick="SuperApp.importData()"><span>📥</span><b>Importer</b><small>Restaurer JSON</small></button><button class="btn ghost" type="button" onclick="window.sbForcePullFromServer?.()"><span>☁️</span><b>Récupérer Supabase</b><small>Restaurer le cloud</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.clearDemoData()"><span>🧹</span><b>Supprimer les données de cet appareil</b><small>Supabase conservé</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.resetCloudData()"><span>⛔</span><b>Supprimer définitivement</b><small>Appareil + Supabase</small></button></div>`;
+    const meta = window.sbSyncMetaExternal ? window.sbSyncMetaExternal() : '';
+    return `${settingsVisualHero({title:'Sauvegarde & données', text:'Gérer les sauvegardes locales et Supabase.', img:'assets/images/cards/settings_data.png', emoji:'🛡️', chips:['Export JSON','Import JSON','Supabase']})}
+      ${meta}
+      <div class="settings-data-actions"><button class="btn ghost" type="button" onclick="SuperApp.exportData()"><span>📤</span><b>Exporter JSON</b><small>Sauvegarde fichier</small></button><button class="btn ghost" type="button" onclick="SuperApp.importData()"><span>📥</span><b>Importer JSON</b><small>Restaurer un fichier</small></button><button class="btn ghost" type="button" onclick="window.sbForcePushNow?.()"><span>☁️</span><b>Exporter vers Supabase</b><small>Envoie les données actuelles</small></button><button class="btn ghost" type="button" onclick="window.sbForcePullFromServer?.()"><span>📥</span><b>Récupérer depuis Supabase</b><small>Restaure les données cloud</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.clearDemoData()"><span>🧹</span><b>Supprimer les données de cet appareil</b><small>Supabase conservé</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.resetCloudData()"><span>⛔</span><b>Supprimer définitivement</b><small>Appareil + Supabase</small></button></div>`;
   }
     function selectWeatherCity(scope='settings', city='', postalCode='', country='France', lat=null, lon=null){
     const root = scope === 'onboarding' ? document.getElementById('onboarding') : document.getElementById('editFields');
@@ -3837,14 +3844,19 @@
   function ensureV53State(){
     if(!state.moduleBlocks) state.moduleBlocks = {};
     if(!state.memberFilters) state.memberFilters = {};
+    if(!state.maisonPeriodFilters) state.maisonPeriodFilters = {};
   }
   function activeModuleBlock(module){ ensureV53State(); return state.moduleBlocks[canonicalModuleId(module)] || defaultBlockForModule(module); }
   function activeMemberFilter(module){ ensureV53State(); return state.memberFilters[canonicalModuleId(module)] || 'all'; }
+  function activeMaisonPeriodFilter(){ ensureV53State(); return state.maisonPeriodFilters.maison || 'all'; }
   function setModuleBlock(module, block){
     ensureV53State(); module = canonicalModuleId(module); state.moduleBlocks[module] = block || defaultBlockForModule(module); state.appsView = {kind:'module', id:module}; setView('apps');
   }
   function setMemberFilter(module, memberId){
     ensureV53State(); module = canonicalModuleId(module); state.memberFilters[module] = memberId || 'all'; state.appsView = {kind:'module', id:module}; setView('apps');
+  }
+  function setMaisonPeriodFilter(period){
+    ensureV53State(); state.maisonPeriodFilters.maison = period || 'all'; state.appsView = {kind:'module', id:'maison'}; setView('apps');
   }
   function fieldVal(item, keys){
     for(const k of keys){ if(item && item[k] !== undefined && item[k] !== null && String(item[k]).trim() !== '') return item[k]; }
@@ -3876,8 +3888,26 @@
   }
   function activeMemberList(){ return getFamilyMembers ? getFamilyMembers() : (data.family||[]).filter(m=>!statusIsHidden(m) && m.active !== false); }
     function listTabsForModule(module){
+    module = canonicalModuleId(module);
+    if(module === 'maison'){
+      const current = activeModuleBlock(module);
+      const period = activeMaisonPeriodFilter();
+      const row = (items, cls='') => `<div class="list-filter-chips v53-tabs ${cls}">${items.map(([b,l,icon,action])=>`<button type="button" class="${b===current || b===period ? 'active' : ''}" onclick="${action}"><span>${icon||''}</span>${l}</button>`).join('')}</div>`;
+      const typeRow = row([
+        ['taches','Tout','▦',"SuperApp.setModuleBlock('maison','taches')"],
+        ['maison_tache','Tâche','🧹',"SuperApp.setModuleBlock('maison','maison_tache')"],
+        ['maison_entretien','Entretien','🔧',"SuperApp.setModuleBlock('maison','maison_entretien')"],
+        ['maison_routine','Routine','🔁',"SuperApp.setModuleBlock('maison','maison_routine')"]
+      ], 'maison-filter-type');
+      const periodRow = row([
+        ['all','Tout','▦',"SuperApp.setMaisonPeriodFilter('all')"],
+        ['today','Aujourd’hui','📅',"SuperApp.setMaisonPeriodFilter('today')"],
+        ['late','En retard','⏰',"SuperApp.setMaisonPeriodFilter('late')"],
+        ['recurrent','Récurrent','🔁',"SuperApp.setMaisonPeriodFilter('recurrent')"]
+      ], 'maison-filter-period');
+      return `<div class="maison-filter-levels"><small>Type</small>${typeRow}<small>Statut</small>${periodRow}</div>`;
+    }
     const groups = {
-      maison:[['taches','Tout','▦'],['taches_aujourdhui','Aujourd’hui','📅'],['taches_retard','En retard','⏰'],['taches_recurrentes','Récurrentes','🔁'],['taches_terminees','Terminées','✅']],
       courses_repas:[['tout','Tout','▦'],['repas','Repas','🍽️'],['courses','Courses','🛒'],['stock','Stock','🧺']],
       education:[['tout','Tout','▦'],['ecole','École','📘'],['ecole_notes','Notes','⭐'],['documents','Documents','📄']],
       sante:[['tous','Tous','▦'],['rendez_vous','Rendez-vous','📅'],['traitements','Traitements','💊'],['documents','Documents','📄'],['alertes','Alertes','🔔']],
@@ -3889,9 +3919,9 @@
         ['documents','Documents','📄'],
       ],
       familles:[['tout','Tout','▦'],['membres','Membres','👨‍👩‍👧‍👦'],['documents','Documents','📁']]
-    }[canonicalModuleId(module)] || [];
+    }[module] || [];
     const current = activeModuleBlock(module);
-    return `<div class="list-filter-chips v53-tabs ${canonicalModuleId(module)==='sante'?'health-filter-tabs':''}">${groups.map(([b,l,icon])=>`<button type="button" class="${b===current?'active':''}" onclick="SuperApp.setModuleBlock('${module}','${b}')"><span>${icon||''}</span>${l}</button>`).join('')}</div>`;
+    return `<div class="list-filter-chips v53-tabs ${module==='sante'?'health-filter-tabs':''}">${groups.map(([b,l,icon])=>`<button type="button" class="${b===current?'active':''}" onclick="SuperApp.setModuleBlock('${module}','${b}')"><span>${icon||''}</span>${l}</button>`).join('')}</div>`;
   }
   function summaryMetric(value, label, emoji){ return `<article class="v53-summary-pill"><span>${emoji}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(label)}</small></article>`; }
   function moduleSummary(module){
@@ -3923,7 +3953,19 @@
       else if(key==='taches_retard' || cfg.filterName==='late') arr = getMaisonTasks('late');
       else if(['taches_recurrentes','routines'].includes(key)) arr = getMaisonTasks('recurrent');
       else if(['taches_terminees'].includes(key)) arr = getMaisonTasks('done');
-      else arr = [...visibleItems('tasks'), ...getGenericChecklistItems('maison')];
+      else {
+        const tasks = visibleItems('tasks');
+        const isEntretien = x => itemType(x).includes('entretien') || itemCategory(x).includes('entretien') || itemCategory(x).includes('reparation') || itemCategory(x).includes('réparation');
+        const isRoutine = x => itemType(x).includes('routine') || matchesWords(x,['routine','récurrent','recurrent','quotidien','hebdo']);
+        if(key === 'maison_entretien') arr = tasks.filter(isEntretien);
+        else if(key === 'maison_routine') arr = tasks.filter(isRoutine);
+        else if(key === 'maison_tache') arr = tasks.filter(x=>!isEntretien(x) && !isRoutine(x));
+        else arr = [...tasks, ...getGenericChecklistItems('maison')];
+        const period = activeMaisonPeriodFilter();
+        if(period === 'today') arr = arr.filter(x=>!statusIsDone(x) && (x.date === today || (/quotidien|daily/i.test(x.recurrence||''))));
+        else if(period === 'late') arr = arr.filter(x=>!statusIsDone(x) && x.date && daysDiff(today,x.date) < 0);
+        else if(period === 'recurrent') arr = arr.filter(x=>matchesWords(x,['routine','récurrent','recurrent','quotidien','hebdo']));
+      }
     } else if(module==='courses_repas'){
       if(key==='tout') arr = [...getShoppingItems('all'), ...getMenus(), ...getStockItems()];
       else if(key==='menus' || (cfg.collections||[]).includes('weeklyMeals')) arr = getMenus();
@@ -3964,6 +4006,11 @@
   function moduleListTitle(module, block, cfg){
     const member = activeMemberFilter(module);
     const memberTxt = member && member !== 'all' ? ` · ${memberName(member)}` : '';
+    if(canonicalModuleId(module)==='maison'){
+      const labels = {all:'Tout', today:'Aujourd’hui', late:'En retard', recurrent:'Récurrent'};
+      const period = activeMaisonPeriodFilter();
+      return `${cfg.title}${period && period !== 'all' ? ' · '+labels[period] : ''}${memberTxt}`;
+    }
     return `${cfg.title}${memberTxt}`;
   }
   function supabaseDocsPanelHtml(mode){
@@ -3981,6 +4028,19 @@
     module = canonicalModuleId(module);
     const block = activeModuleBlock(module);
     const cfg = listConfig(module, block) || listConfig(module, defaultBlockForModule(module));
+    // V5.36.28 — Courses/Repas > Tout : repas en tableau + courses + stock.
+    if(cfg.special === 'coursesAllView'){
+      const shoppingStock = [...getShoppingItems('all'), ...getStockItems()];
+      const rows = shoppingStock.length ? shoppingStock.map(x=>managementRow(x,cfg)).join('') : `<article class="empty cute-empty"><b>🛒 Aucun article ou stock</b><small>Ajoute des courses ou du stock.</small></article>`;
+      return `<section class="v53-direct-list" data-block="${escapeAttr(block)}">
+        <section class="filter-zone"><h3>Filtrer</h3>${listTabsForModule(module)}</section>
+        ${memberFilterRow(module)}
+        <div class="section-title compact-title v53-list-title"><h2>🍽️ Repas</h2><button class="link-btn" onclick="SuperApp.openAdd('courses_repas','repas_semaine','Menu de la semaine')">+ Repas</button></div>
+        ${mealsViewHtml()}
+        <div class="section-title compact-title v53-list-title"><h2>🛒 Courses et stock</h2><button class="link-btn" onclick="SuperApp.openAdd('courses_repas','course','Alimentation')">+ Ajouter</button></div>
+        <div class="management-list">${rows}</div>
+      </section>`;
+    }
     // V5.27 — Vue Repas : repas du jour en vedette + tableau hebdo
     if(cfg.special === 'mealsView'){
       return `<section class="v53-direct-list" data-block="${escapeAttr(block)}">
@@ -4565,7 +4625,7 @@
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
-    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
+    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
     handleCategoryChange, handleSubcategoryChange,
     openCreateCategoryDialog, openCreateSubcategoryDialog, confirmCreateCategory,

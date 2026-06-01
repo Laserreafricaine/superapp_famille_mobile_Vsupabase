@@ -134,7 +134,7 @@
 .sb-doc-filter-group.muted p{margin:0;color:#74829d;font-size:12px;font-weight:750;line-height:1.35}
 
 
-/* V5.36.27 — Carte synchronisation compacte, adaptée mobile */
+/* V5.36.28 — Carte synchronisation compacte, adaptée mobile */
 .sb-user-bar.sb-user-bar-compact{
   display:flex;align-items:center;gap:8px;justify-content:flex-start;
   padding:8px 10px;border-radius:18px;margin:8px 0 12px;
@@ -151,6 +151,18 @@
 .sb-user-bar-compact .sb-logout-compact{width:32px;padding:7px 0;color:#805044}
 @media (max-width:380px){.sb-user-bar-compact .sb-user-info strong{font-size:11px}.sb-user-bar-compact .sb-logout-btn{padding:6px 7px;font-size:10px}.sb-user-bar-compact .sb-sync-icon{width:28px;height:28px}}
 
-/* V5.36.27 — Paramètres > Compte */
+/* V5.36.28 — Paramètres > Compte */
 .settings-account-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border-radius:18px;background:linear-gradient(135deg,#fff,#f7f1ff);border:1px solid rgba(124,58,237,.14);box-shadow:0 10px 24px rgba(70,45,120,.08);margin:12px 0}
 .settings-account-main{display:flex;align-items:center;gap:12px;min-width:0}.settings-account-main>span{width:42px;height:42px;display:grid;place-items:center;border-radius:14px;background:#ede7ff;font-size:22px}.settings-account-main b{display:block;color:#25173f}.settings-account-main small{display:block;color:#6b6280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:52vw}.settings-account-actions{display:flex;gap:8px;flex-shrink:0}@media(max-width:420px){.settings-account-card{align-items:stretch;flex-direction:column}.settings-account-main small{max-width:100%}.settings-account-actions .btn{width:100%}}
+
+
+/* V5.36.28 — Filtres Maison en 3 niveaux + dates Supabase */
+.maison-filter-levels{display:grid;gap:7px}
+.maison-filter-levels>small{font-size:11px;font-weight:950;color:#796f86;text-transform:uppercase;letter-spacing:.06em;margin-left:3px}
+.maison-filter-levels .list-filter-chips{margin:0}
+.settings-sync-dates{display:grid;gap:10px;margin:12px 0}
+.settings-sync-dates article{display:flex;align-items:center;gap:10px;padding:12px;border-radius:18px;background:linear-gradient(135deg,#fff,#f7f1ff);border:1px solid rgba(124,58,237,.14);box-shadow:0 8px 20px rgba(60,44,80,.06)}
+.settings-sync-dates article>span{width:38px;height:38px;display:grid;place-items:center;border-radius:14px;background:#f0ebff;font-size:20px;flex:0 0 auto}
+.settings-sync-dates b{display:block;color:#2f2540;font-size:13px}.settings-sync-dates small{display:block;color:#70677b;font-size:12px;font-weight:800}
+.sync-explicit-actions .btn b{font-size:13px}
+@media(max-width:430px){.settings-sync-dates article{padding:10px}.settings-sync-dates article>span{width:34px;height:34px}.sync-explicit-actions{grid-template-columns:1fr}}
