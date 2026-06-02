@@ -116,34 +116,13 @@
   let state = { view:'home', calendarMode:'month', selectedDate: today, notifFilter:'all', calendarFilter:'all', activeModule:null, editing:null, preset:null, returnList:null, appsView:null, slvTab:'sport', maisonPeriodFilters:{} }; 
 
   const $ = sel => document.querySelector(sel);
-  // iOS Safari fix — showModal() échoue silencieusement quand un parent a un stacking context
-  // (backdrop-filter, transform, filter). On détecte iOS et on simule le modal manuellement.
-  const _isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
   function safeShowModal(dlg){
     if(!dlg) return;
-    if(!_isIOS){ try{ dlg.showModal(); return; }catch{} }
-    // Fallback iOS : fermer le natif, ouvrir manuellement avec overlay div
-    safeCloseModal(dlg);
-    dlg.setAttribute('open','');
-    dlg.style.cssText = 'display:flex!important;position:fixed!important;inset:0!important;margin:auto!important;z-index:9999!important;pointer-events:auto!important;';
-    let overlay = document.getElementById('_safeModalOverlay');
-    if(!overlay){
-      overlay = document.createElement('div');
-      overlay.id = '_safeModalOverlay';
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(8,22,49,.46);z-index:9998;';
-      overlay.addEventListener('click', ()=>{ safeCloseModal(dlg); });
-      document.body.appendChild(overlay);
-    } else {
-      overlay.style.display = '';
-    }
+    try{ dlg.showModal(); }catch{ dlg.setAttribute('open',''); }
   }
   function safeCloseModal(dlg){
     if(!dlg) return;
-    if(!_isIOS){ try{ dlg.close(); return; }catch{} }
-    dlg.removeAttribute('open');
-    dlg.style.cssText = '';
-    const overlay = document.getElementById('_safeModalOverlay');
-    if(overlay) overlay.style.display = 'none';
+    try{ dlg.close(); }catch{ dlg.removeAttribute('open'); }
   }
   const $$ = sel => [...document.querySelectorAll(sel)];
 
