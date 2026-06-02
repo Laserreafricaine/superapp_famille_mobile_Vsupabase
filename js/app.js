@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.29';
+  const APP_VERSION = '5.36.32';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -275,20 +275,52 @@
   function closeEditDialog(){
     state.preset = null;
     try { if($('#editDialog')?.open) $('#editDialog').close(); } catch {}
+    resetDialogActions({submit:true, submitLabel:'Enregistrer', cancelLabel:'Annuler'});
   }
   function closeActionDialog(){
     try { if($('#actionDialog')?.open) $('#actionDialog').close(); } catch {}
   }
+  function resetDialogActions({submit=true, submitLabel='Enregistrer', cancelLabel='Annuler'}={}){
+    const actions = $('#editForm .dialog-actions');
+    if(!actions) return;
+    actions.removeAttribute('hidden');
+    const submitBtn = actions.querySelector('button[type="submit"]');
+    const cancelBtn = actions.querySelector('#cancelEdit');
+    if(submitBtn){
+      submitBtn.hidden = !submit;
+      submitBtn.textContent = submitLabel;
+    }
+    if(cancelBtn) cancelBtn.textContent = cancelLabel;
+  }
   function preferredTheme(){
-    // V5.11 — Le thème sombre est retiré pour le moment. On reste toujours sur "clair".
+    // V5.36.32 — Le thème sombre reste retiré : mode clair ou auto clair.
     return 'clair';
   }
+  const APPEARANCE_ACCENTS = {
+    familial:{label:'Familial', accent:'#e8745f', accent2:'#0d67d4', themeColor:'#fff8f1'},
+    bleu:{label:'Bleu doux', accent:'#2473bf', accent2:'#0d67d4', themeColor:'#f1f8ff'},
+    vert:{label:'Vert nature', accent:'#5d8f4f', accent2:'#2473bf', themeColor:'#f4fbf0'},
+    rose:{label:'Rose chaleureux', accent:'#df5d82', accent2:'#9d4edd', themeColor:'#fff3f7'},
+    violet:{label:'Violet premium', accent:'#7d5cff', accent2:'#5168c7', themeColor:'#f6f2ff'},
+    orange:{label:'Orange solaire', accent:'#e68235', accent2:'#c96f43', themeColor:'#fff6ec'}
+  };
+  function normalizeAccent(value){
+    const key = String(value || 'familial').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_');
+    return APPEARANCE_ACCENTS[key] ? key : 'familial';
+  }
   function applyAppearance(){
+    const a = data.settings?.appearance || {};
+    const accentKey = normalizeAccent(a.accent);
+    const cfg = APPEARANCE_ACCENTS[accentKey] || APPEARANCE_ACCENTS.familial;
     document.documentElement.dataset.theme = 'clair';
     document.body.dataset.theme = 'clair';
+    document.documentElement.dataset.accent = accentKey;
+    document.body.dataset.accent = accentKey;
+    document.documentElement.style.setProperty('--accent', cfg.accent);
+    document.documentElement.style.setProperty('--accent2', cfg.accent2);
     document.body.classList.remove('theme-dark');
     document.body.classList.add('theme-light');
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#fff8f1');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', cfg.themeColor || '#fff8f1');
     const status = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
     if(status) status.setAttribute('content', 'default');
     return 'clair';
@@ -538,6 +570,10 @@
     try{ toast('✅ Application installée.'); }catch{}
   });
   async function installPwa(){
+    if(isIOSDevice()){
+      toast('Sur iPhone : appuie sur Partager, puis “Sur l’écran d’accueil”.');
+      return;
+    }
     if(deferredInstallPrompt){
       try{
         deferredInstallPrompt.prompt();
@@ -551,6 +587,10 @@
   }
   function isAndroidDevice(){
     return /Android/i.test(navigator.userAgent || '');
+  }
+  function isIOSDevice(){
+    const ua = navigator.userAgent || '';
+    return /iPad|iPhone|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   }
   function bindAndroidDialogSafety(){
     const closeIf = (selector, handler) => {
@@ -1832,8 +1872,7 @@
     type = canonicalModuleId(type);
     try { $('#actionDialog').close(); } catch {}
     // Restaurer les boutons Annuler/Enregistrer (peuvent avoir été cachés par openResetConfirmDialog)
-    const actions = $('#editForm .dialog-actions');
-    if(actions) actions.removeAttribute('hidden');
+    resetDialogActions({submit:true, submitLabel:'Enregistrer', cancelLabel:'Annuler'});
     state.editing = id ? findRecord(id) : null;
     const titleMap={maison:'Ajouter une tâche',courses_repas:'Ajouter une course / repas',calendrier:'Ajouter un élément daté',education:'Ajouter un devoir',sante:'Ajouter une information santé',sport_loisirs:(()=>{ const _t=state.slvTab||'tout'; if(_t==='sport') return 'Ajouter un sport'; if(_t==='loisir') return 'Ajouter un loisir'; if(_t==='voyage') return 'Ajouter un voyage'; return 'Ajouter — Sport / Loisir / Voyage'; })(),familles:'Ajouter un document famille'};
     $('#editTitle').textContent = id ? 'Modifier l’élément' : (titleMap[type] || 'Ajouter');
@@ -1896,7 +1935,7 @@
     const found = findRecord(id); if(!found) return;
     confirmDialog('Archiver cet élément ? Il restera synchronisable et consultable.', () => {
       found.item.status='archive'; found.item.statut='archive'; found.item.syncStatus='pending_delete'; touchSync(found.item); hideCalendarCopiesOf(found.item); save(); try{$('#editDialog').close();}catch{} render();
-    }, {confirmLabel:'Archiver', danger:false});
+    }, {confirmLabel:'Supprimer', danger:true});
   }
   function deleteItem(id){
     const found = findRecord(id); if(!found) return;
@@ -1959,6 +1998,7 @@
     if($('#editDialog').open) $('#editDialog').close();
     $('#editForm').dataset.type = 'settings';
     $('#editForm').dataset.id = '';
+    resetDialogActions({submit:true, submitLabel:'Enregistrer', cancelLabel:'Annuler'});
     $('#editTitle').textContent = `Paramètres — ${String(section || 'Paramètres')}`;
     let html = '';
     if(key.includes('famille')) html = settingsFamilyPanel();
@@ -1975,6 +2015,9 @@
     else if(key.includes('donnees')) html = settingsDataPanel();
     else html = `<div class="empty">Choisissez une rubrique de paramètres.</div>`;
     $('#editFields').innerHTML = html;
+    if(['settings','settings_actions'].includes($('#editForm').dataset.type || '')){
+      resetDialogActions({submit:false, cancelLabel:'Fermer'});
+    }
     $('#editDialog').showModal();
   }
     function settingsModuleTabs(selected, targetLabel){
@@ -2024,6 +2067,7 @@
     `;
   }
   function settingsAppsPanel(){
+    $('#editForm').dataset.type = 'settings_actions';
     const registry=data.appsRegistry||{};
     return `
       <p class="settings-sub-hint">Active ou désactive les applications. Les données restent sauvegardées.</p>
@@ -2052,6 +2096,7 @@
     save(); showSettingsPanel('Applications');
   }
   function settingsCategoriesPanel(module=''){
+    $('#editForm').dataset.type = 'settings_actions';
     const selected = canonicalModuleId(module || activeModules().find(m=>APP_MODULE_IDS.includes(m.id))?.id || 'maison');
     const cats = data.categories[selected] || {};
     return `${settingsVisualHero({title:`Catégories ${moduleLabel(selected)}`, text:'Les catégories structurent chaque application active. Elles se règlent sur mobile et resteront compatibles avec la synchronisation.', img:'assets/images/cards/settings_categories.png', emoji:'📁', chips:[`${Object.keys(cats).length} catégorie(s)`, moduleLabel(selected), 'Paramétrage local']})}
@@ -2063,6 +2108,7 @@
     return settingsCategoriesPanel(module) + `<div class="settings-tip-card"><span>🧩</span><div><b>Sous-catégories</b><small>Ouvre une catégorie pour modifier les libellés ligne par ligne.</small></div></div>`;
   }
   function openCategoryEditor(module, encodedCat=''){
+    resetDialogActions({submit:true, submitLabel:'Enregistrer', cancelLabel:'Annuler'});
     module = canonicalModuleId(module);
     const cat = decodeKey(encodedCat);
     const subs = cat && data.categories[module]?.[cat] ? data.categories[module][cat] : [];
@@ -2074,7 +2120,7 @@
       ${settingsVisualHero({title:cat || 'Nouvelle catégorie', text:'Ajoute des libellés simples pour rendre les écrans plus lisibles et plus rapides à utiliser.', img:'assets/images/cards/settings_categories.png', emoji:'📁', chips:[moduleLabel(module),'Mobile autonome']})}
       <div class="form-field"><label>Nom de la catégorie</label><input name="name" required value="${escapeAttr(cat)}"></div>
       <div class="form-field"><label>Sous-catégories / libellés</label><textarea name="children" rows="7" placeholder="Une sous-catégorie par ligne">${escapeHtml(subs.join('\n'))}</textarea></div>
-      ${cat ? `<div class="danger-actions"><button class="btn ghost danger" type="button" onclick="SuperApp.archiveCategory('${module}','${encodeKey(cat)}')">Archiver la catégorie</button></div>` : ''}`;
+      ${cat ? `<div class="danger-actions"><button class="btn ghost danger" type="button" onclick="SuperApp.archiveCategory('${module}','${encodeKey(cat)}')">Supprimer la catégorie</button></div>` : ''}`;
   }
   function settingsNotificationsPanel(){
     const prefs = data.settings.notificationsPrefs || {};
@@ -2099,6 +2145,7 @@
   }
 
   function settingsReferencePanel(module=''){
+    $('#editForm').dataset.type = 'settings_actions';
     const selected = canonicalModuleId(module || activeModules().find(m=>APP_MODULE_IDS.includes(m.id))?.id || 'maison');
     const groups = data.referenceData?.[selected] || {};
     return `${settingsVisualHero({title:`Données ${moduleLabel(selected)}`, text:'Ces listes servent à préparer l’application directement depuis le mobile : magasins, lieux, professionnels, matières, clubs, documents.', img:'assets/images/cards/settings_data.png', emoji:'🧰', chips:[moduleLabel(selected), `${Object.keys(groups).length} liste(s)`, 'Sans import obligatoire']})}
@@ -2107,6 +2154,7 @@
       <button class="btn primary visual-wide" type="button" onclick="SuperApp.openReferenceEditor('${selected}','')">+ Ajouter une liste</button>`;
   }
   function openReferenceEditor(module, encodedGroup=''){
+    resetDialogActions({submit:true, submitLabel:'Enregistrer', cancelLabel:'Annuler'});
     module = canonicalModuleId(module);
     const group = decodeKey(encodedGroup);
     const values = group && data.referenceData?.[module]?.[group] ? data.referenceData[module][group] : [];
@@ -2116,7 +2164,8 @@
     $('#editFields').innerHTML = `<input type="hidden" name="module" value="${module}"><input type="hidden" name="oldName" value="${escapeAttr(group)}">
       ${settingsVisualHero({title:group || 'Nouvelle liste', text:'Une valeur par ligne. Ces données restent locales et synchronisables plus tard.', img:'assets/images/cards/settings_data.png', emoji:'🧰', chips:[moduleLabel(module),'Liste de référence']})}
       <div class="form-field"><label>Nom de la liste</label><input name="name" required value="${escapeAttr(group)}" placeholder="Ex : magasins, lieux, professionnels"></div>
-      <div class="form-field"><label>Valeurs</label><textarea name="values" rows="7" placeholder="Une valeur par ligne">${escapeHtml(values.join('\n'))}</textarea></div>`;
+      <div class="form-field"><label>Valeurs</label><textarea name="values" rows="7" placeholder="Une valeur par ligne">${escapeHtml(values.join('\n'))}</textarea></div>
+      ${group ? `<div class="danger-actions"><button class="btn ghost danger" type="button" onclick="SuperApp.deleteReferenceList('${module}','${encodeKey(group)}')">Supprimer la liste</button></div>` : ''}`;
   }
   function settingsAppearancePanel(){
     const a = data.settings.appearance || {};
@@ -2124,10 +2173,13 @@
     // V5.11 — Thème sombre retiré (l'option ne s'affiche plus dans le sélecteur).
     // Si une valeur "sombre" était enregistrée, on bascule en "clair" silencieusement.
     if(a.theme === 'sombre') a.theme = 'clair';
-    return `${settingsVisualHero({title:'Apparence', text:'L’interface reste familiale, douce et mignonne. Ici on règle seulement l’ambiance visuelle.', emoji:'🎨', chips:[a.theme||'clair', a.accent||'familial', a.accueil||'resume']})}
-      <div class="settings-choice-grid"><label><span>☀️</span><b>Thème</b><select name="theme"><option value="clair" ${a.theme==='clair'?'selected':''}>Clair</option><option value="auto" ${a.theme==='auto'?'selected':''}>Automatique (suit le système)</option></select></label><label><span>🌈</span><b>Accent visuel</b><input name="accent" value="${escapeAttr(a.accent||'familial')}"></label><label><span>🏠</span><b>Accueil préféré</b><select name="accueil"><option value="resume" ${a.accueil==='resume'?'selected':''}>Résumé familial</option><option value="apps" ${a.accueil==='apps'?'selected':''}>Applications</option><option value="calendrier" ${a.accueil==='calendrier'?'selected':''}>Calendrier</option></select></label></div>`;
+    const accent = normalizeAccent(a.accent);
+    const accentOptions = Object.entries(APPEARANCE_ACCENTS).map(([key,cfg])=>`<option value="${key}" ${accent===key?'selected':''}>${cfg.label}</option>`).join('');
+    return `${settingsVisualHero({title:'Apparence', text:'L’interface reste familiale, douce et mignonne. Ici on règle seulement l’ambiance visuelle réellement appliquée.', emoji:'🎨', chips:[a.theme||'clair', APPEARANCE_ACCENTS[accent].label, a.accueil||'resume']})}
+      <div class="settings-choice-grid"><label><span>☀️</span><b>Thème</b><select name="theme"><option value="clair" ${a.theme==='clair'?'selected':''}>Clair</option><option value="auto" ${a.theme==='auto'?'selected':''}>Automatique clair</option></select></label><label><span>🌈</span><b>Couleur principale</b><select name="accent">${accentOptions}</select></label><label><span>🏠</span><b>Accueil préféré</b><select name="accueil"><option value="resume" ${a.accueil==='resume'?'selected':''}>Résumé familial</option><option value="apps" ${a.accueil==='apps'?'selected':''}>Applications</option><option value="calendrier" ${a.accueil==='calendrier'?'selected':''}>Calendrier</option></select></label></div>`;
   }
   function settingsAccountPanel(){
+    $('#editForm').dataset.type = 'settings_actions';
     const email = window._sbUserEmail || '';
     const connected = !!email;
     return `${settingsVisualHero({title:'Compte', text:'Connexion du foyer et accès aux données synchronisées.', img:'assets/images/cards/settings_sync.png', emoji:'👤', chips:[connected ? 'Connecté' : 'Hors ligne', connected ? email : 'Connexion requise']})}
@@ -2139,17 +2191,19 @@
       </div>`;
   }
   function settingsSyncPanel(){
+    $('#editForm').dataset.type = 'settings_actions';
     const meta = window.sbSyncMetaExternal ? window.sbSyncMetaExternal() : '<div class="settings-sync-dates"><small>Dates Supabase indisponibles pour le moment.</small></div>';
-    return `${settingsVisualHero({title:'Synchronisation', text:'Envoyer ou récupérer explicitement les données Supabase.', img:'assets/images/cards/settings_sync.png', emoji:'🔄', chips:[`Mode : ${data.offer?.syncMode || 'mobile_only'}`, data.offer?.syncEnabled ? 'Synchro active' : 'Mobile seul', data.offer?.cockpitOrdinateur ? 'Ordinateur acheté' : 'Ordinateur non acheté']})}
+    const installBlock = isIOSDevice()
+      ? `<div class="settings-tip-card ios-install-help"><span>📱</span><div><b>Installer sur iPhone</b><small>Appuie sur Partager, puis choisis “Sur l’écran d’accueil”.</small></div></div>`
+      : `<button class="btn ghost android-install-action" type="button" onclick="SuperApp.installPwa()"><span>📱</span><b>Installer l’application</b><small>Chrome Android : prompt ou menu ⋮</small></button>`;
+    return `${settingsVisualHero({title:'Synchronisation', text:'Envoyer ou récupérer explicitement les données Supabase. Les sauvegardes JSON sont dans “Sauvegarde & données”.', img:'assets/images/cards/settings_sync.png', emoji:'🔄', chips:[`Mode : ${data.offer?.syncMode || 'mobile_only'}`, data.offer?.syncEnabled ? 'Synchro active' : 'Mobile seul', data.offer?.cockpitOrdinateur ? 'Ordinateur acheté' : 'Ordinateur non acheté']})}
       ${meta}
-      <div class="settings-data-actions sync-explicit-actions"><button class="btn ghost" type="button" onclick="window.sbForcePushNow?.()"><span>☁️</span><b>Exporter les données vers Supabase</b><small>Envoie les données de cet appareil</small></button><button class="btn ghost" type="button" onclick="window.sbForcePullFromServer?.()"><span>📥</span><b>Récupérer les données depuis Supabase</b><small>Remplace le local par le cloud</small></button><button class="btn ghost android-install-action" type="button" onclick="SuperApp.installPwa()"><span>📱</span><b>Installer sur Android</b><small>Ouvre le prompt Chrome si disponible</small></button></div>
-      <div class="today-grid"><button class="btn ghost" type="button" onclick="SuperApp.exportData()">Exporter JSON</button><button class="btn ghost" type="button" onclick="SuperApp.importData()">Importer JSON</button></div>`;
+      <div class="settings-data-actions sync-explicit-actions"><button class="btn ghost" type="button" onclick="window.sbForcePushNow?.()"><span>☁️</span><b>Exporter les données vers Supabase</b><small>Envoie les données de cet appareil vers le cloud</small></button><button class="btn ghost" type="button" onclick="window.sbForcePullFromServer?.()"><span>📥</span><b>Récupérer les données depuis Supabase</b><small>Remplace le local par la dernière version cloud</small></button>${installBlock}</div>`;
   }
   function settingsDataPanel(){
-    const meta = window.sbSyncMetaExternal ? window.sbSyncMetaExternal() : '';
-    return `${settingsVisualHero({title:'Sauvegarde & données', text:'Gérer les sauvegardes locales et Supabase.', img:'assets/images/cards/settings_data.png', emoji:'🛡️', chips:['Export JSON','Import JSON','Supabase']})}
-      ${meta}
-      <div class="settings-data-actions"><button class="btn ghost" type="button" onclick="SuperApp.exportData()"><span>📤</span><b>Exporter JSON</b><small>Sauvegarde fichier</small></button><button class="btn ghost" type="button" onclick="SuperApp.importData()"><span>📥</span><b>Importer JSON</b><small>Restaurer un fichier</small></button><button class="btn ghost" type="button" onclick="window.sbForcePushNow?.()"><span>☁️</span><b>Exporter vers Supabase</b><small>Envoie les données actuelles</small></button><button class="btn ghost" type="button" onclick="window.sbForcePullFromServer?.()"><span>📥</span><b>Récupérer depuis Supabase</b><small>Restaure les données cloud</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.clearDemoData()"><span>🧹</span><b>Supprimer les données de cet appareil</b><small>Supabase conservé</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.resetCloudData()"><span>⛔</span><b>Supprimer définitivement</b><small>Appareil + Supabase</small></button></div>`;
+    $('#editForm').dataset.type = 'settings_actions';
+    return `${settingsVisualHero({title:'Sauvegarde & données', text:'Gérer les fichiers JSON locaux et les suppressions. La synchronisation Supabase est dans la section “Synchronisation”.', img:'assets/images/cards/settings_data.png', emoji:'🛡️', chips:['Export JSON','Import JSON','Réinitialisation']})}
+      <div class="settings-data-actions"><button class="btn ghost" type="button" onclick="SuperApp.exportData()"><span>📤</span><b>Exporter JSON</b><small>Sauvegarder un fichier local avant modification ou réinitialisation</small></button><button class="btn ghost" type="button" onclick="SuperApp.importData()"><span>📥</span><b>Importer JSON</b><small>Restaurer un fichier sauvegardé</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.clearDemoData()"><span>🧹</span><b>Supprimer les données de cet appareil</b><small>Supabase conservé ; export JSON conseillé avant suppression</small></button><button class="btn ghost danger" type="button" onclick="SuperApp.resetCloudData()"><span>⛔</span><b>Supprimer définitivement</b><small>Appareil + Supabase ; export JSON conseillé avant suppression</small></button></div>`;
   }
     function selectWeatherCity(scope='settings', city='', postalCode='', country='France', lat=null, lon=null){
     const root = scope === 'onboarding' ? document.getElementById('onboarding') : document.getElementById('editFields');
@@ -2274,7 +2328,11 @@
   }
   function archiveCategory(module, encodedCat){
     module = canonicalModuleId(module); const cat = decodeKey(encodedCat);
-    confirmDialog('Archiver cette catégorie ? Elle sera retirée de la liste mais les anciennes données conserveront leur libellé.', () => { delete data.categories[module][cat]; save(); render(); showSettingsPanel('Catégories',module); }, {confirmLabel:'Archiver', danger:false});
+    confirmDialog('Supprimer cette catégorie ? Elle ne sera plus proposée, mais les anciennes données conserveront leur libellé.', () => { delete data.categories[module][cat]; save(); render(); showSettingsPanel('Catégories',module); }, {confirmLabel:'Supprimer', danger:true});
+  }
+  function deleteReferenceList(module, encodedGroup){
+    module = canonicalModuleId(module); const group = decodeKey(encodedGroup);
+    confirmDialog('Supprimer cette liste de référence ? Elle ne sera plus proposée dans les paramètres de cette application.', () => { if(data.referenceData?.[module]) delete data.referenceData[module][group]; save(); render(); showSettingsPanel('Données par application', module); }, {confirmLabel:'Supprimer', danger:true});
   }
 
   function openActivationPanel(id){
@@ -4415,6 +4473,18 @@
     try { $('#editDialog').close(); } catch {}
     $('#editDialog').showModal();
   }
+    function resolveWeatherCityFromForm(item){
+      const country = item.country || 'France';
+      const hidden = String(item.weatherCity || '').trim();
+      const typed = String(item.weatherCitySearch || '').trim();
+      if(typed){
+        const match = findWeatherPreset(country, typed);
+        if(match && match.city && match.city.toLowerCase() === typed.toLowerCase()) return match.city;
+        return typed;
+      }
+      return hidden || String(item.city || data.foyer?.weatherCity || '').trim();
+    }
+
     function saveSettingsForm(type,item,id=''){
     if(type==='settings_member'){
       const memberId = id || uid();
@@ -4442,7 +4512,7 @@
         city:String(item.city||'').trim()||data.foyer?.city||'',
         postalCode:String(item.postalCode||'').trim()||data.foyer?.postalCode||'',
         country:item.country||'France',
-        weatherCity:item.weatherCity||item.city||data.foyer?.weatherCity||'',
+        weatherCity:resolveWeatherCityFromForm(item),
         latitude:Number(item.latitude||data.foyer?.latitude||0)||null,
         longitude:Number(item.longitude||data.foyer?.longitude||0)||null,
         weatherAuto:item.weatherAuto==='true',
@@ -4473,7 +4543,7 @@
       const prefs = {global:!!item.global, sauvegarde:!!item.sauvegarde, synchro:!!item.synchro}; APP_MODULE_IDS.forEach(mid=>prefs[mid]=!!item[mid]); data.settings.notificationsPrefs = prefs; save(); render(); closeEditDialog(); return;
     }
     if(type==='settings_appearance'){
-      data.settings.appearance = {...(data.settings.appearance||{}), ...item}; data.settings.theme = item.theme || data.settings.theme; save(); applyAppearance(); render(); closeEditDialog(); return;
+      data.settings.appearance = {...(data.settings.appearance||{}), ...item, accent: normalizeAccent(item.accent), theme: item.theme || 'clair'}; data.settings.theme = data.settings.appearance.theme; save(); applyAppearance(); render(); closeEditDialog(); return;
     }
     closeEditDialog();
   }
@@ -4784,7 +4854,7 @@
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
-    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
+    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, deleteReferenceList, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
     handleCategoryChange, handleSubcategoryChange,
     openCreateCategoryDialog, openCreateSubcategoryDialog, confirmCreateCategory,
