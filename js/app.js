@@ -116,14 +116,6 @@
   let state = { view:'home', calendarMode:'month', selectedDate: today, notifFilter:'all', calendarFilter:'all', activeModule:null, editing:null, preset:null, returnList:null, appsView:null, slvTab:'sport', maisonPeriodFilters:{} }; 
 
   const $ = sel => document.querySelector(sel);
-  function safeShowModal(dlg){
-    if(!dlg) return;
-    try{ dlg.showModal(); }catch{ dlg.setAttribute('open',''); }
-  }
-  function safeCloseModal(dlg){
-    if(!dlg) return;
-    try{ dlg.close(); }catch{ dlg.removeAttribute('open'); }
-  }
   const $$ = sel => [...document.querySelectorAll(sel)];
 
   function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
@@ -282,10 +274,10 @@
   }
   function closeEditDialog(){
     state.preset = null;
-    safeCloseModal($('#editDialog'));
+    try { if($('#editDialog')?.open) $('#editDialog').close(); } catch {}
   }
   function closeActionDialog(){
-    safeCloseModal($('#actionDialog'));
+    try { if($('#actionDialog')?.open) $('#actionDialog').close(); } catch {}
   }
   function preferredTheme(){
     // V5.11 — Le thème sombre est retiré pour le moment. On reste toujours sur "clair".
@@ -797,12 +789,12 @@
     const okBtn = dlg.querySelector('#appConfirmOk');
     okBtn.textContent = opts.confirmLabel || 'Confirmer';
     okBtn.className = 'btn ' + (opts.danger !== false ? 'primary danger' : 'primary');
-    const close = () => { safeCloseModal(dlg); };
+    const close = () => { try{ dlg.close(); }catch{} };
     const newOk = okBtn.cloneNode(true);
     okBtn.replaceWith(newOk);
     newOk.addEventListener('click', () => { close(); onConfirm(); });
     dlg.querySelector('#appConfirmCancel').onclick = close;
-    safeShowModal(dlg);
+    try{ dlg.showModal(); }catch{ dlg.setAttribute('open',''); }
   }
   // Remplace alert() natif : toast enrichi ou modale simple selon contexte
   function infoDialog(message){
@@ -816,8 +808,8 @@
       document.body.appendChild(dlg);
     }
     dlg.querySelector('#appInfoMsg').textContent = message;
-    dlg.querySelector('#appInfoOk').onclick = () => { safeCloseModal(dlg); };
-    safeShowModal(dlg);
+    dlg.querySelector('#appInfoOk').onclick = () => { try{ dlg.close(); }catch{} };
+    try{ dlg.showModal(); }catch{ dlg.setAttribute('open',''); }
   }
   function render(){
     const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
@@ -1595,7 +1587,7 @@
       submit.disabled = false;
       submit.classList.remove('disabled');
     }
-    safeShowModal(dlg);
+    try { dlg.showModal(); } catch { dlg.setAttribute('open',''); }
   }
   function ensureStockToCoursesDialog(){
     let dlg = document.getElementById('stockToCoursesDialog');
@@ -1625,7 +1617,7 @@
     const dlg = document.getElementById('stockToCoursesDialog');
     if(!dlg || dlg.dataset.duplicate === '1') return;
     addStockToCourses(dlg.dataset.stockId, {silentDuplicate:true});
-    safeCloseModal(dlg);
+    try{ dlg.close(); }catch{}
   }
   function addStockToCourses(stockId, opts={}){
     const item = (data.stock||[]).find(x=>x.id===stockId);
@@ -1672,7 +1664,7 @@
     input.max = String(current);
     input.value = current > 0 ? (unit === 'unité' ? '1' : '0.1') : '0';
     updateConsumeStockPreview(dlg);
-    safeShowModal(dlg);
+    try { dlg.showModal(); } catch { dlg.setAttribute('open',''); }
     setTimeout(()=>input.focus(), 50);
   }
   function ensureConsumeStockDialog(){
@@ -1781,7 +1773,7 @@
     $('#editForm').dataset.type = 'settings_budget_courses'; $('#editForm').dataset.id = '';
     const b = data.foodBudget || {monthly:0,spent:0,currency:'EUR'};
     $('#editFields').innerHTML = `<div class="form-field"><label>Budget mensuel</label><input name="monthly" type="number" value="${Number(b.monthly||0)}"></div><div class="form-field"><label>Dépensé</label><input name="spent" type="number" value="${Number(b.spent||0)}"></div><div class="form-field"><label>Devise</label><input name="currency" value="${escapeAttr(b.currency||'EUR')}"></div>`;
-    safeCloseModal($('#editDialog')); safeShowModal($('#editDialog'));
+    if($('#editDialog').open) $('#editDialog').close(); $('#editDialog').showModal();
   }
   function openMemberDocList(memberId, category, title){
     const member = data.family.find(m=>m.id===memberId); if(!member) return;
@@ -1834,11 +1826,11 @@
     $('#quickActions').innerHTML = [
       ['maison','🏠','Ajouter une tâche'],['courses_repas','🛒','Ajouter une course'],['calendrier','📅','Ajouter un événement'],['education','📘','Ajouter un devoir'],['sante','💊','Ajouter une information santé'],['sport_loisirs','⚽','Ajouter sport, loisir ou voyage'],['familles','👨‍👩‍👧‍👦','Ajouter document famille']
     ].map(([id,icon,label])=>`<button class="quick-action" type="button" onclick="SuperApp.openEdit('${id}')"><span>${icon}</span>${label}</button>`).join('');
-    safeShowModal($('#actionDialog'));
+    $('#actionDialog').showModal();
   }
   function openEdit(type, id=''){
     type = canonicalModuleId(type);
-    safeCloseModal($('#actionDialog'));
+    try { $('#actionDialog').close(); } catch {}
     // Restaurer les boutons Annuler/Enregistrer (peuvent avoir été cachés par openResetConfirmDialog)
     const actions = $('#editForm .dialog-actions');
     if(actions) actions.removeAttribute('hidden');
@@ -1853,8 +1845,8 @@
     if(state.editing?.collection==='sportGear' && !item.type) item.type = item.category==='Documents sport' ? 'document_sport' : 'materiel_sport';
     if(state.editing?.collection==='weeklyMeals' && (!item.type || item.type==='repas')) item.type='repas_semaine';
     $('#editFields').innerHTML = fieldsFor(type,item);
-    safeCloseModal($('#editDialog'));
-    safeShowModal($('#editDialog'));
+    if($('#editDialog').open) $('#editDialog').close();
+    $('#editDialog').showModal();
     if(supportsSupabaseDocs(type) && item.id){
       setTimeout(()=>window.sbHydrateHealthItemDocs?.(item.id, type), 120);
     }
@@ -1869,11 +1861,11 @@
     $('#editTitle').textContent = `Dossier — ${member.name}`;
     $('#editForm').dataset.type = 'settings';
     $('#editForm').dataset.id = '';
-    safeCloseModal($('#editDialog'));
+    if($('#editDialog').open) $('#editDialog').close();
     const workType = memberWorkSchoolType(member);
     const workPhoneLabel = workType.toLowerCase().includes('école') || workType.toLowerCase().includes('ecole') ? 'Numéro école' : 'Numéro travail';
     $('#editFields').innerHTML = `<div class="member-detail-panel"><p><b>Rôle :</b> ${member.role || 'Famille'}</p><p><b>Naissance :</b> ${member.birth || 'À renseigner'} · ${ageFromBirth(member.birth)}</p><p><b>Téléphone personnel :</b> ${formatPhone(member.phone)}</p><p><b>Contact principal :</b> ${boolLabel(member.primaryContact)}</p><p><b>Peut conduire :</b> ${boolLabel(member.canDrive)}</p><p><b>${escapeHtml(workType)} :</b> ${escapeHtml(member.workSchoolName || 'À renseigner')}</p><p><b>${escapeHtml(workPhoneLabel)} :</b> ${formatPhone(member.workSchoolPhone)}</p><p><b>Email :</b> ${member.email || 'À renseigner'}</p><p><b>Alertes :</b> ${escapeHtml(memberAlertLabel(member))}</p></div>${memberHealthQuickBlock(member,'detail')}<div class="settings-chips embedded"><span>Carte d’identité</span><span>Passeport</span><span>Diplômes</span><span>Santé</span><span>Scolarité</span><span>Assurances</span></div><button class="btn primary" type="button" onclick="SuperApp.openAdd('familles','document_famille','Dossier membre','Document — ${escapeAttr(member.name)}','${member.id}')">Ajouter un document</button>`;
-    safeShowModal($('#editDialog'));
+    $('#editDialog').showModal();
   }
   function memberOptions(selected='family'){
     return `<option value="family" ${selected==='family'?'selected':''}>Toute la famille</option>${data.family.map(m=>`<option value="${m.id}" ${selected===m.id?'selected':''}>${m.name}</option>`).join('')}`;
@@ -1903,7 +1895,7 @@
   function archiveItem(id){
     const found = findRecord(id); if(!found) return;
     confirmDialog('Archiver cet élément ? Il restera synchronisable et consultable.', () => {
-      found.item.status='archive'; found.item.statut='archive'; found.item.syncStatus='pending_delete'; touchSync(found.item); hideCalendarCopiesOf(found.item); save(); safeCloseModal($('#editDialog')); render();
+      found.item.status='archive'; found.item.statut='archive'; found.item.syncStatus='pending_delete'; touchSync(found.item); hideCalendarCopiesOf(found.item); save(); try{$('#editDialog').close();}catch{} render();
     }, {confirmLabel:'Archiver', danger:false});
   }
   function deleteItem(id){
@@ -1911,7 +1903,7 @@
     confirmDialog('Supprimer cet élément ? Il disparaître de l’interface mais restera marqué pour la synchronisation.', () => {
       found.item.status='supprime'; found.item.statut='supprime'; found.item.syncStatus='pending_delete'; touchSync(found.item);
       hideCalendarCopiesOf(found.item);
-      save(); safeCloseModal($('#editDialog')); render();
+      save(); try{$('#editDialog').close();}catch{} render();
       toast('🗑️ Élément supprimé');
     });
   }
@@ -1964,7 +1956,7 @@
       openStyleFamillePanel();
       return;
     }
-    safeCloseModal($('#editDialog'));
+    if($('#editDialog').open) $('#editDialog').close();
     $('#editForm').dataset.type = 'settings';
     $('#editForm').dataset.id = '';
     $('#editTitle').textContent = `Paramètres — ${String(section || 'Paramètres')}`;
@@ -1983,7 +1975,7 @@
     else if(key.includes('donnees')) html = settingsDataPanel();
     else html = `<div class="empty">Choisissez une rubrique de paramètres.</div>`;
     $('#editFields').innerHTML = html;
-    safeShowModal($('#editDialog'));
+    $('#editDialog').showModal();
   }
     function settingsModuleTabs(selected, targetLabel){
     return `<div class="settings-module-tabs">${activeModules().filter(m=>APP_MODULE_IDS.includes(m.id)).map(m=>`<button class="settings-module-tab ${selected===m.id?'active':''}" type="button" onclick="SuperApp.openSettings('${targetLabel}','${m.id}')"><span class="settings-tab-emoji">${appLogoHtml(m.id, 28)}</span><b>${m.short}</b></button>`).join('')}</div>`;
@@ -2292,14 +2284,14 @@
     $('#editTitle').textContent = `Activation — ${m.name}`;
     $('#editForm').dataset.type = 'settings';
     $('#editForm').dataset.id = '';
-    safeCloseModal($('#editDialog'));
+    if($('#editDialog').open) $('#editDialog').close();
     $('#editFields').innerHTML = `<div class="empty"><b>${m.name}</b> est disponible comme application indépendante. Elle peut fonctionner seule sur le cockpit mobile et être connectée plus tard au cockpit ordinateur.</div><div class="settings-chips embedded"><span>Cockpit mobile</span><span>Application indépendante</span><span>Connexion ordinateur optionnelle</span></div><button class="btn primary" type="button" onclick="SuperApp.activateApp('${id}')">Activer cette application</button>`;
-    safeShowModal($('#editDialog'));
+    $('#editDialog').showModal();
   }
   function activateApp(id){
     id = canonicalModuleId(id); data.appsRegistry = makeAppsRegistry(data.appsRegistry || {});
     if(data.appsRegistry[id]){ Object.assign(data.appsRegistry[id], {actif:true, installe:true, licence:'active', sourceActivation:'cockpit_mobile', activatedAt:nowISO(), connectedToMobile:true, syncStatus:'pending_update'}); }
-    save(); safeCloseModal($('#editDialog')); render(); openModule(id);
+    save(); if($('#editDialog').open) $('#editDialog').close(); render(); openModule(id);
   }
   function deactivateApp(id){
     id = canonicalModuleId(id); data.appsRegistry = makeAppsRegistry(data.appsRegistry || {});
@@ -2459,8 +2451,8 @@
     // Masquer les boutons Annuler/Enregistrer (la modale gère ses propres boutons)
     const actions = $('#editForm .dialog-actions');
     if(actions) actions.setAttribute('hidden', '');
-    safeCloseModal($('#editDialog'));
-    safeShowModal($('#editDialog'));
+    if($('#editDialog').open) $('#editDialog').close();
+    $('#editDialog').showModal();
   }
   async function confirmFullReset(mode='local'){
     const cloud = mode === 'cloud';
@@ -3790,7 +3782,7 @@
     dlg.querySelector('[name="subName"]').value = '';
     dlg.querySelector('[name="subName"]').parentElement.style.display = '';
     dlg.querySelector('[name="catName"]').focus();
-    safeShowModal(dlg);
+    try { dlg.showModal(); } catch { dlg.setAttribute('open',''); }
   }
   function openCreateSubcategoryDialog(){
     const m = getCurrentFormModule();
@@ -3803,7 +3795,7 @@
     dlg.querySelector('[name="subName"]').value = '';
     dlg.querySelector('[name="subName"]').parentElement.style.display = 'none';
     dlg.querySelector('[name="catName"]').focus();
-    safeShowModal(dlg);
+    try { dlg.showModal(); } catch { dlg.setAttribute('open',''); }
   }
   function ensureCreateDialog(){
     let dlg = document.getElementById('createCatDialog');
@@ -4420,8 +4412,8 @@
     $('#editFields').innerHTML = html;
     $('#editForm').dataset.type = 'settings';
     $('#editForm').dataset.id = '';
-    safeCloseModal($('#editDialog'));
-    safeShowModal($('#editDialog'));
+    try { $('#editDialog').close(); } catch {}
+    $('#editDialog').showModal();
   }
     function saveSettingsForm(type,item,id=''){
     if(type==='settings_member'){
@@ -4744,7 +4736,7 @@
       </details>
       <div class="form-field"><label>Couleur</label><select name="accent"><option value="violet" ${m.accent==='violet'?'selected':''}>Violet doux</option><option value="rose" ${m.accent==='rose'?'selected':''}>Rose</option><option value="bleu" ${m.accent==='bleu'?'selected':''}>Bleu</option><option value="vert" ${m.accent==='vert'?'selected':''}>Vert</option><option value="orange" ${m.accent==='orange'?'selected':''}>Orange</option></select></div>
       ${id ? `<div class="danger-actions"><button class="btn ghost danger" type="button" onclick="SuperApp.archiveMember('${id}')">Supprimer / archiver le membre</button></div>` : ''}`;
-    safeShowModal($('#editDialog'));
+    if(!$('#editDialog').open) $('#editDialog').showModal();
   }
   function renderCalendar(){
     const selected = parseDMY(state.selectedDate) || new Date();
