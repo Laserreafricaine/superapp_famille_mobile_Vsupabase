@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.36.32';
+  const APP_VERSION = '5.37.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -3151,6 +3151,36 @@
   function slvChecklistRemaining(activity){
     return slvChecklistForActivity(activity).filter(x=>!statusIsDone(x)).length;
   }
+  // --- V5.37 — Sous-catégories propres à chaque activité (voyage, loisir, sport) ---
+  // Les sous-catégories d'un voyage (ex : "Avant départ", "Affaires", "Papiers"…)
+  // sont stockées directement sur l'activité, dans le champ `subcategories`
+  // (texte multi-lignes). Chaque sous-catégorie devient un onglet/filtre de la checklist.
+  function activitySubcategories(activity){
+    if(!activity) return [];
+    const raw = activity.subcategories;
+    if(Array.isArray(raw)) return raw.map(s=>String(s).trim()).filter(Boolean);
+    return lineArray(raw);
+  }
+  function subcategoriesText(item){
+    const raw = item && item.subcategories;
+    if(Array.isArray(raw)) return raw.join('\n');
+    return String(raw || '');
+  }
+  // Sous-catégorie d'un objet de checklist (avec repli sur les anciens champs).
+  function slvItemSubcategory(x){
+    return String((x && (x.subcategory || x.itemCategory || x.category)) || '').trim();
+  }
+  // Filtre de sous-catégorie actif sur la page checklist (réinitialisé par activité).
+  function activeSlvSubFilter(activityId){
+    if(!state.slvSubFilters) state.slvSubFilters = {};
+    return state.slvSubFilters[activityId] || 'all';
+  }
+  function setSlvSubFilter(activityId, sub){
+    if(!state.slvSubFilters) state.slvSubFilters = {};
+    const val = sub ? decodeKey(sub) : 'all';
+    state.slvSubFilters[activityId] = val || 'all';
+    if(state.appsView?.kind==='slvChecklist' && state.appsView.id===activityId) paintSlvChecklistPage(activityId);
+  }
   function slvAllContent(){
     const sport=slvConfigFor('sport'), loisir=slvConfigFor('loisir'), voyage=slvConfigFor('voyage');
     const all=[...sport.acts,...loisir.acts,...voyage.acts];
@@ -3194,7 +3224,19 @@
   function slvChecklistRows(gear, activityId=''){
     const vis=(gear||[]).filter(x=>!statusIsHidden(x));
     if(!vis.length) return '<div class="empty">Checklist vide. Appuie sur + pour ajouter.</div>';
-    return `<div class="agenda-list">${vis.map(x=>shoppingRow(x,{module:'sport_loisirs',collection:collectionForItemLike(x),activityId})).join('')}</div>`;
+    const activity = activityId ? slvActivityById(activityId) : null;
+    const names = activity ? slvChecklistGroupNames(activity) : [];
+    const norm = s => normalizeText(s);
+    const rowHtml = x => shoppingRow(x,{module:'sport_loisirs',collection:collectionForItemLike(x),activityId});
+    // V5.37 — Si des sous-catégories existent, on regroupe l'aperçu par sous-catégorie.
+    if(!names.length) return `<div class="agenda-list">${vis.map(rowHtml).join('')}</div>`;
+    const buckets = names.map(name=>({name, items:vis.filter(x=>norm(slvItemSubcategory(x))===norm(name))}));
+    const orphans = vis.filter(x=>!slvItemSubcategory(x));
+    if(orphans.length) buckets.push({name:'Sans sous-catégorie', items:orphans});
+    return buckets.filter(b=>b.items.length).map(b=>{
+      const done = b.items.filter(statusIsDone).length;
+      return `<div class="slv-subcat-group"><div class="slv-subcat-head"><b>${escapeHtml(b.name)}</b><em>${done}/${b.items.length}</em></div><div class="agenda-list">${b.items.map(rowHtml).join('')}</div></div>`;
+    }).join('');
   }
   function paintSlvActivityDetail(id){
     const activity=slvActivityById(id);
@@ -3311,20 +3353,68 @@
     const rows=slvChecklistForActivity(activity); const ready=rows.filter(statusIsDone).length;
     return {total:rows.length, ready, remaining:Math.max(0, rows.length-ready)};
   }
-  function slvChecklistLightRows(activity){
-    const rows = slvChecklistForActivity(activity);
-    if(!rows.length) return '<div class="empty cute-empty"><b>Checklist vide</b><small>Ajoute un premier objet ou clique sur une suggestion.</small></div>';
-    return `<div class="slv-object-list">${rows.map(x=>{
-      const done = statusIsDone(x);
-      const qty = Number(x.quantity || x.qty || 1) || 1;
-      const cat = x.itemCategory || x.category || 'Autre';
-      return `<article class="slv-object-row ${done?'done':''}">
+  function slvChecklistRowHtml(x){
+    const done = statusIsDone(x);
+    const qty = Number(x.quantity || x.qty || 1) || 1;
+    const cat = slvItemSubcategory(x) || 'Autre';
+    return `<article class="slv-object-row ${done?'done':''}">
         <button type="button" class="shopping-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')">${done?'✓':''}</button>
         <div class="slv-object-main" onclick="SuperApp.openEdit('sport_loisirs','${x.id}')"><b>${escapeHtml(x.title||'Objet')}</b><small>${escapeHtml(cat)}${done?' · Prêt':''}</small></div>
         <div class="slv-stepper" aria-label="Quantité"><button type="button" onclick="event.stopPropagation();SuperApp.changeSlvChecklistQty('${x.id}',-1)">−</button><strong>${qty}</strong><button type="button" onclick="event.stopPropagation();SuperApp.changeSlvChecklistQty('${x.id}',1)">+</button></div>
         <button type="button" class="btn-sm ghost danger" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">🗑️</button>
       </article>`;
-    }).join('')}</div>`;
+  }
+  // V5.37 — Noms de groupes pour la checklist : sous-catégories du voyage d'abord,
+  // puis toute sous-catégorie présente sur un objet (compatibilité ascendante).
+  function slvChecklistGroupNames(activity){
+    const subs = activitySubcategories(activity);
+    const names = [...subs];
+    slvChecklistForActivity(activity).forEach(x=>{
+      const s = slvItemSubcategory(x);
+      if(s && !names.some(g=>normalizeText(g)===normalizeText(s))) names.push(s);
+    });
+    return names;
+  }
+  function slvSubFilterChips(activity){
+    const names = slvChecklistGroupNames(activity);
+    if(!names.length) return '';
+    const rows = slvChecklistForActivity(activity);
+    const norm = s => normalizeText(s);
+    const filter = activeSlvSubFilter(activity.id);
+    const hasOrphans = rows.some(x=>!slvItemSubcategory(x));
+    const chip=(val,label,count)=>`<button type="button" class="slv-subcat-chip ${norm(filter)===norm(val)?'active':''}" onclick="SuperApp.setSlvSubFilter('${activity.id}','${encodeKey(val)}')">${escapeHtml(label)}<em>${count}</em></button>`;
+    let html = chip('all','Tout', rows.length);
+    names.forEach(n=>{ html += chip(n, n, rows.filter(x=>norm(slvItemSubcategory(x))===norm(n)).length); });
+    if(hasOrphans) html += chip('none','Sans sous-catégorie', rows.filter(x=>!slvItemSubcategory(x)).length);
+    return `<div class="slv-subcat-filter" aria-label="Filtrer par sous-catégorie">${html}</div>`;
+  }
+  function slvChecklistLightRows(activity){
+    const allRows = slvChecklistForActivity(activity);
+    if(!allRows.length) return '<div class="empty cute-empty"><b>Checklist vide</b><small>Ajoute un premier objet ou choisis une sous-catégorie.</small></div>';
+    const names = slvChecklistGroupNames(activity);
+    const norm = s => normalizeText(s);
+    const filter = activeSlvSubFilter(activity.id);
+    // Pas de sous-catégorie du tout → liste à plat (comportement historique)
+    if(!names.length) return `<div class="slv-object-list">${allRows.map(slvChecklistRowHtml).join('')}</div>`;
+    const buckets = names.map(name=>({name, items:allRows.filter(x=>norm(slvItemSubcategory(x))===norm(name))}));
+    const orphans = allRows.filter(x=>!slvItemSubcategory(x));
+    if(orphans.length) buckets.push({name:'Sans sous-catégorie', items:orphans, orphan:true});
+    const visible = buckets.filter(b=>{
+      if(filter==='all') return b.items.length > 0;            // en vue "Tout", on masque les groupes vides
+      if(filter==='none') return !!b.orphan;
+      return norm(b.name)===norm(filter);                       // sinon on affiche la sous-catégorie choisie (même vide)
+    });
+    if(!visible.length) return '<div class="empty cute-empty"><small>Aucun objet pour ce filtre.</small></div>';
+    return visible.map(b=>{
+      const done = b.items.filter(statusIsDone).length;
+      const body = b.items.length
+        ? `<div class="slv-object-list">${b.items.map(slvChecklistRowHtml).join('')}</div>`
+        : '<div class="empty cute-empty small"><small>Rien ici pour l’instant. Ajoute un objet ci-dessus.</small></div>';
+      return `<div class="slv-subcat-group">
+        <div class="slv-subcat-head"><b>${escapeHtml(b.name)}</b><em>${done}/${b.items.length}</em></div>
+        ${body}
+      </div>`;
+    }).join('');
   }
   function paintSlvChecklistPage(activityId){
     const activity=slvActivityById(activityId);
@@ -3334,13 +3424,25 @@
     const mems=activity.members&&activity.members!=='family'?String(activity.members).split(',').map(mid=>memberName(mid.trim())).join(', '):(activity.member==='family'||!activity.member?'Toute la famille':memberName(activity.member));
     const suggestions=slvChecklistSuggestions(tab);
     state.activeModule='sport_loisirs'; state.slvTab=tab;
+    // V5.37 — Sous-catégories du voyage : sélecteur d'ajout + filtre
+    const subs = activitySubcategories(activity);
+    const filter = activeSlvSubFilter(activity.id);
+    const norm = s => normalizeText(s);
+    const quickCatSelect = subs.length
+      ? `<select id="slvQuickCatInput" aria-label="Sous-catégorie">${subs.map(s=>`<option ${norm(s)===norm(filter)?'selected':''}>${escapeHtml(s)}</option>`).join('')}</select>`
+      : `<select id="slvQuickCatInput" aria-label="Catégorie"><option>Documents</option><option>Vêtements</option><option>Santé</option><option>Électronique</option><option>Toilette</option><option>Chaussures</option><option>Sport</option><option>Autre</option></select>`;
+    const filterChips = slvSubFilterChips(activity);
+    const subHint = subs.length
+      ? `<small>Range chaque objet dans une sous-catégorie. Pour en ajouter, modifie le voyage.</small>`
+      : `<small>Astuce : ouvre le voyage et renseigne ses « sous-catégories » pour organiser la checklist (ex : Affaires, Papiers, Hygiène…).</small>`;
     $('#view-apps').innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openSlvActivityDetail('${activity.id}')">← Retour activité</button></div>
       <section class="slv-checklist-page ${tab}">
         <article class="slv-detail-hero ${cfg.tone}"><div class="slv-detail-icon">${cfg.gearEmoji}</div><div class="slv-detail-main"><span>Checklist ${escapeHtml(cfg.label)}</span><h2>${escapeHtml(activity.title||cfg.label)}</h2><p>${escapeHtml(dates)} · ${escapeHtml(mems)}${activity.location?' · 📍 '+escapeHtml(activity.location):''}</p></div></article>
         <section class="slv-checklist-board">
-          <div class="slv-board-head"><div><h3>Objets à préparer</h3><small>Ajoute tes objets, ajuste les quantités, coche quand c’est prêt. Les objets cochés restent barrés.</small></div><div class="slv-stat-chips"><span>${stats.total} objets</span><span>${stats.ready} prêts</span><span>${stats.remaining} restants</span></div></div>
-          <div class="slv-add-object-card"><input id="slvQuickItemInput" type="text" placeholder="Nom de l’objet"><input id="slvQuickQtyInput" type="number" min="1" step="1" value="1" aria-label="Quantité"><select id="slvQuickCatInput"><option>Documents</option><option>Vêtements</option><option>Santé</option><option>Électronique</option><option>Toilette</option><option>Chaussures</option><option>Sport</option><option>Autre</option></select><button type="button" class="btn primary" onclick="SuperApp.addSlvChecklistLine('${activity.id}')">+ Ajouter</button></div>
+          <div class="slv-board-head"><div><h3>Objets à préparer</h3>${subHint}</div><div class="slv-stat-chips"><span>${stats.total} objets</span><span>${stats.ready} prêts</span><span>${stats.remaining} restants</span></div></div>
+          <div class="slv-add-object-card"><input id="slvQuickItemInput" type="text" placeholder="Nom de l’objet"><input id="slvQuickQtyInput" type="number" min="1" step="1" value="1" aria-label="Quantité">${quickCatSelect}<button type="button" class="btn primary" onclick="SuperApp.addSlvChecklistLine('${activity.id}')">+ Ajouter</button></div>
           <div class="slv-suggestions"><b>Suggestions rapides</b><div>${suggestions.map(v=>`<button type="button" onclick="SuperApp.addSlvChecklistSuggestion('${activity.id}','${escapeAttr(v)}')">＋ ${escapeHtml(v)}</button>`).join('')}</div></div>
+          ${filterChips}
           ${slvChecklistLightRows(activity)}
           <footer class="dialog-actions slv-checklist-actions"><button type="button" class="btn ghost" onclick="SuperApp.openSlvActivityDetail('${activity.id}')">Retour activité</button><button type="button" class="btn primary" onclick="SuperApp.finishSlvChecklist('${activity.id}')">Valider la checklist</button></footer>
         </section>
@@ -3369,11 +3471,18 @@
     const qtyEl=document.getElementById('slvQuickQtyInput');
     const catEl=document.getElementById('slvQuickCatInput');
     const qty=Math.max(1, parseInt(qtyEl?.value||'1',10)||1);
-    const cat=catEl?.value || 'Autre';
+    const subs = activitySubcategories(activity);
+    // Valeur du sélecteur ; si le voyage a des sous-catégories, c'est l'une d'elles.
+    let cat = catEl?.value || '';
+    if(!cat){
+      const filter = activeSlvSubFilter(activity.id);
+      cat = (subs.length && filter && filter!=='all' && filter!=='none') ? filter : (subs[0] || 'Autre');
+    }
+    const sub = subs.length ? cat : (catEl?.value || '');  // sous-catégorie renseignée seulement si le voyage en définit
     const cfg = slvConfigFor(slvTabForActivity(activity));
     data[cfg.checklistCollection] = Array.isArray(data[cfg.checklistCollection]) ? data[cfg.checklistCollection] : [];
     data[cfg.checklistCollection].push(decorateSync({
-      id:uid(), module:'sport_loisirs', type:cfg.checklistType, category:cat, itemCategory:cat,
+      id:uid(), module:'sport_loisirs', type:cfg.checklistType, category:cat, itemCategory:cat, subcategory:sub,
       title, quantity:qty, unit:'unité', qty:`${qty} unité${qty>1?'s':''}`, date:activity.date || activity.startDate || today, member:activity.member || 'family', members:activity.members || activity.member || 'family',
       parentId:activity.id, activityId:activity.id, status:'a_faire', statut:'a_faire'
     }));
@@ -3685,7 +3794,8 @@
           </div>
           <input type="hidden" name="members" id="membersHidden" value="${escapeAttr(item.members||item.member||'family')}">
         </div>
-        <div class="form-field"><label>Lieu (facultatif)</label><input id="activityLocationInput" name="location" value="${escapeAttr(item.location||'')}" placeholder="Ex : Gymnase, Cinéma, Paris…"><div class="map-action-row"><button class="btn ghost" type="button" onclick="SuperApp.useActivityPosition()">📍 Utiliser ma position</button><button class="btn ghost" type="button" onclick="SuperApp.openActivityInMaps()">🗺️ Ouvrir Maps</button></div><input type="hidden" name="locationLat" id="activityLatInput" value="${escapeAttr(item.locationLat||'')}"><input type="hidden" name="locationLng" id="activityLngInput" value="${escapeAttr(item.locationLng||'')}"><small>Le texte reste libre. La position GPS est ajoutée seulement si l’utilisateur le souhaite.</small></div>`;
+        <div class="form-field"><label>Lieu (facultatif)</label><input id="activityLocationInput" name="location" value="${escapeAttr(item.location||'')}" placeholder="Ex : Gymnase, Cinéma, Paris…"><div class="map-action-row"><button class="btn ghost" type="button" onclick="SuperApp.useActivityPosition()">📍 Utiliser ma position</button><button class="btn ghost" type="button" onclick="SuperApp.openActivityInMaps()">🗺️ Ouvrir Maps</button></div><input type="hidden" name="locationLat" id="activityLatInput" value="${escapeAttr(item.locationLat||'')}"><input type="hidden" name="locationLng" id="activityLngInput" value="${escapeAttr(item.locationLng||'')}"><small>Le texte reste libre. La position GPS est ajoutée seulement si l’utilisateur le souhaite.</small></div>
+        <div class="form-field"><label>Sous-catégories ${item.type==='voyage'?'du voyage':''} (une par ligne)</label><textarea name="subcategories" rows="5" placeholder="Ex :&#10;Avant départ&#10;Affaires&#10;Papiers&#10;Hygiène&#10;Pharmacie&#10;Électronique&#10;Maison&#10;Jeux&#10;Nourriture">${escapeHtml(subcategoriesText(item))}</textarea><small>Chaque ligne devient un onglet de la checklist : tu pourras y ranger chaque objet.</small></div>`;
       }
     }
     let extraAfterDetails = '';
@@ -3769,33 +3879,97 @@
   }
   function slvCategoryPack(item={}){
     const t = String(item.type||'').toLowerCase();
-    if(t==='voyage') return {'Vacances':[],'Week-end':[],'Voyage international':[],'Voyage scolaire':[],'Documents voyage':[],'Préparation valise':[]};
-    if(t==='loisir') return {'Sortie famille':[],'Cinéma':[],'Anniversaire':[],'Musée':[],'Parc':[],'Atelier créatif':[]};
-    if(t==='materiel_voyage') return {'Bagages':[],'Documents voyage':[],'Administratif':[],'Santé voyage':[]};
+    if(t==='voyage') return {
+      'Vacances':['Avant départ','Affaires','Papiers','Hygiène','Pharmacie','Électronique','Maison','Jeux','Nourriture'],
+      'Week-end':['Affaires','Papiers','Trousse de toilette','Nourriture'],
+      'Voyage international':['Papiers','Affaires','Santé','Électronique','Argent & banque'],
+      'Voyage scolaire':['Affaires','Papiers','Trousse de toilette','Goûter'],
+      'Documents voyage':['Passeports','Billets','Réservations','Assurances'],
+      'Préparation valise':['Avant départ','Affaires','Hygiène']
+    };
+    if(t==='loisir') return {
+      'Sortie famille':['À emporter','Réservation','Goûter'],
+      'Cinéma':['Billets','Goûter'],
+      'Anniversaire':['Cadeau','Gâteau','Décoration'],
+      'Musée':['Billets','Carnet'],
+      'Parc':['Pique-nique','Crème solaire','Jeux'],
+      'Atelier créatif':['Matériel','Tablier']
+    };
+    if(t==='materiel_voyage') return {'Bagages':[],'Documents voyage':[],'Santé voyage':[],'Autre':[]};
     if(t==='materiel_loisir') return {'À préparer':[],'Réservation':[],'Matériel loisir':[]};
     if(['materiel_sport','document_sport'].includes(t)) return {'Équipement':[],'Tenue':[],'Documents sport':[],'Sac de sport':[]};
-    return {'Entraînement':[],'Compétition':[],'Randonnée':[],'Salle de sport':[],'Danse':[],'Football':[],'Natation':[]};
+    return {
+      'Entraînement':['Tenue','Chaussures','Gourde'],
+      'Compétition':['Licence','Dossard','Équipement'],
+      'Randonnée':['Sac','Eau','Chaussures'],
+      'Salle de sport':['Tenue','Serviette'],
+      'Danse':['Tenue','Chaussons'],
+      'Football':['Crampons','Protège-tibias','Maillot'],
+      'Natation':['Maillot','Bonnet','Lunettes']
+    };
+  }
+  // V5.37 — Source unique de sous-catégories pour le formulaire.
+  // Sport/Loisir/Voyage : on lit le pack SLV (et non data.categories), et pour
+  // un objet de checklist on propose en priorité les sous-catégories du voyage parent.
+  function formSubcategoryOptions(module, category, item={}){
+    const m = canonicalModuleId(module);
+    if(m === 'sport_loisirs'){
+      const t = String(item.type||'').toLowerCase();
+      if(['materiel_voyage','materiel_loisir','materiel_sport','document_sport'].includes(t)){
+        const parent = findRecord(item.parentId || item.activityId || '')?.item;
+        const fromParent = activitySubcategories(parent);
+        if(fromParent.length) return fromParent;
+      }
+      const pack = slvCategoryPack(item);
+      return Array.isArray(pack[category]) ? pack[category] : [];
+    }
+    return subcategoriesFor(m, category);
   }
   function buildCategoryFieldsHtml(module, item={}){
     const m = canonicalModuleId(module);
-    const cats = m==='sport_loisirs' ? slvCategoryPack(item) : categoriesForModule(m);
+    const itemType = String(item.type||'').toLowerCase();
+    const isSlvChecklistItem = m==='sport_loisirs' && ['materiel_sport','materiel_loisir','materiel_voyage','document_sport'].includes(itemType);
+    const isSlvActivityType = m==='sport_loisirs' && !isSlvChecklistItem;
+    // Sous-catégories définies par le voyage parent (pour un objet de checklist)
+    const parentForItem = isSlvChecklistItem ? findRecord(item.parentId || item.activityId || '')?.item : null;
+    const parentSubs = activitySubcategories(parentForItem);
+    // V5.37 — Pour un objet de checklist rattaché à un voyage qui définit des sous-catégories,
+    // la "catégorie" = ces sous-catégories (le bucket stocké reste donc une option valide).
+    let cats;
+    if(isSlvChecklistItem && parentSubs.length){
+      cats = Object.fromEntries(parentSubs.map(s=>[s,[]]));
+    } else {
+      cats = m==='sport_loisirs' ? slvCategoryPack(item) : categoriesForModule(m);
+    }
     const catNames = Object.keys(cats);
     const currentCat = item.category && catNames.includes(item.category) ? item.category : catNames[0];
-    const subOptions = subcategoriesFor(m, currentCat);
+    // On masque le menu "sous-catégorie" simple quand :
+    //  - c'est une ACTIVITÉ SLV (la liste multi-lignes la remplace), ou
+    //  - c'est un OBJET de checklist dont le voyage parent définit déjà les sous-catégories
+    //    (la catégorie EST alors la sous-catégorie/bucket).
+    const hideSubField = isSlvActivityType || (isSlvChecklistItem && parentSubs.length > 0);
+    const catLabel = (isSlvChecklistItem && parentSubs.length) ? 'Sous-catégorie' : (isSlvActivityType ? 'Catégorie' : 'Où ça se range ?');
+    const subOptions = formSubcategoryOptions(m, currentCat, item);
     const subSelected = item.subcategory || '';
     // V5.8 : dernière option "+ Créer une catégorie…" qui ouvre la mini-fenêtre
     const catSelect = `<select name="category" id="fieldCategory" onchange="SuperApp.handleCategoryChange(this)">${catNames.map(c=>`<option ${currentCat===c?'selected':''}>${escapeHtml(c)}</option>`).join('')}<option value="__create__" data-create>＋ Créer une catégorie…</option></select>`;
     const subSelect = subOptions.length
       ? `<select name="subcategory" id="fieldSubcategory" onchange="SuperApp.handleSubcategoryChange(this)"><option value="">— Aucune —</option>${subOptions.map(s=>`<option ${subSelected===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}<option value="__create__" data-create>＋ Créer une sous-catégorie…</option></select>`
       : `<input name="subcategory" id="fieldSubcategory" placeholder="Sous-catégorie (optionnelle)" value="${escapeAttr(subSelected)}"><button type="button" class="link-btn inline-create" onclick="SuperApp.openCreateSubcategoryDialog()">＋ Créer une sous-catégorie</button>`;
-    return `<div class="form-field"><label>Où ça se range ?</label>${catSelect}</div>
-      <div class="form-field"><label>Sous-catégorie (facultatif)</label>${subSelect}</div>`;
+    return `<div class="form-field"><label>${catLabel}</label>${catSelect}</div>
+      ${hideSubField ? '' : `<div class="form-field"><label>Sous-catégorie (facultatif)</label>${subSelect}</div>`}`;
   }
   function refreshSubcategories(newCat){
     const form = document.getElementById('editForm'); if(!form) return;
     const type = form.dataset.type || 'calendrier';
     const moduleId = (form.querySelector('[name="targetModule"]')?.value) || canonicalModuleId(type);
-    const subs = subcategoriesFor(moduleId, newCat);
+    // V5.37 — reconstruire un mini-item depuis le formulaire pour router la bonne source de sous-catégories
+    const ctxItem = {
+      type: form.querySelector('[name="type"]')?.value || '',
+      parentId: form.querySelector('[name="parentId"]')?.value || '',
+      activityId: form.querySelector('[name="activityId"]')?.value || ''
+    };
+    const subs = formSubcategoryOptions(moduleId, newCat, ctxItem);
     const wrap = document.getElementById('fieldSubcategory'); if(!wrap) return;
     if(subs.length){
       const sel = document.createElement('select'); sel.name='subcategory'; sel.id='fieldSubcategory';
@@ -3963,6 +4137,12 @@
     if(item.students && !item.member) item.member = String(item.students).split(',')[0] || 'family';
     if(item.members && (!item.member || item.member==='family')) item.member = item.members === 'family' ? 'family' : (String(item.members).split(',')[0] || 'family');
     if(['sante','education','sport_loisirs','familles','calendrier'].includes(targetModule) && item.showOnHome === undefined) item.showOnHome = false;
+    // V5.37 — Objet de checklist d'un voyage : si le voyage parent définit des sous-catégories,
+    // la catégorie choisie EST le bucket → on aligne la sous-catégorie pour le regroupement/filtre.
+    if(targetModule==='sport_loisirs' && ['materiel_sport','materiel_loisir','materiel_voyage','document_sport'].includes(String(item.type||'').toLowerCase())){
+      const parentAct = findRecord(item.parentId || item.activityId || '')?.item;
+      if(activitySubcategories(parentAct).length && item.category){ item.subcategory = item.category; item.itemCategory = item.category; }
+    }
     delete item.initialChecklist; // ancienne saisie texte supprimée : checklist structurée uniquement
     let record;
     if(id && state.editing){
@@ -4854,7 +5034,7 @@
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
-    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, deleteReferenceList, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
+    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, setSlvSubFilter, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, deleteReferenceList, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
     handleCategoryChange, handleSubcategoryChange,
     openCreateCategoryDialog, openCreateSubcategoryDialog, confirmCreateCategory,

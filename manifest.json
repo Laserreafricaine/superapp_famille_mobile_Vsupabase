@@ -1,7 +1,7 @@
 {
   "name": "SuperApp Famille Mobile",
   "short_name": "SuperFamille",
-  "description": "SuperApp Famille Mobile V5.36.29 — PWA iPhone et Android avec synchronisation Supabase.",
+  "description": "SuperApp Famille Mobile V5.37.0 — PWA iPhone et Android avec synchronisation Supabase.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
