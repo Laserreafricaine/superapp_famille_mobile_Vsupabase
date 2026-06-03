@@ -2658,16 +2658,19 @@ body[data-theme="sombre"] .dialog-actions{
   }
 }
 
-/* V5.37 — Sous-catégories de voyage : filtre + regroupement de la checklist */
-.slv-subcat-filter{display:flex;gap:8px;overflow:auto;padding:2px 2px 4px;margin:2px 0 2px;scrollbar-width:none}
-.slv-subcat-filter::-webkit-scrollbar{display:none}
+/* V5.37/5.38 — Filtres catégorie/sous-catégorie : barre affichée EN ENTIER, sans glissière */
+.slv-subcat-filter{display:flex;flex-wrap:wrap;gap:8px;padding:2px 0 4px;margin:2px 0 4px}
+.slv-subcat-filter.sub{margin-top:0;padding-top:0}
 .slv-subcat-chip{border:0;border-radius:999px;background:#fff;box-shadow:0 8px 18px rgba(31,50,84,.07);padding:9px 13px;font-weight:900;color:#31506f;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.slv-subcat-chip.mini{padding:7px 11px;font-size:.84rem;background:#f6f9fd}
 .slv-subcat-chip em{font-style:normal;font-weight:950;font-size:.7rem;border-radius:999px;background:#eef4ff;color:#315e99;padding:2px 7px;min-width:18px;text-align:center}
 .slv-subcat-chip.active{background:var(--tone-accent,#153d79);color:#fff}
 .slv-subcat-chip.active em{background:rgba(255,255,255,.28);color:#fff}
+.cat-filter-wrap{display:grid;gap:4px;margin:4px 0 8px}
+.cat-grouped-list{display:grid;gap:12px}
 .slv-subcat-group{display:grid;gap:9px;margin-top:4px}
 .slv-subcat-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 4px 2px}
 .slv-subcat-head b{color:#16365f;font-weight:950;font-size:.98rem;text-transform:uppercase;letter-spacing:.02em}
-.slv-subcat-head em{font-style:normal;font-weight:950;font-size:.74rem;border-radius:999px;background:var(--tone-accent,#eef4ff);color:#fff;padding:4px 10px;opacity:.92}
+.slv-subcat-head em{font-style:normal;font-weight:950;font-size:.74rem;border-radius:999px;background:var(--tone-accent,#16365f);color:#fff;padding:4px 10px;opacity:.92}
 .empty.cute-empty.small{padding:10px 12px;border-style:dashed}
 .empty.cute-empty.small small{color:#7a879b;font-weight:800}

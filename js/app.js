@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.37.0';
+  const APP_VERSION = '5.38.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -1188,7 +1188,7 @@
       <div class="sublist-title-bar"><div class="sublist-emoji">${cfg.emoji || m.icon}</div><div><h2>${cfg.title}</h2><small>${cfg.help || ''}</small></div></div>
       ${chips}
       <div class="list-toolbar-card"><button class="btn ghost" onclick="SuperApp.openModule('${module}')">← Retour ${m.short}</button><button class="btn primary" onclick="SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')">${cfg.emoji} + Ajouter</button></div>
-      ${block==='documents' ? supabaseDocsHtml : `${specialHtml || `<div class="management-list">${items.length ? items.map(x=>module==='sante' ? healthInfoRow(x,cfg) : managementRow(x,cfg)).join('') : `<article class="empty cute-empty"><b>${cfg.emoji} Rien pour le moment</b><button class="btn primary" onclick="SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')">+ Ajouter</button></article>`}</div>`}${supabaseDocsHtml && block!=='documents' ? supabaseDocsHtml : ''}`}`;
+      ${block==='documents' ? supabaseDocsHtml : `${specialHtml || managementListSection(module, block, items, cfg)}${supabaseDocsHtml && block!=='documents' ? supabaseDocsHtml : ''}`}`;
   }
   function emergencyNumbers(){
     return data.settings?.emergencyNumbers || {pompiers:'', police:'', samu:''};
@@ -3170,16 +3170,17 @@
   function slvItemSubcategory(x){
     return String((x && (x.subcategory || x.itemCategory || x.category)) || '').trim();
   }
-  // Filtre de sous-catégorie actif sur la page checklist (réinitialisé par activité).
-  function activeSlvSubFilter(activityId){
+  // Filtre de sous-catégorie actif — INDÉPENDANT par écran (scope 'check' = page Checklist, 'fiche' = fiche activité).
+  function activeSlvSubFilter(activityId, scope='check'){
     if(!state.slvSubFilters) state.slvSubFilters = {};
-    return state.slvSubFilters[activityId] || 'all';
+    return state.slvSubFilters[`${scope}:${activityId}`] || 'all';
   }
-  function setSlvSubFilter(activityId, sub){
+  function setSlvSubFilter(activityId, sub, scope='check'){
     if(!state.slvSubFilters) state.slvSubFilters = {};
     const val = sub ? decodeKey(sub) : 'all';
-    state.slvSubFilters[activityId] = val || 'all';
-    if(state.appsView?.kind==='slvChecklist' && state.appsView.id===activityId) paintSlvChecklistPage(activityId);
+    state.slvSubFilters[`${scope}:${activityId}`] = val || 'all';
+    if(scope==='fiche'){ if(state.appsView?.kind==='slvDetail' && state.appsView.id===activityId) paintSlvActivityDetail(activityId); }
+    else if(state.appsView?.kind==='slvChecklist' && state.appsView.id===activityId) paintSlvChecklistPage(activityId);
   }
   function slvAllContent(){
     const sport=slvConfigFor('sport'), loisir=slvConfigFor('loisir'), voyage=slvConfigFor('voyage');
@@ -3230,12 +3231,23 @@
     const rowHtml = x => shoppingRow(x,{module:'sport_loisirs',collection:collectionForItemLike(x),activityId});
     // V5.37 — Si des sous-catégories existent, on regroupe l'aperçu par sous-catégorie.
     if(!names.length) return `<div class="agenda-list">${vis.map(rowHtml).join('')}</div>`;
+    // V5.38 — Filtre propre à la FICHE (indépendant de la page Checklist).
+    const filter = activity ? activeSlvSubFilter(activity.id, 'fiche') : 'all';
     const buckets = names.map(name=>({name, items:vis.filter(x=>norm(slvItemSubcategory(x))===norm(name))}));
     const orphans = vis.filter(x=>!slvItemSubcategory(x));
-    if(orphans.length) buckets.push({name:'Sans sous-catégorie', items:orphans});
-    return buckets.filter(b=>b.items.length).map(b=>{
+    if(orphans.length) buckets.push({name:'Sans sous-catégorie', items:orphans, orphan:true});
+    const visible = buckets.filter(b=>{
+      if(filter==='all') return b.items.length > 0;
+      if(filter==='none') return !!b.orphan;
+      return norm(b.name)===norm(filter);
+    });
+    if(!visible.length) return '<div class="empty cute-empty"><small>Aucun objet pour ce filtre.</small></div>';
+    return visible.map(b=>{
       const done = b.items.filter(statusIsDone).length;
-      return `<div class="slv-subcat-group"><div class="slv-subcat-head"><b>${escapeHtml(b.name)}</b><em>${done}/${b.items.length}</em></div><div class="agenda-list">${b.items.map(rowHtml).join('')}</div></div>`;
+      const body = b.items.length
+        ? `<div class="agenda-list">${b.items.map(rowHtml).join('')}</div>`
+        : '<div class="empty cute-empty small"><small>Rien ici pour l’instant.</small></div>';
+      return `<div class="slv-subcat-group"><div class="slv-subcat-head"><b>${escapeHtml(b.name)}</b><em>${done>0?done+'/':''}${b.items.length}</em></div>${body}</div>`;
     }).join('');
   }
   function paintSlvActivityDetail(id){
@@ -3263,6 +3275,7 @@
         <div class="list-toolbar-card"><button class="btn ghost" onclick="SuperApp.openEdit('sport_loisirs','${activity.id}')">✏️ Modifier l’activité</button><button class="btn primary" onclick="SuperApp.openSlvChecklistLight('${activity.id}')">${cfg.gearEmoji} Checklist</button></div>
         <section class="play-block ${cfg.tone2}">
           <div class="play-head"><div><span>Checklist liée</span><h3>${cfg.gearEmoji} À préparer</h3></div></div>
+          ${slvSubFilterChips(activity, 'fiche')}
           <div class="play-body">${slvChecklistRows(rows, activity.id)}</div>
         </section>
       </section>`;
@@ -3296,8 +3309,13 @@
     if(!title){ toast('Renseigne un élément.'); return; }
     data.documents = Array.isArray(data.documents) ? data.documents : [];
     const parent = genericChecklistActivity(parentId) || {};
+    const parentCat = parent.category || cfg.category;
+    const subOpts = subcategoriesFor(cfg.module, parentCat);
+    const chosen = catEl?.value || '';
+    // Le menu propose les sous-catégories de la catégorie de la fiche → on range l'objet dedans.
+    const sub = subOpts.length ? chosen : '';
     data.documents.push(decorateSync({
-      id:uid(), module:cfg.module, type:cfg.type, category:catEl?.value || cfg.category,
+      id:uid(), module:cfg.module, type:cfg.type, category: parentCat, subcategory: sub, itemCategory: sub || parentCat,
       title, quantity:qtyEl?.value || '1', unit:'unité', qty:qtyEl?.value ? `${qtyEl.value} unité` : '1 unité',
       status:'a_faire', parentId, member:parent.member || 'family', members:parent.members || parent.students || parent.member || 'family'
     }));
@@ -3315,7 +3333,47 @@
   }
   function genericChecklistLineHtml(x){
     const done=statusIsDone(x); const qty=parseInt(x.quantity||x.qty||1,10)||1;
-    return `<article class="slv-check-row ${done?'done':''}"><label><input type="checkbox" ${done?'checked':''} onchange="SuperApp.toggleGenericChecklistItem('${x.id}')"><span><b>${escapeHtml(x.title)}</b><small>${escapeHtml(x.category||'Checklist')}</small></span></label><div class="slv-stepper" aria-label="Quantité"><button type="button" onclick="event.stopPropagation();SuperApp.changeGenericChecklistQty('${x.id}',-1)">−</button><strong>${qty}</strong><button type="button" onclick="event.stopPropagation();SuperApp.changeGenericChecklistQty('${x.id}',1)">+</button></div><button type="button" class="row-action del btn-sm ghost danger" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">Supprimer</button></article>`;
+    const label = x.subcategory || x.category || 'Checklist';
+    return `<article class="slv-check-row ${done?'done':''}"><label><input type="checkbox" ${done?'checked':''} onchange="SuperApp.toggleGenericChecklistItem('${x.id}')"><span><b>${escapeHtml(x.title)}</b><small>${escapeHtml(label)}</small></span></label><div class="slv-stepper" aria-label="Quantité"><button type="button" onclick="event.stopPropagation();SuperApp.changeGenericChecklistQty('${x.id}',-1)">−</button><strong>${qty}</strong><button type="button" onclick="event.stopPropagation();SuperApp.changeGenericChecklistQty('${x.id}',1)">+</button></div><button type="button" class="row-action del btn-sm ghost danger" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">Supprimer</button></article>`;
+  }
+  // V5.38 — Filtre/regroupement par sous-catégorie pour les checklists Maison/Éducation.
+  function genericChecklistItemSub(x){ return String((x && (x.subcategory || x.itemCategory)) || '').trim(); }
+  function genericChecklistGroupNames(parentId, rows){
+    const parent = genericChecklistActivity(parentId) || {};
+    const moduleCat = parent.category || '';
+    const defSubs = moduleCat ? subcategoriesFor(canonicalModuleId(parent.module||'maison'), moduleCat) : [];
+    const names = [...defSubs]; const norm = normalizeText;
+    rows.forEach(x=>{ const s=genericChecklistItemSub(x); if(s && !names.some(n=>norm(n)===norm(s))) names.push(s); });
+    return names;
+  }
+  function activeGenericChecklistFilter(parentId){ if(!state.genericChecklistFilters) state.genericChecklistFilters={}; return state.genericChecklistFilters[parentId]||'all'; }
+  function setGenericChecklistFilter(parentId, kind, sub){ if(!state.genericChecklistFilters) state.genericChecklistFilters={}; state.genericChecklistFilters[parentId]= sub?decodeKey(sub):'all'; paintGenericChecklistPage(parentId, kind); }
+  function genericChecklistFilterChips(parentId, kind, rows){
+    const names = genericChecklistGroupNames(parentId, rows);
+    if(!names.length) return '';
+    const norm = normalizeText; const filter = activeGenericChecklistFilter(parentId);
+    const hasOrphan = rows.some(x=>!genericChecklistItemSub(x));
+    const chip=(val,label,count)=>`<button type="button" class="slv-subcat-chip ${norm(filter)===norm(val)?'active':''}" onclick="SuperApp.setGenericChecklistFilter('${parentId}','${kind}','${encodeKey(val)}')">${escapeHtml(label)}<em>${count}</em></button>`;
+    let html = chip('all','Tout', rows.length);
+    names.forEach(n=>html += chip(n, n, rows.filter(x=>norm(genericChecklistItemSub(x))===norm(n)).length));
+    if(hasOrphan) html += chip('none','Sans sous-cat.', rows.filter(x=>!genericChecklistItemSub(x)).length);
+    return `<div class="slv-subcat-filter">${html}</div>`;
+  }
+  function genericChecklistGroupedRows(parentId, kind, rows){
+    if(!rows.length) return '<div class="empty cute-empty"><b>Checklist vide</b></div>';
+    const names = genericChecklistGroupNames(parentId, rows);
+    const norm = normalizeText; const filter = activeGenericChecklistFilter(parentId);
+    if(!names.length) return `<div class="slv-checklist-light-rows">${rows.map(genericChecklistLineHtml).join('')}</div>`;
+    const buckets = names.map(n=>({name:n, items:rows.filter(x=>norm(genericChecklistItemSub(x))===norm(n))}));
+    const orphans = rows.filter(x=>!genericChecklistItemSub(x));
+    if(orphans.length) buckets.push({name:'Sans sous-catégorie', items:orphans, orphan:true});
+    const visible = buckets.filter(b=>{ if(filter==='all') return b.items.length>0; if(filter==='none') return !!b.orphan; return norm(b.name)===norm(filter); });
+    if(!visible.length) return '<div class="empty cute-empty"><small>Aucun élément pour ce filtre.</small></div>';
+    return visible.map(b=>{
+      const done=b.items.filter(statusIsDone).length;
+      const body=b.items.length?`<div class="slv-checklist-light-rows">${b.items.map(genericChecklistLineHtml).join('')}</div>`:'<div class="empty cute-empty small"><small>Rien ici.</small></div>';
+      return `<div class="slv-subcat-group"><div class="slv-subcat-head"><b>${escapeHtml(b.name)}</b><em>${done>0?done+'/':''}${b.items.length}</em></div>${body}</div>`;
+    }).join('');
   }
   function paintGenericChecklistPage(parentId, kind='maison'){
     const parent = genericChecklistActivity(parentId); if(!parent){ paintModule(kind==='education'?'education':'maison'); return; }
@@ -3323,13 +3381,20 @@
     const rows = genericChecklistRows(parentId);
     const done = rows.filter(statusIsDone).length;
     const suggestions = cfg.suggestions;
+    const parentCat = parent.category || cfg.category;
+    const subOpts = subcategoriesFor(cfg.module, parentCat);
+    const catSelect = subOpts.length
+      ? `<select id="genericChecklistCatInput" aria-label="Sous-catégorie">${subOpts.map(s=>`<option>${escapeHtml(s)}</option>`).join('')}</select>`
+      : `<select id="genericChecklistCatInput"><option>${escapeHtml(cfg.category)}</option><option>Préparation</option><option>À faire</option><option>Autre</option></select>`;
+    const filterChips = genericChecklistFilterChips(parentId, cfg.kind, rows);
     $('#view-apps').innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openEdit('${cfg.module}','${parentId}')">← Retour fiche</button></div>
       <section class="slv-checklist-page ${escapeAttr(cfg.module)}">
         <article class="slv-detail-hero"><div class="slv-detail-icon">${cfg.emoji}</div><div class="slv-detail-main"><span>${escapeHtml(cfg.title)}</span><h2>${escapeHtml(parent.title||'Élément')}</h2><p>${done}/${rows.length} fait(s)</p></div></article>
         <section class="slv-checklist-board">
-          <div class="slv-add-object-card"><input id="genericChecklistTitleInput" type="text" placeholder="${escapeAttr(cfg.itemPlaceholder)}"><input id="genericChecklistQtyInput" type="number" min="1" step="1" value="1" aria-label="Quantité"><select id="genericChecklistCatInput"><option>${escapeHtml(cfg.category)}</option><option>Préparation</option><option>À faire</option><option>Autre</option></select><button type="button" class="btn primary" onclick="SuperApp.addGenericChecklistLine('${parentId}','${cfg.kind}')">+ Ajouter</button></div>
+          <div class="slv-add-object-card"><input id="genericChecklistTitleInput" type="text" placeholder="${escapeAttr(cfg.itemPlaceholder)}"><input id="genericChecklistQtyInput" type="number" min="1" step="1" value="1" aria-label="Quantité">${catSelect}<button type="button" class="btn primary" onclick="SuperApp.addGenericChecklistLine('${parentId}','${cfg.kind}')">+ Ajouter</button></div>
           <div class="slv-suggestions"><b>Suggestions rapides</b><div>${suggestions.map(v=>`<button type="button" onclick="SuperApp.addGenericChecklistSuggestion('${parentId}','${cfg.kind}','${escapeAttr(v)}')">＋ ${escapeHtml(v)}</button>`).join('')}</div></div>
-          <div class="slv-checklist-light-rows">${rows.length ? rows.map(genericChecklistLineHtml).join('') : '<div class="empty cute-empty"><b>Checklist vide</b></div>'}</div>
+          ${filterChips}
+          ${genericChecklistGroupedRows(parentId, cfg.kind, rows)}
           <footer class="dialog-actions slv-checklist-actions"><button type="button" class="btn ghost" onclick="SuperApp.openEdit('${cfg.module}','${parentId}')">Retour fiche</button><button type="button" class="btn primary" onclick="SuperApp.openModule('${cfg.module}')">Valider</button></footer>
         </section>
       </section>`;
@@ -3375,14 +3440,14 @@
     });
     return names;
   }
-  function slvSubFilterChips(activity){
+  function slvSubFilterChips(activity, scope='check'){
     const names = slvChecklistGroupNames(activity);
     if(!names.length) return '';
     const rows = slvChecklistForActivity(activity);
     const norm = s => normalizeText(s);
-    const filter = activeSlvSubFilter(activity.id);
+    const filter = activeSlvSubFilter(activity.id, scope);
     const hasOrphans = rows.some(x=>!slvItemSubcategory(x));
-    const chip=(val,label,count)=>`<button type="button" class="slv-subcat-chip ${norm(filter)===norm(val)?'active':''}" onclick="SuperApp.setSlvSubFilter('${activity.id}','${encodeKey(val)}')">${escapeHtml(label)}<em>${count}</em></button>`;
+    const chip=(val,label,count)=>`<button type="button" class="slv-subcat-chip ${norm(filter)===norm(val)?'active':''}" onclick="SuperApp.setSlvSubFilter('${activity.id}','${encodeKey(val)}','${scope}')">${escapeHtml(label)}<em>${count}</em></button>`;
     let html = chip('all','Tout', rows.length);
     names.forEach(n=>{ html += chip(n, n, rows.filter(x=>norm(slvItemSubcategory(x))===norm(n)).length); });
     if(hasOrphans) html += chip('none','Sans sous-catégorie', rows.filter(x=>!slvItemSubcategory(x)).length);
@@ -3876,6 +3941,101 @@
     const cats = categoriesForModule(module);
     const arr = cats[category];
     return Array.isArray(arr) ? arr : [];
+  }
+  // ============================================================
+  // V5.38 — Filtre RÉUTILISABLE à 2 niveaux (catégorie + sous-catégorie)
+  // pour les listes de module (Maison, Courses, Éducation, Santé, Familles).
+  // - Barre affichée en entier (flex-wrap, sans glissière)
+  // - Filtre INDÉPENDANT par écran (clé = module:block)
+  // - Regroupement automatique (par catégorie, puis par sous-catégorie)
+  // ============================================================
+  function listFilterState(module, block){
+    if(!state.listFilters) state.listFilters = {};
+    return state.listFilters[`${module}:${block}`] || {cat:'all', sub:'all'};
+  }
+  function setListCatFilter(module, block, cat){
+    if(!state.listFilters) state.listFilters = {};
+    state.listFilters[`${module}:${block}`] = {cat: decodeKey(cat) || 'all', sub:'all'};
+    paintModuleList(module, block);
+  }
+  function setListSubFilter(module, block, sub){
+    if(!state.listFilters) state.listFilters = {};
+    const cur = listFilterState(module, block);
+    state.listFilters[`${module}:${block}`] = {cat: cur.cat, sub: decodeKey(sub) || 'all'};
+    paintModuleList(module, block);
+  }
+  function itemCat(x){ return String(x?.category || '').trim(); }
+  function itemSub(x){ return String(x?.subcategory || '').trim(); }
+  function applyListFilter(items, module, block){
+    const f = listFilterState(module, block); const norm = normalizeText;
+    let out = items;
+    if(f.cat && f.cat!=='all') out = out.filter(x=>norm(itemCat(x))===norm(f.cat));
+    if(f.sub && f.sub!=='all'){
+      out = f.sub==='none' ? out.filter(x=>!itemSub(x)) : out.filter(x=>norm(itemSub(x))===norm(f.sub));
+    }
+    return out;
+  }
+  function categorySubFilterBar(module, block, items){
+    const norm = normalizeText;
+    // Catégories : celles définies pour le module qui ont des items, + celles présentes mais non définies
+    const moduleCats = Object.keys(categoriesForModule(module));
+    const present = [];
+    items.forEach(x=>{ const c=itemCat(x); if(c && !present.some(p=>norm(p)===norm(c))) present.push(c); });
+    let cats = moduleCats.filter(c=>present.some(p=>norm(p)===norm(c)));
+    present.forEach(p=>{ if(!cats.some(c=>norm(c)===norm(p))) cats.push(p); });
+    const f = listFilterState(module, block);
+    const chip=(kind,val,label,count,active)=>`<button type="button" class="slv-subcat-chip ${kind==='sub'?'mini ':''}${active?'active':''}" onclick="SuperApp.${kind==='sub'?'setListSubFilter':'setListCatFilter'}('${module}','${block}','${encodeKey(val)}')">${escapeHtml(label)}<em>${count}</em></button>`;
+    // Ligne catégories
+    let catRow = chip('cat','all','Toutes', items.length, norm(f.cat)==='all');
+    cats.forEach(c=>catRow += chip('cat', c, c, items.filter(x=>norm(itemCat(x))===norm(c)).length, norm(f.cat)===norm(c)));
+    // Ligne sous-catégories (uniquement si une catégorie précise est sélectionnée)
+    let subRow = '';
+    if(f.cat && f.cat!=='all'){
+      const inCat = items.filter(x=>norm(itemCat(x))===norm(f.cat));
+      const defSubs = subcategoriesFor(module, f.cat);
+      const subsPresent = [];
+      inCat.forEach(x=>{ const s=itemSub(x); if(s && !subsPresent.some(p=>norm(p)===norm(s))) subsPresent.push(s); });
+      let subs = defSubs.filter(s=>subsPresent.some(p=>norm(p)===norm(s)));
+      subsPresent.forEach(p=>{ if(!subs.some(s=>norm(s)===norm(p))) subs.push(p); });
+      const hasOrphan = inCat.some(x=>!itemSub(x));
+      if(subs.length || hasOrphan){
+        let sr = chip('sub','all','Toutes', inCat.length, norm(f.sub)==='all');
+        subs.forEach(s=>sr += chip('sub', s, s, inCat.filter(x=>norm(itemSub(x))===norm(s)).length, norm(f.sub)===norm(s)));
+        if(hasOrphan) sr += chip('sub','none','Sans sous-cat.', inCat.filter(x=>!itemSub(x)).length, f.sub==='none');
+        subRow = `<div class="slv-subcat-filter sub">${sr}</div>`;
+      }
+    }
+    // Rien à filtrer (0 ou 1 catégorie et pas de sous-cat) → pas de barre
+    if(cats.length <= 1 && !subRow) return '';
+    return `<div class="cat-filter-wrap"><div class="slv-subcat-filter">${catRow}</div>${subRow}</div>`;
+  }
+  function groupedManagementList(items, module, block, rowFn){
+    if(!items.length) return '';
+    const f = listFilterState(module, block); const norm = normalizeText;
+    let getKey, order, orphanLabel;
+    if(f.cat==='all'){ getKey = itemCat; order = Object.keys(categoriesForModule(module)); orphanLabel='Sans catégorie'; }
+    else if(f.sub==='all'){ getKey = itemSub; order = subcategoriesFor(module, f.cat); orphanLabel='Sans sous-catégorie'; }
+    else { return `<div class="management-list">${items.map(rowFn).join('')}</div>`; }
+    const names = [...order];
+    items.forEach(x=>{ const k=getKey(x); if(k && !names.some(n=>norm(n)===norm(k))) names.push(k); });
+    const buckets = names.map(n=>({name:n, items:items.filter(x=>norm(getKey(x))===norm(n))}));
+    const orphans = items.filter(x=>!getKey(x));
+    if(orphans.length) buckets.push({name:orphanLabel, items:orphans});
+    return buckets.filter(b=>b.items.length).map(b=>{
+      const done = b.items.filter(statusIsDone).length;
+      return `<div class="slv-subcat-group"><div class="slv-subcat-head"><b>${escapeHtml(b.name)}</b><em>${done>0?done+'/':''}${b.items.length}</em></div><div class="management-list">${b.items.map(rowFn).join('')}</div></div>`;
+    }).join('');
+  }
+  function managementListSection(module, block, items, cfg){
+    const rowFn = x => module==='sante' ? healthInfoRow(x,cfg) : managementRow(x,cfg);
+    const bar = categorySubFilterBar(module, block, items);
+    const shown = applyListFilter(items, module, block);
+    const body = shown.length
+      ? groupedManagementList(shown, module, block, rowFn)
+      : (items.length
+          ? '<div class="empty cute-empty"><b>Aucun élément pour ce filtre</b><small>Change de catégorie ou de sous-catégorie ci-dessus.</small></div>'
+          : `<article class="empty cute-empty"><b>${cfg.emoji||''} Rien pour le moment</b><button class="btn primary" onclick="SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')">+ Ajouter</button></article>`);
+    return `${bar}<div class="cat-grouped-list">${body}</div>`;
   }
   function slvCategoryPack(item={}){
     const t = String(item.type||'').toLowerCase();
@@ -5036,6 +5196,7 @@
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
     openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, setSlvSubFilter, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, deleteReferenceList, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
+    setListCatFilter, setListSubFilter, setGenericChecklistFilter,
     handleCategoryChange, handleSubcategoryChange,
     openCreateCategoryDialog, openCreateSubcategoryDialog, confirmCreateCategory,
     openStyleFamillePanel, selectAvatarChoice,
