@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.38.0';
+  const APP_VERSION = '5.39.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -3001,9 +3001,8 @@
     pushMany(getSportActivities('open'), '⚽', 'Sport', 'sport_loisirs', 'sports');
     pushMany(getLoisirActivities('open'), '🎨', 'Loisir', 'sport_loisirs', 'loisirs');
     pushMany(getVoyageActivities('open'), '✈️', 'Voyage', 'sport_loisirs', 'voyages');
-    pushMany(getSportGear('all'), '🎒', 'Matériel sport', 'sport_loisirs', 'sportGear');
-    pushMany(getLoisirGear(), '🎡', 'Matériel loisir', 'sport_loisirs', 'loisirGear');
-    pushMany(getVoyageGear(), '🧳', 'Bagages', 'sport_loisirs', 'voyageGear');
+    // V5.39 — Le calendrier n'affiche que les ACTIVITÉS (catégorie), pas les objets de leurs
+    // checklists/matériel (Bagages, Matériel sport, Matériel loisir) qui partagent la même date.
     pushMany(getFamilyDocuments('all'), '📁', 'Familles', 'familles', 'familyDocuments');
     pushMany(getGeneralCalendarEvents(), '📌', 'Calendrier', 'calendrier', 'calendarEvents');
 
@@ -3562,6 +3561,19 @@
     const next=Math.max(1,current+Number(delta||0));
     found.item.quantity=next; found.item.unit='unité'; found.item.qty=`${next} unité${next>1?'s':''}`; touchSync(found.item); save(); render();
   }
+  function familyMemberJumpStrip(members){
+    if(!members || members.length < 2) return ''; // inutile avec 0 ou 1 membre
+    return `<div class="member-jump-strip" aria-label="Aller au membre">${members.map(m=>`<button type="button" class="member-jump-chip member-${escapeAttr(m.accent||'violet')}" onclick="SuperApp.scrollToMember('${m.id}')"><img src="${memberAvatarSrc(m)}" alt=""><span>${escapeHtml(firstMemberName(m.name))}</span></button>`).join('')}</div>`;
+  }
+  function scrollToMember(id){
+    const el = document.getElementById('member-card-'+id);
+    if(!el) return;
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+    el.classList.remove('member-jump-highlight');
+    void el.offsetWidth; // force reflow pour relancer l'animation
+    el.classList.add('member-jump-highlight');
+    setTimeout(()=>el.classList.remove('member-jump-highlight'), 2200);
+  }
   function familyModuleContent(){
     const members=getFamilyMembers(), docs=getFamilyDocuments();
     return `${primaryActionBar([
@@ -3570,6 +3582,7 @@
     ])}
       ${moduleKpis([[members.length,'membres','👨‍👩‍👧‍👦',`SuperApp.openFamilyMembersManager('all')`],[docs.length,'documents','📁',`SuperApp.openModuleList('familles','documents')`]])}
       ${familyStyleInlineBlock()}
+      ${familyMemberJumpStrip(members)}
       <div class="section-title compact-title"><h2>👨‍👩‍👧‍👦 Membres du foyer</h2><button class="link-btn" onclick="SuperApp.openSettingsMember('')">+ Ajouter</button></div>
       <div class="family-spaces">${members.map(memberCard).join('')}</div>
       ${fusedBlock('familles','documents','Documents importants','📁','family tone-family-2','Identité · assurances',`<p class="play-copy">Identité, passeport, diplômes, santé, scolarité et assurances dans un seul espace documentaire.</p>${miniChips(['Identité','Passeport','Diplômes','Santé','Scolarité','Assurances'])}`,`<button class="link-btn" onclick="SuperApp.openModuleList('familles','documents')">+ Ajouter</button>`)}
@@ -5065,7 +5078,7 @@
     const primary = boolLabel(m.primaryContact, (['Papa','Maman','Parent'].includes(m.role) ? 'oui' : 'non'));
     const canDrive = boolLabel(m.canDrive, (['Papa','Maman','Parent'].includes(m.role) ? 'oui' : 'non'));
     const alert = memberAlertLabel(m);
-    return `<article class="family-member-card member-${accent} clickable-card avatar-member-card rich-member-card" onclick="SuperApp.openMember('${m.id}')">
+    return `<article id="member-card-${m.id}" class="family-member-card member-${accent} clickable-card avatar-member-card rich-member-card" onclick="SuperApp.openMember('${m.id}')">
       <div class="member-top rich-member-top"><img class="member-avatar-img" src="${memberAvatarSrc(m)}" alt=""><div><h3>${escapeHtml(m.name||'Membre')}</h3><span>${escapeHtml(m.role||'Famille')} · ${escapeHtml(ageFromBirth(m.birth)||'Âge à renseigner')}</span><small>🎂 ${escapeHtml(birthdayLabel(m.birth))}</small></div></div>
       <div class="member-info-grid">
         ${infoCell('📞','Contact principal',primary,boolClass(m.primaryContact, primary))}
@@ -5196,7 +5209,7 @@
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
     openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, setSlvSubFilter, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, deleteReferenceList, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
-    setListCatFilter, setListSubFilter, setGenericChecklistFilter,
+    setListCatFilter, setListSubFilter, setGenericChecklistFilter, scrollToMember,
     handleCategoryChange, handleSubcategoryChange,
     openCreateCategoryDialog, openCreateSubcategoryDialog, confirmCreateCategory,
     openStyleFamillePanel, selectAvatarChoice,
