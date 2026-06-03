@@ -2658,6 +2658,28 @@ body[data-theme="sombre"] .dialog-actions{
   }
 }
 
+/* V5.39.2 — Correctif Android (PWA) : le centrage par transform translate(-50%,-50%)
+   décale la boîte (haut-gauche, titre rogné). Sur Android on revient au centrage
+   natif fiable inset:0 + margin:auto, SANS transform. iPhone garde son centrage
+   (réappliqué plus haut via @supports -webkit-touch-callout) et n'est pas touché. */
+html.is-android dialog.dialog-card[open],
+html.is-android #editDialog[open],
+html.is-android #actionDialog[open],
+html.is-android .create-cat-dialog[open]{
+  inset:0!important;
+  margin:auto!important;
+  transform:none!important;
+  -webkit-transform:none!important;
+  height:max-content!important;
+  max-height:calc(100dvh - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;
+}
+html.is-android dialog.dialog-card[open] form,
+html.is-android #editDialog[open] form,
+html.is-android #actionDialog[open] form,
+html.is-android .create-cat-dialog[open] form{
+  max-height:calc(100dvh - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;
+}
+
 /* V5.37/5.38 — Filtres catégorie/sous-catégorie : barre affichée EN ENTIER, sans glissière */
 .slv-subcat-filter{display:flex;flex-wrap:wrap;gap:8px;padding:2px 0 4px;margin:2px 0 4px}
 .slv-subcat-filter.sub{margin-top:0;padding-top:0}
