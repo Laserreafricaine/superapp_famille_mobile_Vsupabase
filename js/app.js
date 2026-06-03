@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.39.2';
+  const APP_VERSION = '5.39.3';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -4642,12 +4642,9 @@
           return managementRow(x,cfg);
         }).join('') : `<article class="empty cute-empty"><b>${cfg.emoji} Rien pour le moment</b><small>Ajoute un premier élément. Tout élément affiché peut ensuite être modifié ou supprimé.</small><button class="btn primary" onclick="${addAction}">+ Ajouter</button></article>`);
     const titleBar = module === 'sante' ? '' : `<div class="section-title compact-title v53-list-title"><h2>${cfg.emoji} ${escapeHtml(moduleListTitle(module, block, cfg))}</h2><button class="link-btn" onclick="${addAction}">+ Ajouter</button></div>`;
-    // V5.39 — Accès rapide aux membres (app Famille) : mini-cartes cliquables avant la liste.
-    const memberJump = module === 'familles' ? familyMemberJumpStrip(getFamilyMembers()) : '';
     return `<section class="v53-direct-list ${module==='sante'?'health-direct-list':''}" data-block="${escapeAttr(block)}">
       <section class="filter-zone"><h3>${module==='sante'?'Filtrer la liste':'Filtrer'}</h3>${listTabsForModule(module)}</section>
       ${memberFilterRow(module)}
-      ${memberJump}
       ${titleBar}
       <div class="management-list">${rows}</div>
       ${docsPanelInline}
@@ -4673,9 +4670,11 @@
         <section class="palette-strong ${tone}">${primaryActionsForModule(m.id)}</section>
         <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
     } else {
+      const familyJump = m.id==='familles' ? familyMemberJumpStrip(getFamilyMembers()) : '';
       view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
         ${appHeroBlock(m.id)}
         <section class="palette-soft ${tone}"><div class="v53-recap-head"><b>Récap rapide</b><small>Vue rapide des éléments importants du module.</small></div><div class="v53-summary-grid">${moduleSummary(m.id)}</div></section>
+        ${familyJump}
         <section class="palette-strong ${tone}">${primaryActionsForModule(m.id)}</section>
         <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
     }
