@@ -1,13 +1,13 @@
-const CACHE = 'superapp-famille-v5-39-3';
+const CACHE = 'superapp-famille-v5-40-0';
 const CORE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/app.css?v=5.39.3',
-  './css/supabase-auth.css?v=5.39.3',
-  './js/app.js?v=5.39.3',
-  './js/supabase-client.js?v=5.39.3',
-  './js/supabase-app.js?v=5.39.3',
+  './css/app.css?v=5.40.0',
+  './css/supabase-auth.css?v=5.40.0',
+  './js/app.js?v=5.40.0',
+  './js/supabase-client.js?v=5.40.0',
+  './js/supabase-app.js?v=5.40.0',
   './assets/icons/superapp-famille-icon-180.png',
   './assets/icons/superapp-famille-icon-192.png',
   './assets/icons/superapp-famille-icon-512.png'

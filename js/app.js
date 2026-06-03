@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.39.3';
+  const APP_VERSION = '5.40.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -4478,16 +4478,19 @@
       : '';
     return `<div class="maison-filter-bar">${chips}${moreBtn}</div>`;
   }
-  function summaryMetric(value, label, emoji){ return `<article class="v53-summary-pill"><span>${emoji}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(label)}</small></article>`; }
+  function summaryMetric(value, label, emoji, onclick=''){
+    if(onclick) return `<button type="button" class="v53-summary-pill v53-summary-clickable" onclick="${onclick}"><span>${emoji}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(label)}</small></button>`;
+    return `<article class="v53-summary-pill"><span>${emoji}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(label)}</small></article>`;
+  }
   function moduleSummary(module){
     module = canonicalModuleId(module);
     const scoped = arr => applyMemberFilter(arr, module);
-    if(module==='maison') return [summaryMetric(scoped([...getMaisonTasks('open'), ...getGenericChecklistItems('maison')]).length,'éléments actifs','🏠'), summaryMetric(scoped(getMaisonTasks('today')).length,'aujourd’hui','📅'), summaryMetric(scoped(getMaisonTasks('late')).length,'en retard','⏰')].join('');
-    if(module==='courses_repas') return [summaryMetric(scoped(getMenus()).length,'menus','🍽️'), summaryMetric(scoped(getShoppingItems('open')).length,'courses','🛒'), summaryMetric(scoped(getStockItems('low')).length,'stock faible','⚠️')].join('');
-    if(module==='education') return [summaryMetric(scoped(getSchoolItems('open')).length,'école','📚'), summaryMetric(scoped(getSchoolItems('open').filter(x=>x.type==='note' || x.category==='Notes')).length,'notes','⭐'), summaryMetric(scoped(getSchoolItems('today')).length,'aujourd’hui','📅')].join('');
-    if(module==='sante') return [summaryMetric(scoped(getHealthTreatments('open')).length,'traitements','💊'), summaryMetric(scoped(getHealthAppointments('open')).length,'rendez-vous','🩺'), summaryMetric(scoped(getHealthBookItems()).length,'carnet','📘')].join('');
-    if(module==='sport_loisirs'){ const _a=[...scoped(getSportActivities('open')),...scoped(getLoisirActivities('open')),...scoped(getVoyageActivities('open'))]; return [summaryMetric(_a.length,'activités','⚽'), summaryMetric(scoped(getSportGear()).length+scoped(getLoisirGear()).length+scoped(getVoyageGear()).length,'matériel','🎒'), summaryMetric(scoped(getSportActivities('today')).length,'aujourd’hui','📅')].join(''); }
-    if(module==='familles') return [summaryMetric(getFamilyMembers().length,'membres','👨‍👩‍👧‍👦'), summaryMetric(scoped(getFamilyDocuments()).length,'documents','📁')].join('');
+    if(module==='maison') return [summaryMetric(scoped([...getMaisonTasks('open'), ...getGenericChecklistItems('maison')]).length,'éléments actifs','🏠',"SuperApp.setMaisonPeriodFilter('all')"), summaryMetric(scoped(getMaisonTasks('today')).length,'aujourd’hui','📅',"SuperApp.setMaisonPeriodFilter('today')"), summaryMetric(scoped(getMaisonTasks('late')).length,'en retard','⏰',"SuperApp.setMaisonPeriodFilter('late')")].join('');
+    if(module==='courses_repas') return [summaryMetric(scoped(getMenus()).length,'menus','🍽️',"SuperApp.setModuleBlock('courses_repas','repas')"), summaryMetric(scoped(getShoppingItems('open')).length,'courses','🛒',"SuperApp.setModuleBlock('courses_repas','courses')"), summaryMetric(scoped(getStockItems('low')).length,'stock faible','⚠️',"SuperApp.setModuleBlock('courses_repas','stock')")].join('');
+    if(module==='education') return [summaryMetric(scoped(getSchoolItems('open')).length,'école','📚',"SuperApp.setModuleBlock('education','ecole')"), summaryMetric(scoped(getSchoolItems('open').filter(x=>x.type==='note' || x.category==='Notes')).length,'notes','⭐',"SuperApp.setModuleBlock('education','ecole_notes')"), summaryMetric(scoped(getSchoolItems('today')).length,'aujourd’hui','📅',"SuperApp.setModuleBlock('education','ecole')")].join('');
+    if(module==='sante') return [summaryMetric(scoped(getHealthTreatments('open')).length,'traitements','💊',"SuperApp.setModuleBlock('sante','traitements')"), summaryMetric(scoped(getHealthAppointments('open')).length,'rendez-vous','🩺',"SuperApp.setModuleBlock('sante','rendez_vous')"), summaryMetric(scoped(getHealthBookItems()).length,'carnet','📘',"SuperApp.setModuleBlock('sante','documents')")].join('');
+    if(module==='sport_loisirs'){ const _a=[...scoped(getSportActivities('open')),...scoped(getLoisirActivities('open')),...scoped(getVoyageActivities('open'))]; return [summaryMetric(_a.length,'activités','⚽',"SuperApp.setModuleBlock('sport_loisirs','tout')"), summaryMetric(scoped(getSportGear()).length+scoped(getLoisirGear()).length+scoped(getVoyageGear()).length,'matériel','🎒',"SuperApp.setModuleBlock('sport_loisirs','documents')"), summaryMetric(scoped(getSportActivities('today')).length,'aujourd’hui','📅')].join(''); }
+    if(module==='familles') return [summaryMetric(getFamilyMembers().length,'membres','👨‍👩‍👧‍👦',"SuperApp.openFamilyMembersManager('all')"), summaryMetric(scoped(getFamilyDocuments()).length,'documents','📁',"SuperApp.setModuleBlock('familles','documents')")].join('');
     return '';
   }
   function listConfig(module, block){
