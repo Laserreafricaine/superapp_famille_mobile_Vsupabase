@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.50.0';
+  const APP_VERSION = '5.51.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -1897,13 +1897,44 @@
   // V5.49 — Le ＋ Ajouter du hub Santé doit demander quoi ajouter (sinon il créait
   // un traitement par défaut, jamais un vrai rendez-vous).
   function openSanteAdd(){
-    const items=[
+    openAddSheet([
       ['📅','Rendez-vous',"SuperApp.openAdd('sante','rendez_vous_medical','Rendez-vous')"],
       ['💊','Traitement',"SuperApp.openAdd('sante','medicament','Traitements')"],
       ['📄','Document',"SuperApp.openAdd('sante','document_sante','Documents santé')"]
-    ];
+    ]);
+  }
+  // V5.51 — Mêmes règles que Santé : le ＋ Ajouter de chaque app à plusieurs types
+  // ouvre une petite fenêtre de choix → puis le bon formulaire.
+  function openAddSheet(items){
     $('#quickActions').innerHTML = items.map(([icon,label,act])=>`<button class="quick-action" type="button" onclick="${act}"><span>${icon}</span>${label}</button>`).join('');
     $('#actionDialog').showModal();
+  }
+  function openSlvAdd(){
+    openAddSheet([
+      ['⚽','Sport',"SuperApp.setSlvTab('sport');SuperApp.openAdd('sport_loisirs','activite','Sport')"],
+      ['🎨','Loisir',"SuperApp.setSlvTab('loisir');SuperApp.openAdd('sport_loisirs','loisir','Loisir')"],
+      ['✈️','Voyage',"SuperApp.setSlvTab('voyage');SuperApp.openAdd('sport_loisirs','voyage','Voyage')"]
+    ]);
+  }
+  function openCoursesAdd(){
+    openAddSheet([
+      ['🛒','Course',"SuperApp.openAdd('courses_repas','course')"],
+      ['🍽️','Repas',"SuperApp.openAdd('courses_repas','repas_semaine','Repas')"],
+      ['📦','Stock',"SuperApp.openAdd('courses_repas','stock')"]
+    ]);
+  }
+  function openEducationAdd(){
+    openAddSheet([
+      ['📘','Devoir',"SuperApp.openAdd('education','devoir')"],
+      ['📊','Note',"SuperApp.openAdd('education','note')"],
+      ['📄','Document',"SuperApp.openAdd('education','document_ecole')"]
+    ]);
+  }
+  function openFamilleAdd(){
+    openAddSheet([
+      ['👤','Membre',"this.closest('dialog')?.close();SuperApp.openSettingsMember('')"],
+      ['📁','Document',"SuperApp.openAdd('familles','document_famille')"]
+    ]);
   }
   function openEdit(type, id=''){
     type = canonicalModuleId(type);
@@ -4843,7 +4874,7 @@
         </div>
         ${coursesSignatureBlock()}
         <button class="ch-docs" onclick="SuperApp.openAppList('courses_repas','documents')"><span>🧾 Tickets de caisse</span><span class="chev">›</span></button>
-        <div class="ch-add"><button onclick="SuperApp.openAdd('courses_repas')">＋ Ajouter une course</button></div>
+        <div class="ch-add"><button onclick="SuperApp.openCoursesAdd()">＋ Ajouter</button></div>
       </section>`;
   }
   // V5.43 — Hub Santé « personnalité » : framboise, héros, bloc « À prendre aujourd'hui ».
@@ -4931,7 +4962,7 @@
           </div>
         </div>
         ${educationSignatureBlock()}
-        <div class="eh-add"><button onclick="SuperApp.openAdd('education')">＋ Ajouter un devoir</button></div>
+        <div class="eh-add"><button onclick="SuperApp.openEducationAdd()">＋ Ajouter</button></div>
       </section>`;
   }
   // V5.45 — Hub Sport/Loisir/Voyage « personnalité » : turquoise, héros, bloc « Prochaine activité ».
@@ -4976,7 +5007,7 @@
           </div>
         </div>
         ${slvSignatureBlock()}
-        <div class="sp-add"><button onclick="SuperApp.openAdd('sport_loisirs')">＋ Ajouter une activité</button></div>
+        <div class="sp-add"><button onclick="SuperApp.openSlvAdd()">＋ Ajouter</button></div>
       </section>`;
   }
   // V5.46 — Hub Famille « personnalité » : violet, héros, boutons membres → fiche, bloc « Prochain anniversaire ».
@@ -5030,7 +5061,7 @@
         </div>
         ${familleSignatureBlock()}
         <button class="fh-docs" onclick="SuperApp.openAppList('familles','documents')"><span>📁 Documents importants ${docN?`· ${docN}`:''}</span><span class="chev">›</span></button>
-        <div class="fh-add"><button onclick="SuperApp.openSettingsMember('')">＋ Ajouter un membre</button></div>
+        <div class="fh-add"><button onclick="SuperApp.openFamilleAdd()">＋ Ajouter</button></div>
       </section>`;
   }
   function paintModule(id, focusKey=''){
@@ -5620,7 +5651,7 @@
     _findRecord: findRecord, toast,
     setView, openModule, openItem, openCalendarDate, openCalendarModule, setCalendarFilter, setNotificationFilter,
     renderAppsHome:()=>{ state.appsView=null; setView('apps'); }, render:()=>render(),
-    setActiveProfile, openProfilePicker, closeProfileSheet, requestNotify, openQuickActions, openSanteAdd,
+    setActiveProfile, openProfilePicker, closeProfileSheet, requestNotify, openQuickActions, openSanteAdd, openSlvAdd, openCoursesAdd, openEducationAdd, openFamilleAdd,
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
