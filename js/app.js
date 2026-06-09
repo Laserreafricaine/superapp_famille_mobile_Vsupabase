@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.53.0';
+  const APP_VERSION = '5.54.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -954,60 +954,62 @@
     const who = isMemberProfile() ? profileFirstName().replace(/^./,c=>c.toUpperCase()) : familyGreetingName();
     const greeting = `Bonjour ${who} 👋`;
 
-    // ── V5.48 — Récapitulatif transversal coloré (couleurs par app, Style A) ──
-    const tasksToday  = getMaisonTasks('today').length;
-    const coursesOpen = getShoppingItems('open').length;
-    const profileNotices = forActiveProfile(getNotifications()).filter(noticeVisibleOnHome);
-    const alertsCount = profileNotices.length;
+    // ── V5.54 — Les 6 apps remplacent les cartes (logo centré + compteur),
+    //           + ligne « À faire » (1 ligne) + barre anniversaire. Sans onglet Apps.
+    const trunc = s => { s = String(s||'').trim(); return s.length>16 ? s.slice(0,15)+'…' : s; };
 
-    const trunc = s => { s = String(s||'').trim(); return s.length>14 ? s.slice(0,13)+'…' : s; };
-    const relLabel = diff => diff===0 ? 'Auj.' : diff===1 ? 'Demain' : `J‑${diff}`;
-    // V5.48 — RDV & voyages : leur vraie date est dans startDate. On la lit en
-    // priorité, et on affiche l'élément même sans date valable (« À venir »).
-    const pickNext = arr => {
-      arr = arr || [];
-      let best=null, bestD=Infinity;
-      arr.forEach(x=>{ const d=x.startDate||x.date; if(!d) return; const diff=daysDiff(today,d); if(diff>=0 && diff<bestD){ bestD=diff; best={item:x,label:relLabel(diff)}; } });
-      if(best) return best;
-      if(arr.length) return {item:arr[0], label:'À venir'};
-      return null;
+    const APP_PAL = {
+      maison:        {soft:'#E4F5EC', bd:'#CFEEDE', core:'#2FA66B', deep:'#1E7C4D'},
+      courses_repas: {soft:'#FCEDDC', bd:'#F6DCC1', core:'#F08A3C', deep:'#C76717'},
+      education:     {soft:'#E8EDFC', bd:'#D4DDF7', core:'#4C6FE0', deep:'#3350B4'},
+      sante:         {soft:'#FCE7EE', bd:'#F7D2E0', core:'#E45C86', deep:'#BE3C66'},
+      sport_loisirs: {soft:'#DFF2F8', bd:'#C7E9F1', core:'#149FC4', deep:'#0B7794'},
+      familles:      {soft:'#EDE8FA', bd:'#DED4F4', core:'#8A6FD1', deep:'#6A50B5'}
     };
-
-    const rdvN = pickNext(getHealthAppointments('open'));
-    let rdvVal = '—';
-    if(rdvN){
-      const _t = rdvN.item;
-      const _title = trunc(_t.title || 'RDV');
-      const _when = (rdvN.label === 'Auj.' && _t.time) ? String(_t.time).replace(':','h') : rdvN.label;
-      rdvVal = `${_when} · ${_title}`;
-    }
-
-    const schoolToday = getSchoolItems('today');
-    const schoolVal = schoolToday.length ? trunc(schoolToday[0].title || schoolToday[0].name || 'Oui') : '—';
-
-    const voyN = pickNext(getVoyageActivities('open'));
-    const voyageVal = voyN ? voyN.label : '—';
-    const voyageLbl = voyN ? trunc(voyN.item.title || voyN.item.name || 'Voyage') : 'Prochain voyage';
-
-    // Palettes verrouillées (douce / bord / cœur / profonde)
-    const PAL = {
-      maison:   {soft:'#E4F5EC', bd:'#CFEEDE', core:'#2FA66B', deep:'#1E7C4D'},
-      sante:    {soft:'#FCE7EE', bd:'#F7D2E0', core:'#E45C86', deep:'#BE3C66'},
-      courses:  {soft:'#FCEDDC', bd:'#F6DCC1', core:'#F08A3C', deep:'#C76717'},
-      education:{soft:'#E8EDFC', bd:'#D4DDF7', core:'#4C6FE0', deep:'#3350B4'},
-      voyage:   {soft:'#DFF2F8', bd:'#C7E9F1', core:'#149FC4', deep:'#0B7794'},
-      alertes:  {soft:'#FBF0D6', bd:'#F1E2B4', core:'#E2A52B', deep:'#B07F18'}
+    const counts = {
+      maison: getMaisonTasks('open').length,
+      courses_repas: getShoppingItems('open').length,
+      education: getSchoolItems('open').length,
+      sante: getHealthAppointments('open').length,
+      sport_loisirs: getSportActivities('open').length + getLoisirActivities('open').length + getVoyageActivities('open').length,
+      familles: getFamilyMembers().length
     };
-    const tile = (emoji,val,label,onclick,pal,isTxt)=>`<button class="home-recap-tile" type="button" style="--soft:${pal.soft};--bd:${pal.bd};--core:${pal.core};--deep:${pal.deep}" onclick="${onclick}"><span class="hr-em">${emoji}</span><span class="hr-v${isTxt?' txt':''}">${escapeHtml(String(val))}</span><span class="hr-l">${escapeHtml(label)}</span></button>`;
-
-    const recap = `<div class="home-recap-grid">`
-      + tile('🏠', tasksToday, 'Tâches du jour', "SuperApp.openModule('maison')", PAL.maison, false)
-      + tile('🩺', rdvVal, 'Prochain RDV', "SuperApp.openModule('sante')", PAL.sante, true)
-      + tile('🛒', coursesOpen, 'Courses', "SuperApp.openModule('courses_repas')", PAL.courses, false)
-      + tile('📚', schoolVal, 'École du jour', "SuperApp.openModule('education')", PAL.education, true)
-      + tile('✈️', voyageVal, voyageLbl, "SuperApp.openSlvUniverse('voyage','voyage_activites')", PAL.voyage, true)
-      + tile('🔔', alertsCount, 'Alertes', "SuperApp.setView('notifications')", PAL.alertes, false)
+    const appTile = (id,name)=>{
+      const p = APP_PAL[id]; const n = counts[id]||0;
+      return `<button class="home-app-tile" type="button" style="--soft:${p.soft};--bd:${p.bd};--core:${p.core};--deep:${p.deep}" onclick="SuperApp.openModule('${id}')">`
+        + `<span class="hat-cnt${n===0?' zero':''}">${n}</span>`
+        + `<span class="hat-logo">${appLogoHtml(id, 52)}</span>`
+        + `<span class="hat-nm">${escapeHtml(name)}</span>`
+        + `</button>`;
+    };
+    const appsGrid = `<div class="home-apps-grid">`
+      + appTile('maison','Maison')
+      + appTile('courses_repas','Courses & repas')
+      + appTile('education','Éducation')
+      + appTile('sante','Santé')
+      + appTile('sport_loisirs','Sport · Loisir · Voyage')
+      + appTile('familles','Famille')
       + `</div>`;
+
+    // Ligne « À faire » : prochain élément urgent + nombre d'autres → Calendrier
+    const APP_COLOR = {maison:'#2FA66B',courses_repas:'#F08A3C',education:'#4C6FE0',sante:'#E45C86',sport_loisirs:'#149FC4',familles:'#8A6FD1',calendrier:'#E2A52B'};
+    const todo = [];
+    const pushTodo = (arr,app)=>(arr||[]).forEach(x=>todo.push({x,app}));
+    pushTodo(getMaisonTasks('open'),'maison');
+    pushTodo(getShoppingItems('open'),'courses_repas');
+    pushTodo(getHealthAppointments('open'),'sante');
+    pushTodo(getSchoolItems('open'),'education');
+    pushTodo(getSportActivities('open'),'sport_loisirs');
+    pushTodo(getLoisirActivities('open'),'sport_loisirs');
+    pushTodo(getVoyageActivities('open'),'sport_loisirs');
+    todo.sort((a,b)=>{ const da=a.x.startDate||a.x.date, db=b.x.startDate||b.x.date; const va=da?daysDiff(today,da):9999, vb=db?daysDiff(today,db):9999; return va-vb; });
+    let dueLine = '';
+    if(todo.length){
+      const head = trunc(todo[0].x.title || todo[0].x.name || 'À faire');
+      const others = todo.length - 1;
+      const dotC = APP_COLOR[todo[0].app] || '#E45C86';
+      dueLine = `<div class="home-due clickable-card" onclick="SuperApp.setView('calendar')"><span class="hd-lab">À faire</span><span class="hd-dot" style="background:${dotC}"></span><b>${escapeHtml(head)}</b>${others>0?`<span class="hd-x">+ ${others} autre${others>1?'s':''}</span>`:''}</div>`;
+    }
 
     const homeDateLine = displayDate(today).replace(/^./,c=>c.toUpperCase());
     const _bd = nextBirthday();
@@ -1023,7 +1025,8 @@
         <img src="${profileAvatar()}" alt="" onerror="this.style.display='none'" />
       </article>
       ${annivBar}
-      ${recap}
+      ${dueLine}
+      ${appsGrid}
       <div class="home-add-cta"><button type="button" class="btn primary" onclick="SuperApp.openQuickActions()">＋ Ajouter</button></div>`;
   }
   function moduleImage(m,variant='tile'){
@@ -1896,12 +1899,14 @@
   function openQuickActions(){
     state.returnList = null;
     const items=[
-      ['🏠','Tâche',"SuperApp.openEdit('maison')"],
-      ['🛒','Course',"SuperApp.openEdit('courses_repas')"],
-      ['🩺','Rendez-vous',"SuperApp.openAdd('sante','rendez_vous_medical','Rendez-vous')"],
-      ['📅','Événement',"SuperApp.openEdit('calendrier')"],
-      ['👤','Membre',"this.closest('dialog')?.close();SuperApp.openSettingsMember('')"],
-      ['📁','Document',"SuperApp.openEdit('familles')"]
+      ['🏠','Tâche',"SuperApp.openAdd('maison')"],
+      ['🍽️','Repas',"SuperApp.openAdd('courses_repas','repas_semaine','Repas')"],
+      ['🛒','Course',"SuperApp.openAdd('courses_repas','course')"],
+      ['🩺','Rendez-vous médical',"SuperApp.openAdd('sante','rendez_vous_medical','Rendez-vous')"],
+      ['⚽','Sport',"SuperApp.setSlvTab('sport');SuperApp.openAdd('sport_loisirs','activite','Sport')"],
+      ['🎨','Loisir',"SuperApp.setSlvTab('loisir');SuperApp.openAdd('sport_loisirs','loisir','Loisir')"],
+      ['📅','Évènement simple',"SuperApp.openAdd('calendrier')"],
+      ['📄','Documents famille',"SuperApp.openAdd('familles','document_famille','Documents')"]
     ];
     $('#quickActions').innerHTML = items.map(([icon,label,act])=>`<button class="quick-action" type="button" onclick="${act}"><span>${icon}</span>${label}</button>`).join('');
     $('#actionDialog').showModal();
@@ -4829,7 +4834,7 @@
     const lateN = getMaisonTasks('late').length;
     const sig = getMaisonTasks('today')[0] || open[0] || null;
     const heroSrc = appHeroSrc('maison');
-    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
+    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.setView('home')">← Accueil</button></div>
       <section class="maison-hub">
         <div class="mh-hero" style="background-image:url('${heroSrc}')">
           <span class="mh-badge">Maison</span>
@@ -4869,7 +4874,7 @@
     const coursesN = getShoppingItems('open').length;
     const stockN = getStockItems('low').length;
     const heroSrc = appHeroSrc('courses_repas');
-    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
+    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.setView('home')">← Accueil</button></div>
       <section class="courses-hub">
         <div class="ch-hero" style="background-image:url('${heroSrc}')">
           <span class="ch-badge">Courses & repas</span>
@@ -4915,7 +4920,7 @@
     const rdvN = getHealthAppointments('open').length;
     const docN = getHealthBookItems().length;
     const heroSrc = appHeroSrc('sante');
-    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
+    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.setView('home')">← Accueil</button></div>
       <section class="sante-hub">
         <div class="sh-hero" style="background-image:url('${heroSrc}')">
           <span class="sh-badge">Santé</span>
@@ -4958,7 +4963,7 @@
     const notesN = visibleItems('homework').filter(x=>!statusIsDone(x) && (x.type==='note' || x.category==='Notes')).length;
     const docN = visibleItems('schoolDocs').length;
     const heroSrc = appHeroSrc('education');
-    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
+    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.setView('home')">← Accueil</button></div>
       <section class="education-hub">
         <div class="eh-hero" style="background-image:url('${heroSrc}')">
           <span class="eh-badge">Éducation</span>
@@ -5003,7 +5008,7 @@
   function sportHubScreen(){
     const sportN=getSportActivities('open').length, loisirN=getLoisirActivities('open').length, voyageN=getVoyageActivities('open').length;
     const heroSrc=appHeroSrc('sport_loisirs');
-    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
+    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.setView('home')">← Accueil</button></div>
       <section class="sport-hub">
         <div class="sp-hero" style="background-image:url('${heroSrc}')">
           <span class="sp-badge">Sport · Loisir · Voyage</span>
@@ -5060,7 +5065,7 @@
     const memberBtns = members.length
       ? members.map(m=>`<button class="fh-member" onclick="SuperApp.openMember('${m.id}')"><img src="${memberAvatarSrc(m)}" alt="" onerror="this.style.visibility='hidden'"><span>${escapeHtml(firstMemberName(m.name))}</span></button>`).join('')
       : `<p class="fh-empty">Aucun membre pour le moment.</p>`;
-    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
+    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.setView('home')">← Accueil</button></div>
       <section class="famille-hub">
         <div class="fh-hero" style="background-image:url('${heroSrc}')">
           <span class="fh-badge">Famille</span>
@@ -5128,7 +5133,7 @@
         view.innerHTML = familleHubScreen();
       }
     } else {
-      view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
+      view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.setView('home')">← Accueil</button></div>
         ${appHeroBlock(m.id)}
         <section class="palette-soft ${tone}"><div class="v53-recap-head"><b>Récap rapide</b><small>Vue rapide des éléments importants du module.</small></div><div class="v53-summary-grid">${moduleSummary(m.id)}</div></section>
         ${familyJump}
@@ -5238,14 +5243,11 @@
     ];
 
     $('#view-settings').innerHTML = sbUserBarHtml() + `
-      <article class="settings-hero-v59">
-        <img class="settings-hero-photo" src="${familyImg}" alt="Photo de famille" onerror="this.style.display='none'">
-        <div class="settings-hero-overlay">
-          <span class="settings-hero-eyebrow">Mes réglages</span>
-          <h2>${escapeHtml(familleName)} <span class="wave">👋</span></h2>
-          <p>${memberCount} membre${memberCount>1?'s':''} · ${active} app${active>1?'s':''} active${active>1?'s':''} · style « ${packLabel} »</p>
-        </div>
-      </article>
+      <div class="settings-head-plain">
+        <span class="shp-eyebrow">Mes réglages</span>
+        <h2>${escapeHtml(familleName)} <span class="wave">👋</span></h2>
+        <p>${memberCount} membre${memberCount>1?'s':''} · ${active} app${active>1?'s':''} active${active>1?'s':''} · style « ${packLabel} »</p>
+      </div>
       ${groups.map(g=>`
         <section class="settings-section-v59">
           <h3 class="settings-section-title"><span>${g.emoji}</span> ${g.title}</h3>
