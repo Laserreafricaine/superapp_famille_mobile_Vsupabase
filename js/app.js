@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.52.0';
+  const APP_VERSION = '5.53.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -974,7 +974,13 @@
     };
 
     const rdvN = pickNext(getHealthAppointments('open'));
-    const rdvVal = rdvN ? rdvN.label : '—';
+    let rdvVal = '—';
+    if(rdvN){
+      const _t = rdvN.item;
+      const _title = trunc(_t.title || 'RDV');
+      const _when = (rdvN.label === 'Auj.' && _t.time) ? String(_t.time).replace(':','h') : rdvN.label;
+      rdvVal = `${_when} · ${_title}`;
+    }
 
     const schoolToday = getSchoolItems('today');
     const schoolVal = schoolToday.length ? trunc(schoolToday[0].title || schoolToday[0].name || 'Oui') : '—';
@@ -1004,12 +1010,19 @@
       + `</div>`;
 
     const homeDateLine = displayDate(today).replace(/^./,c=>c.toUpperCase());
+    const _bd = nextBirthday();
+    const annivBar = _bd ? `<div class="home-anniv clickable-card" onclick="SuperApp.openMember('${_bd.m.id}')">
+        <span class="ha-cake">🎂</span>
+        <div class="ha-t"><small>Prochain anniversaire</small><b>${escapeHtml(firstMemberName(_bd.m.name))} fête ses ${_bd.turning} ans</b></div>
+        <span class="ha-cd">${_bd.days===0?"Auj. 🎉":(_bd.days===1?'Demain':`dans ${_bd.days} j`)}</span>
+      </div>` : '';
     $('#view-home').innerHTML = `
       <article class="home-hero home-hero-slim clickable-card" onclick="SuperApp.openProfilePicker()">
         <button class="home-hero-bell" type="button" onclick="event.stopPropagation();SuperApp.setView('notifications')" aria-label="Notifications">🔔</button>
         <div class="hero-copy"><span>SUPERAPP FAMILLE</span><h2>${greeting}</h2><p>${homeDateLine} · ${currentWeatherIcon()} ${weatherTemperatureText()}</p></div>
         <img src="${profileAvatar()}" alt="" onerror="this.style.display='none'" />
       </article>
+      ${annivBar}
       ${recap}
       <div class="home-add-cta"><button type="button" class="btn primary" onclick="SuperApp.openQuickActions()">＋ Ajouter</button></div>`;
   }
