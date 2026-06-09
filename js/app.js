@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.40.0';
+  const APP_VERSION = '5.50.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -99,6 +99,7 @@
     loisirGear: [],
     voyageGear: [],
     familyDocuments: [],
+    coursesDocs: [],
     documents: [],
     calendarEvents: [],
     notifications: [],
@@ -156,7 +157,7 @@
       ['tasks','maison'], ['shopping','courses_repas'], ['meals','courses_repas'], ['weeklyMeals','courses_repas'], ['stock','courses_repas'], ['calendarEvents','calendrier'],
       ['homework','education'], ['schoolDocs','education'],
       ['health','sante'], ['vaccines','sante'], ['healthDocs','sante'], ['emergency','sante'],
-      ['sports','sport_loisirs'], ['loisirs','sport_loisirs'], ['voyages','sport_loisirs'], ['sportGear','sport_loisirs'], ['loisirGear','sport_loisirs'], ['voyageGear','sport_loisirs'], ['familyDocuments','familles'], ['documents','calendrier']
+      ['sports','sport_loisirs'], ['loisirs','sport_loisirs'], ['voyages','sport_loisirs'], ['sportGear','sport_loisirs'], ['loisirGear','sport_loisirs'], ['voyageGear','sport_loisirs'], ['familyDocuments','familles'], ['coursesDocs','courses_repas'], ['documents','calendrier']
     ];
   }
   function findRecord(id){
@@ -189,7 +190,7 @@
   function targetCollectionFor(module,type){
     module = canonicalModuleId(module);
     if(module==='maison') return 'tasks';
-    if(module==='courses_repas') return type === 'stock' ? 'stock' : (type === 'repas_semaine' ? 'weeklyMeals' : (type === 'course' ? 'shopping' : 'meals'));
+    if(module==='courses_repas') return type === 'document_courses' ? 'coursesDocs' : (type === 'stock' ? 'stock' : (type === 'repas_semaine' ? 'weeklyMeals' : (type === 'course' ? 'shopping' : 'meals')));
     if(module==='education') return type === 'document_ecole' ? 'schoolDocs' : 'homework';
     if(module==='sante') return type === 'urgence_sante' ? 'emergency' : (type === 'vaccin' ? 'vaccines' : (type === 'document_sante' ? 'healthDocs' : 'health'));
     if(module==='sport_loisirs'){
@@ -253,7 +254,7 @@
     d.settings.syncMode = d.settings.syncMode || d.offer.syncMode || 'mobile_only';
     d.appsRegistry = makeAppsRegistry({...base.appsRegistry, ...(d.appsRegistry || d.modules || {})});
     d.categories = migrateCategories({...base.categories, ...(d.categories||{})});
-    ['family','tasks','shopping','meals','weeklyMeals','stock','homework','schoolDocs','health','vaccines','healthDocs','emergency','sports','loisirs','voyages','sportGear','loisirGear','voyageGear','familyDocuments','documents','calendarEvents','notifications'].forEach(key=>{
+    ['family','tasks','shopping','meals','weeklyMeals','stock','homework','schoolDocs','health','vaccines','healthDocs','emergency','sports','loisirs','voyages','sportGear','loisirGear','voyageGear','familyDocuments','coursesDocs','documents','calendarEvents','notifications'].forEach(key=>{
       if(!Array.isArray(d[key])) d[key] = base[key] || [];
     });
     d.family = d.family.map(member => {
@@ -644,6 +645,7 @@
     // pas si on rappelle setView sur la vue actuelle (ex. après une action interne).
     const wasSameView = state.view === view;
     state.view=view;
+    try { document.body.dataset.view = view; } catch {}
     $$('.view').forEach(v=>v.classList.toggle('active', v.dataset.view===view));
     $$('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.target===view));
     updateHeader(); render();
@@ -947,64 +949,70 @@
     return found.item.showOnHome !== false && found.item.afficherAccueil !== false;
   }
   function renderHome(){
-    const profileNotices = forActiveProfile(getNotifications()).filter(noticeVisibleOnHome);
-    const todayItems = profileNotices.filter(n=>n.time==='Aujourd’hui');
-    const digest = [...todayItems, ...profileNotices.filter(n=>n.time!=='Aujourd’hui')].slice(0,6);
     const who = isMemberProfile() ? profileFirstName().replace(/^./,c=>c.toUpperCase()) : familyGreetingName();
-    const greeting = isMemberProfile() ? `Bonjour ${who} 👋` : `Bonjour ${who} 👋`;
-    const digestRows = digest.length
-      ? digest.map(n=>homeDigestRow(n)).join('')
-      : `<div class="empty cute-empty"><b>🎉 Tout est réglé pour ${who} aujourd’hui</b><small>Rien d’urgent. Profite du moment.</small></div>`;
-    // V5.27 — Carte Repas du jour CONDITIONNELLE (s'affiche seulement si au moins un repas planifié)
-    const todayIdx = (new Date().getDay() + 6) % 7;
-    const meals = (data.weeklyMeals || []).filter(x=>!statusIsHidden(x));
-    const todayMidi = meals.find(m=>Number(m.day)===todayIdx && (m.slot||'soir')==='midi');
-    const todaySoir = meals.find(m=>Number(m.day)===todayIdx && (m.slot||'soir')==='soir');
-    let mealsCardHtml = '';
-    if(todayMidi || todaySoir){
-      const cell = (slot, meal)=>{
-        const ico = slot==='midi'?'🌞':'🌙';
-        const lbl = slot==='midi'?'Midi':'Soir';
-        if(meal){
-          return `<div class="home-meal-cell filled"><span class="ico">${ico}</span><span class="lbl">${lbl}</span><b>${escapeHtml(meal.title)}</b></div>`;
-        }
-        return `<button class="home-meal-cell empty" onclick="event.stopPropagation();SuperApp.openAddWeeklyMeal(${todayIdx},'${slot}')"><span class="ico">${ico}</span><span class="lbl">${lbl}</span><span class="plus">＋</span></button>`;
-      };
-      mealsCardHtml = `<article class="home-meals-card clickable-card" onclick="SuperApp.openModule('courses_repas','repas')">
-        <div class="home-meals-head"><b>🍽️ Aujourd'hui à table</b></div>
-        <div class="home-meals-grid">${cell('midi', todayMidi)}${cell('soir', todaySoir)}</div>
-      </article>`;
-    }
+    const greeting = `Bonjour ${who} 👋`;
 
-    // V5.27 — Indicateur courses CONDITIONNEL (uniquement si liste non vide)
-    const openShopping = (data.shopping || []).filter(x=>!statusIsHidden(x) && !statusIsDone(x));
-    let shoppingHintHtml = '';
-    if(openShopping.length){
-      shoppingHintHtml = `<article class="home-shopping-hint clickable-card" onclick="SuperApp.openModule('courses_repas','courses')">
-        <span class="ico">🛒</span>
-        <div><b>${openShopping.length} ${openShopping.length>1?'courses en attente':'course en attente'}</b><small>Toucher pour voir la liste</small></div>
-        <span class="chev">›</span>
-      </article>`;
-    }
+    // ── V5.48 — Récapitulatif transversal coloré (couleurs par app, Style A) ──
+    const tasksToday  = getMaisonTasks('today').length;
+    const coursesOpen = getShoppingItems('open').length;
+    const profileNotices = forActiveProfile(getNotifications()).filter(noticeVisibleOnHome);
+    const alertsCount = profileNotices.length;
+
+    const trunc = s => { s = String(s||'').trim(); return s.length>14 ? s.slice(0,13)+'…' : s; };
+    const relLabel = diff => diff===0 ? 'Auj.' : diff===1 ? 'Demain' : `J‑${diff}`;
+    // V5.48 — RDV & voyages : leur vraie date est dans startDate. On la lit en
+    // priorité, et on affiche l'élément même sans date valable (« À venir »).
+    const pickNext = arr => {
+      arr = arr || [];
+      let best=null, bestD=Infinity;
+      arr.forEach(x=>{ const d=x.startDate||x.date; if(!d) return; const diff=daysDiff(today,d); if(diff>=0 && diff<bestD){ bestD=diff; best={item:x,label:relLabel(diff)}; } });
+      if(best) return best;
+      if(arr.length) return {item:arr[0], label:'À venir'};
+      return null;
+    };
+
+    const rdvN = pickNext(getHealthAppointments('open'));
+    const rdvVal = rdvN ? rdvN.label : '—';
+
+    const schoolToday = getSchoolItems('today');
+    const schoolVal = schoolToday.length ? trunc(schoolToday[0].title || schoolToday[0].name || 'Oui') : '—';
+
+    const voyN = pickNext(getVoyageActivities('open'));
+    const voyageVal = voyN ? voyN.label : '—';
+    const voyageLbl = voyN ? trunc(voyN.item.title || voyN.item.name || 'Voyage') : 'Prochain voyage';
+
+    // Palettes verrouillées (douce / bord / cœur / profonde)
+    const PAL = {
+      maison:   {soft:'#E4F5EC', bd:'#CFEEDE', core:'#2FA66B', deep:'#1E7C4D'},
+      sante:    {soft:'#FCE7EE', bd:'#F7D2E0', core:'#E45C86', deep:'#BE3C66'},
+      courses:  {soft:'#FCEDDC', bd:'#F6DCC1', core:'#F08A3C', deep:'#C76717'},
+      education:{soft:'#E8EDFC', bd:'#D4DDF7', core:'#4C6FE0', deep:'#3350B4'},
+      voyage:   {soft:'#DFF2F8', bd:'#C7E9F1', core:'#149FC4', deep:'#0B7794'},
+      alertes:  {soft:'#FBF0D6', bd:'#F1E2B4', core:'#E2A52B', deep:'#B07F18'}
+    };
+    const tile = (emoji,val,label,onclick,pal,isTxt)=>`<button class="home-recap-tile" type="button" style="--soft:${pal.soft};--bd:${pal.bd};--core:${pal.core};--deep:${pal.deep}" onclick="${onclick}"><span class="hr-em">${emoji}</span><span class="hr-v${isTxt?' txt':''}">${escapeHtml(String(val))}</span><span class="hr-l">${escapeHtml(label)}</span></button>`;
+
+    const recap = `<div class="home-recap-title">Récapitulatif</div><div class="home-recap-grid">`
+      + tile('🏠', tasksToday, 'Tâches du jour', "SuperApp.openModule('maison')", PAL.maison, false)
+      + tile('🩺', rdvVal, 'Prochain RDV', "SuperApp.openModule('sante')", PAL.sante, true)
+      + tile('🛒', coursesOpen, 'Courses', "SuperApp.openModule('courses_repas')", PAL.courses, false)
+      + tile('📚', schoolVal, 'École du jour', "SuperApp.openModule('education')", PAL.education, true)
+      + tile('✈️', voyageVal, voyageLbl, "SuperApp.openSlvUniverse('voyage','voyage_activites')", PAL.voyage, true)
+      + tile('🔔', alertsCount, 'Alertes', "SuperApp.setView('notifications')", PAL.alertes, false)
+      + `</div>`;
 
     $('#view-home').innerHTML = `
       <article class="home-hero clickable-card" onclick="SuperApp.openProfilePicker()">
-        <div class="hero-copy"><span>SUPERAPP FAMILLE</span><h2>${greeting}</h2><p>${isMemberProfile()?'Voici ta journée. Touche pour changer de profil.':'Voici les informations importantes de votre foyer aujourd’hui.'}</p></div>
+        <div class="hero-copy"><span>SUPERAPP FAMILLE</span><h2>${greeting}</h2><p>${isMemberProfile()?'Voici ta journée. Touche pour changer de profil.':'Voici l’essentiel de votre foyer aujourd’hui.'}</p></div>
         <img src="${profileAvatar()}" alt="" onerror="this.style.display='none'" />
       </article>
       ${sbUserBarHtml()}
       <article class="card weather weather-premium clickable-card" onclick="SuperApp.openSettings('localisation')">
         <div class="sun" aria-label="Icône météo">${currentWeatherIcon()}</div><div><strong>${weatherTemperatureText()}</strong><br><small>${weatherMainLine()}</small></div>
-        <div class="right"><b>${weatherCityLabel()}</b><br><small>${weatherSummary()}</small><br><small>${weatherUpdatedText()}</small></div>
+        <div class="right"><b>${weatherCityLabel()}</b><br><small>${weatherSummary()}</small><br><small>${displayDate(today).replace(/^./,c=>c.toUpperCase())}</small></div>
       </article>
-      ${mealsCardHtml}
-      ${shoppingHintHtml}
-      <div class="section-title"><h2>${isMemberProfile()?'Ma journée':'Aujourd’hui pour la famille'}</h2><span>${displayDate(today).replace(/^./,c=>c.toUpperCase())}</span></div>
-      <div class="digest-list">${digestRows}</div>
-      <div class="section-title"><h2>Mes apps</h2><button class="link-btn" onclick="SuperApp.setView('apps')">Voir tout</button></div>
-      <div class="app-grid visual-grid">
-        ${modules.filter(m=>m.id !== 'calendrier').map(moduleTileSmall).join('')}
-      </div>`;
+      ${recap}
+      <div class="home-add-cta"><button type="button" class="btn primary" onclick="SuperApp.openQuickActions()">＋ Ajouter</button></div>`;
   }
   function moduleImage(m,variant='tile'){
     return `<div class="app-icon-large ${variant}" aria-hidden="true"><span>${m.icon}</span></div>`;
@@ -1035,6 +1043,12 @@
     id = canonicalModuleId(id);
     if(!ensureActiveAccess(id)) return;
     if(id==='calendrier'){ state.appsView=null; setView('calendar'); return; }
+    if(id==='maison'){ if(!state.moduleViews) state.moduleViews = {}; state.moduleViews[id] = 'hub'; }
+    if(id==='courses_repas'){ if(!state.moduleViews) state.moduleViews = {}; state.moduleViews[id] = 'hub'; }
+    if(id==='sante'){ if(!state.moduleViews) state.moduleViews = {}; state.moduleViews[id] = 'hub'; }
+    if(id==='education'){ if(!state.moduleViews) state.moduleViews = {}; state.moduleViews[id] = 'hub'; }
+    if(id==='sport_loisirs'){ if(!state.moduleViews) state.moduleViews = {}; state.moduleViews[id] = 'hub'; }
+    if(id==='familles'){ if(!state.moduleViews) state.moduleViews = {}; state.moduleViews[id] = 'hub'; }
     state.appsView = {kind:'module', id, focus:focusKey};
     setView('apps');          // render() -> restoreAppsView() -> paintModule()
   }
@@ -1117,6 +1131,7 @@
       repas:{title:'Repas', emoji:'🍽️', collection:'weeklyMeals', type:'repas_semaine', category:'Repas', help:'Repas du jour en vedette et menu de la semaine.', special:'mealsView'},
       courses:{title:'Courses', emoji:'🛒', collection:'shopping', type:'course', category:'Alimentation', help:'Liste de courses cochable, ajout manuel.'},
       stock:{title:'Stock', emoji:'🧺', collection:'stock', type:'stock', category:'Stock', help:'Frigo, congélateur, placards.', special:'stockView'},
+      documents:{title:'Tickets & documents', emoji:'🧾', collection:'coursesDocs', type:'document_courses', category:'Tickets de caisse', help:'Tickets de caisse et documents liés aux courses (Supabase).'},
       // alias rétrocompatibles (anciens raccourcis du calendrier, notifications, etc.)
       menu_semaine:{title:'Repas', emoji:'🍽️', collection:'weeklyMeals', type:'repas_semaine', category:'Repas', help:'Voir les repas.', special:'mealsView', aliasOf:'repas'},
       menu_jour:{title:'Repas', emoji:'🍽️', collection:'weeklyMeals', type:'repas_semaine', category:'Repas', help:'Voir les repas.', special:'mealsView', aliasOf:'repas'},
@@ -1446,7 +1461,11 @@
     if(String(x.type||'').startsWith('checklist_')) return checklistManagementRow(x,cfg);
     if((cfg?.module === 'maison' || x.module === 'maison' || cfg?.collection === 'tasks') && !String(x.type||'').startsWith('checklist_')) return maisonTaskRow(x,cfg);
     if((cfg?.collection === 'shopping') || x.type === 'course') return shoppingRow(x,cfg);
-    if(['sport_activites','loisir_activites','voyage_activites'].includes(cfg?.key) || ['activite','loisir','voyage'].includes(itemType(x))) return slvActivityCard(x);
+    if(!String(x.type||'').startsWith('checklist_')
+       && !/materiel|gear/i.test(String(x.type||'')+String(cfg?.collection||''))
+       && ( (['sport_activites','loisir_activites','voyage_activites','tout'].includes(cfg?.key) && canonicalModuleId(cfg?.module||x.module)==='sport_loisirs')
+            || ['activite','loisir','voyage','sport','loisirs','sortie'].includes(itemType(x)) ))
+      return slvActivityCard(x);
     if(cfg?.module === 'education' || x.module === 'education') return schoolItemCard(x,cfg);
     return commonInfoRow(x,cfg);
   }
@@ -1864,13 +1883,32 @@
   
   function openQuickActions(){
     state.returnList = null;
-    $('#quickActions').innerHTML = [
-      ['maison','🏠','Ajouter une tâche'],['courses_repas','🛒','Ajouter une course'],['calendrier','📅','Ajouter un événement'],['education','📘','Ajouter un devoir'],['sante','💊','Ajouter une information santé'],['sport_loisirs','⚽','Ajouter sport, loisir ou voyage'],['familles','👨‍👩‍👧‍👦','Ajouter document famille']
-    ].map(([id,icon,label])=>`<button class="quick-action" type="button" onclick="SuperApp.openEdit('${id}')"><span>${icon}</span>${label}</button>`).join('');
+    const items=[
+      ['🏠','Tâche',"SuperApp.openEdit('maison')"],
+      ['🛒','Course',"SuperApp.openEdit('courses_repas')"],
+      ['🩺','Rendez-vous',"SuperApp.openAdd('sante','rendez_vous_medical','Rendez-vous')"],
+      ['📅','Événement',"SuperApp.openEdit('calendrier')"],
+      ['👤','Membre',"this.closest('dialog')?.close();SuperApp.openSettingsMember('')"],
+      ['📁','Document',"SuperApp.openEdit('familles')"]
+    ];
+    $('#quickActions').innerHTML = items.map(([icon,label,act])=>`<button class="quick-action" type="button" onclick="${act}"><span>${icon}</span>${label}</button>`).join('');
+    $('#actionDialog').showModal();
+  }
+  // V5.49 — Le ＋ Ajouter du hub Santé doit demander quoi ajouter (sinon il créait
+  // un traitement par défaut, jamais un vrai rendez-vous).
+  function openSanteAdd(){
+    const items=[
+      ['📅','Rendez-vous',"SuperApp.openAdd('sante','rendez_vous_medical','Rendez-vous')"],
+      ['💊','Traitement',"SuperApp.openAdd('sante','medicament','Traitements')"],
+      ['📄','Document',"SuperApp.openAdd('sante','document_sante','Documents santé')"]
+    ];
+    $('#quickActions').innerHTML = items.map(([icon,label,act])=>`<button class="quick-action" type="button" onclick="${act}"><span>${icon}</span>${label}</button>`).join('');
     $('#actionDialog').showModal();
   }
   function openEdit(type, id=''){
     type = canonicalModuleId(type);
+    // V5.41.2 — Le dialogue prend la couleur de l'app active (Maison vert, Courses mandarine, …)
+    try { const _ed = $('#editDialog'); if(_ed){ if(['maison','courses_repas','education','sante','sport_loisirs','familles'].includes(type)) _ed.dataset.app = type; else _ed.removeAttribute('data-app'); } } catch {}
     try { $('#actionDialog').close(); } catch {}
     // Restaurer les boutons Annuler/Enregistrer (peuvent avoir été cachés par openResetConfirmDialog)
     resetDialogActions({submit:true, submitLabel:'Enregistrer', cancelLabel:'Annuler'});
@@ -1898,6 +1936,7 @@
   }
   function openMember(memberId){
     const member = data.family.find(m=>m.id===memberId); if(!member) return;
+    try { $('#editDialog').dataset.app = 'familles'; } catch {}
     $('#editTitle').textContent = `Dossier — ${member.name}`;
     $('#editForm').dataset.type = 'settings';
     $('#editForm').dataset.id = '';
@@ -2489,7 +2528,7 @@
     clean.foyer = {...clean.foyer, city:'', postalCode:'', country:'', weatherCity:'', latitude:null, longitude:null};
     clean.weather = {city:'', temperature:null, wind:null, summary:'Météo à configurer', updatedAt:''};
     clean.family = [];
-    ['tasks','shopping','meals','weeklyMeals','stock','homework','schoolDocs','health','vaccines','healthDocs','emergency','sports','sportGear','familyDocuments','documents','calendarEvents','notifications'].forEach(k=>{ clean[k]=[]; });
+    ['tasks','shopping','meals','weeklyMeals','stock','homework','schoolDocs','health','vaccines','healthDocs','emergency','sports','sportGear','familyDocuments','coursesDocs','documents','calendarEvents','notifications'].forEach(k=>{ clean[k]=[]; });
     return clean;
   }
   function resetConfirmContent(mode='reset'){
@@ -3668,7 +3707,7 @@
     return ({maison:'Maison', education:'Éducation', sante:'Santé', sport_loisirs:'Sport / Loisir / Voyage', familles:'Familles'}[canonicalModuleId(module)] || moduleLabel(module));
   }
   function supportsSupabaseDocs(module){
-    return ['education','sante','sport_loisirs','familles'].includes(canonicalModuleId(module));
+    return ['education','sante','sport_loisirs','familles','courses_repas'].includes(canonicalModuleId(module));
   }
   function healthDocsFieldHtml(item={}, module='sante'){
     module = canonicalModuleId(module);
@@ -3703,14 +3742,19 @@
     const moduleValue = canonicalModuleId(item.module || (type === 'calendrier' ? 'calendrier' : type));
     const isEditing = !!(item && item.id);
 
+    // V5.50 — Santé : formulaires dédiés (RV / Traitement / Document), sans collapse ni menu « Où ça se range ».
+    const isApptForm = (type === 'sante') && isAppointment(item);
+    const isDocForm = /^document/.test(String(item.type || ''));
+    const isTreatmentForm = (type === 'sante') && !isApptForm && !isDocForm;
+
     // 1. TITRE — toujours en premier, focus automatique, avec exemple adapté au module
     const titleField = `<div class="form-field form-field-title"><label>Quoi ?</label><input name="title" required placeholder="${escapeAttr(exampleTitlePlaceholder(type, item))}" value="${escapeAttr(item.title||item.meal||'')}" autofocus></div>`;
 
-    // 2. DATE
-    const dateField = dateFieldHtml(item);
+    // 2. DATE — le traitement utilise la Période (début/fin), pas une date unique
+    const dateField = isTreatmentForm ? '' : dateFieldHtml(item);
 
-    // 3. HEURE
-    const hourField = `<div class="form-field"><label>Heure (facultatif)</label><input name="time" type="time" value="${escapeAttr(item.time||'')}"></div>`;
+    // 3. HEURE — pas d'heure unique pour un traitement (gérée par les prises) ni pour un document
+    const hourField = (isTreatmentForm || isDocForm) ? '' : `<div class="form-field"><label>Heure (facultatif)</label><input name="time" type="time" value="${escapeAttr(item.time||'')}"></div>`;
 
     // 4. POUR QUI (membre)
     const memberField = `<div class="form-field"><label>Pour qui ?</label><select name="member">${memberOptions(item.member || activeProfile() || 'family')}</select></div>`;
@@ -3718,8 +3762,16 @@
     // 5+6. CATÉGORIE + SOUS-CATÉGORIE (lit data.categories — V5.6)
     const categoryField = buildCategoryFieldsHtml(moduleValue, item);
 
-    // 7. DÉTAILS SPÉCIFIQUES (repliés sous "Plus de détails")
-    const moduleDetails = moduleDetailsHtml(type, item);
+    // 7. DÉTAILS SPÉCIFIQUES — V5.50 : Santé sans « ＋ Plus de détails ».
+    let moduleDetails;
+    if(isApptForm){
+      moduleDetails = `<div class="form-field"><label>Médecin / spécialiste (facultatif)</label><input name="doctor" value="${escapeAttr(item.doctor||'')}" placeholder="Dr Dupont…"></div>`
+        + `<div class="form-field"><label>Lieu du rendez-vous (facultatif)</label><input name="place" value="${escapeAttr(item.place||'')}" placeholder="Cabinet, Hôpital…"></div>`;
+    } else if(isDocForm){
+      moduleDetails = '';
+    } else {
+      moduleDetails = moduleDetailsHtml(type, item);
+    }
 
     // Le module/type cachés (le routage est déterminé par le bouton sur lequel on a cliqué)
     const hiddenRouting = hiddenRoutingHtml(type, moduleValue, item) + hiddenParentHtml(item);
@@ -3845,7 +3897,7 @@
         </section>` : '';
       inside = `
         <div class="form-grid-2"><div class="form-field"><label>Date de début</label><input name="startDate" type="date" value="${escapeAttr(dmyToISO(item.startDate||item.date)||'')}"></div><div class="form-field"><label>Date de fin</label><input name="endDate" type="date" value="${escapeAttr(dmyToISO(item.endDate)||'')}"></div></div>
-        ${!_isAppt?`<div class="form-field"><label>Résumé fréquence</label><input name="frequency" value="${escapeAttr(item.frequency||'3 prises par jour')}" placeholder="Ex : 3 prises par jour, tous les 2 jours..."></div><div class="form-field"><label>Posologie (facultatif)</label><input name="dosage" value="${escapeAttr(item.dosage||'')}" placeholder="Ex : 1 comprimé..."></div>${treatmentPlanner}`:''}
+        ${!_isAppt?`${treatmentPlanner}<div class="form-field"><label>Posologie (facultatif)</label><input name="dosage" value="${escapeAttr(item.dosage||'')}" placeholder="Ex : 1 comprimé..."></div>`:''}
         <div class="form-field"><label>${_isAppt?'Médecin / spécialiste':'Médecin prescripteur'} (facultatif)</label><input name="doctor" value="${escapeAttr(item.doctor||item.place||'')}" placeholder="Dr Dupont..."></div>
         ${_isAppt?`<div class="form-field"><label>Lieu du rendez-vous</label><input name="place" value="${escapeAttr(item.place||'')}" placeholder="Cabinet, Hôpital..."></div>`:''}
         <div class="form-field"><label>Accompagnant (facultatif)</label><select name="companion"><option value="">Aucun</option>${(data.family||[]).filter(mb=>!statusIsHidden(mb)).map(mb=>`<option value="${escapeAttr(mb.id)}" ${item.companion===mb.id?'selected':''}>${escapeHtml(mb.name)}</option>`).join('')}</select></div>`;
@@ -3930,6 +3982,8 @@
         </section>`;
     }
     if(!inside) return extraAfterDetails;
+    // V5.50 — Santé : détails affichés directement (pas de « ＋ Plus de détails »).
+    if(type === 'sante') return `${inside}${extraAfterDetails}`;
     return `<details class="form-collapse"><summary>＋ Plus de détails</summary>${inside}</details>${extraAfterDetails}`;
   }
 
@@ -4116,12 +4170,19 @@
       cats = m==='sport_loisirs' ? slvCategoryPack(item) : categoriesForModule(m);
     }
     const catNames = Object.keys(cats);
-    const currentCat = item.category && catNames.includes(item.category) ? item.category : catNames[0];
+    let currentCat = item.category && catNames.includes(item.category) ? item.category : catNames[0];
+    // V5.50 — Santé : la catégorie (RV / Traitements / Documents) est fixée par le type choisi
+    // en amont → plus de menu « Où ça se range ? ». On garde la sous-catégorie utile
+    // (Généraliste/Dentiste… pour un RV, Ordonnance/Mutuelle… pour un doc), pas pour un traitement.
+    const isSante = (m === 'sante');
+    const santeCat = !isSante ? '' : (isAppointment(item) ? 'Rendez-vous' : (/^document/.test(String(item.type||'')) ? 'Documents santé' : 'Traitements'));
+    if(isSante && santeCat) currentCat = santeCat;
+    const isSanteTreatment = isSante && santeCat === 'Traitements';
     // On masque le menu "sous-catégorie" simple quand :
     //  - c'est une ACTIVITÉ SLV (la liste multi-lignes la remplace), ou
-    //  - c'est un OBJET de checklist dont le voyage parent définit déjà les sous-catégories
-    //    (la catégorie EST alors la sous-catégorie/bucket).
-    const hideSubField = isSlvActivityType || (isSlvChecklistItem && parentSubs.length > 0);
+    //  - c'est un OBJET de checklist dont le voyage parent définit déjà les sous-catégories, ou
+    //  - c'est un TRAITEMENT santé (sous-type redondant avec l'organisation des prises).
+    const hideSubField = isSlvActivityType || (isSlvChecklistItem && parentSubs.length > 0) || isSanteTreatment;
     const catLabel = (isSlvChecklistItem && parentSubs.length) ? 'Sous-catégorie' : (isSlvActivityType ? 'Catégorie' : 'Où ça se range ?');
     const subOptions = formSubcategoryOptions(m, currentCat, item);
     const subSelected = item.subcategory || '';
@@ -4130,6 +4191,12 @@
     const subSelect = subOptions.length
       ? `<select name="subcategory" id="fieldSubcategory" onchange="SuperApp.handleSubcategoryChange(this)"><option value="">— Aucune —</option>${subOptions.map(s=>`<option ${subSelected===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}<option value="__create__" data-create>＋ Créer une sous-catégorie…</option></select>`
       : `<input name="subcategory" id="fieldSubcategory" placeholder="Sous-catégorie (optionnelle)" value="${escapeAttr(subSelected)}"><button type="button" class="link-btn inline-create" onclick="SuperApp.openCreateSubcategoryDialog()">＋ Créer une sous-catégorie</button>`;
+    // Santé : catégorie en champ caché (fixée par le type), pas de menu « Où ça se range ? ».
+    if(isSante){
+      const subLabel = santeCat==='Rendez-vous' ? 'Type de rendez-vous (facultatif)' : 'Type de document (facultatif)';
+      return `<input type="hidden" name="category" id="fieldCategory" value="${escapeAttr(santeCat)}">`
+        + (isSanteTreatment ? '' : `<div class="form-field"><label>${subLabel}</label>${subSelect}</div>`);
+    }
     return `<div class="form-field"><label>${catLabel}</label>${catSelect}</div>
       ${hideSubField ? '' : `<div class="form-field"><label>Sous-catégorie (facultatif)</label>${subSelect}</div>`}`;
   }
@@ -4300,6 +4367,12 @@
       item.endDate = item.endDate || item.startDate;
       if(!item.doseStatuses) item.doseStatuses = (state.editing?.item?.doseStatuses) || {};
     }
+    // V5.48 — Les RDV santé et les activités/voyages rangent leur date réelle dans
+    // startDate (pas de champ `date` dans leur formulaire). On la recopie dans `date`
+    // pour que l'accueil ET le calendrier lisent la vraie date au lieu d'« aujourd'hui ».
+    if((isAppointment(item) || targetModule==='sport_loisirs') && item.startDate && !item.date){
+      item.date = item.startDate;
+    }
     const _scbs=document.querySelectorAll('[name="students_cb"]:checked');
     if(_scbs.length){
       const _sv=[..._scbs].map(c=>c.value).filter(v=>v&&v!=='family');
@@ -4359,6 +4432,39 @@
     if(!state.moduleBlocks) state.moduleBlocks = {};
     if(!state.memberFilters) state.memberFilters = {};
     if(!state.maisonPeriodFilters) state.maisonPeriodFilters = {};
+    if(!state.moduleViews) state.moduleViews = {};
+  }
+  function maisonScreenMode(){ ensureV53State(); return state.moduleViews.maison || 'hub'; }
+  function openMaisonList(period){
+    ensureV53State();
+    state.moduleViews.maison = 'list';
+    state.maisonPeriodFilters.maison = period || 'all';
+    state.moduleBlocks.maison = 'taches';
+    state.appsView = {kind:'module', id:'maison'};
+    setView('apps');
+  }
+  function openMaisonHub(){
+    ensureV53State();
+    state.moduleViews.maison = 'hub';
+    state.appsView = {kind:'module', id:'maison'};
+    setView('apps');
+  }
+  // V5.42 — Helpers génériques hub/liste, réutilisables pour chaque app personnalisée
+  function appViewMode(module){ ensureV53State(); return state.moduleViews[canonicalModuleId(module)] || 'hub'; }
+  function openAppList(module, block){ ensureV53State(); module=canonicalModuleId(module); state.moduleViews[module]='list'; state.moduleBlocks[module]=block||defaultBlockForModule(module); state.appsView={kind:'module', id:module}; setView('apps'); }
+  function openAppHub(module){ ensureV53State(); module=canonicalModuleId(module); state.moduleViews[module]='hub'; state.appsView={kind:'module', id:module}; setView('apps'); }
+  function openEducationChild(childId){ ensureV53State(); state.moduleViews.education='list'; state.moduleBlocks.education='ecole'; state.memberFilters.education = childId || 'all'; state.appsView={kind:'module', id:'education'}; setView('apps'); }
+  function openSlvUniverse(tab, block){ ensureV53State(); state.slvTab=tab; state.moduleViews.sport_loisirs='list'; state.moduleBlocks.sport_loisirs=block; state.appsView={kind:'module', id:'sport_loisirs'}; setView('apps'); }
+  // V5.41 — Report d'une tâche en 1 tap (Demain / Ce week-end / Un autre jour)
+  function rescheduleTask(id, when){
+    const found = findRecord(id); if(!found){ return; }
+    if(when === 'autre'){ openEdit('maison', id); return; }
+    let d = new Date();
+    if(when === 'demain'){ d = addDays(new Date(), 1); }
+    else if(when === 'weekend'){ const day = new Date().getDay(); let add = (6 - day + 7) % 7; if(add === 0) add = 7; d = addDays(new Date(), add); }
+    found.item.date = `${pad2(d.getDate())}-${pad2(d.getMonth()+1)}-${d.getFullYear()}`;
+    touchSync(found.item); save(); render();
+    toast('↪ Tâche reportée');
   }
   function activeModuleBlock(module){ ensureV53State(); return state.moduleBlocks[canonicalModuleId(module)] || defaultBlockForModule(module); }
   function activeMemberFilter(module){ ensureV53State(); return state.memberFilters[canonicalModuleId(module)] || 'all'; }
@@ -4370,7 +4476,7 @@
     ensureV53State(); module = canonicalModuleId(module); state.memberFilters[module] = memberId || 'all'; state.appsView = {kind:'module', id:module}; setView('apps');
   }
   function setMaisonPeriodFilter(period){
-    ensureV53State(); state.maisonPeriodFilters.maison = period || 'all'; if(period && period !== 'all') state.moduleBlocks['maison'] = 'taches'; state.appsView = {kind:'module', id:'maison'}; setView('apps');
+    ensureV53State(); state.maisonPeriodFilters.maison = period || 'all'; state.moduleViews.maison = 'list'; if(period && period !== 'all') state.moduleBlocks['maison'] = 'taches'; state.appsView = {kind:'module', id:'maison'}; setView('apps');
   }
   function toggleMaisonFilters(){
     ensureV53State(); state.maisonFiltersExpanded = !state.maisonFiltersExpanded; state.appsView = {kind:'module', id:'maison'}; setView('apps');
@@ -4653,27 +4759,332 @@
       ${docsPanelInline}
     </section>`;
   }
+  // V5.41 — Hub Maison « personnalité » : vert, héros, bloc signature « Tâche du jour », report.
+  function maisonSignatureBlock(t){
+    if(!t){
+      return `<div class="mh-sig empty"><div class="mh-sig-tag">🌟 Ta tâche du jour</div><p class="mh-sig-empty">Rien d'urgent aujourd'hui. Profite ! 🌿</p></div>`;
+    }
+    const title = t.title || t.titre || t.nom || 'Tâche';
+    const cat = t.category || t.categorie || 'Maison';
+    return `<div class="mh-sig">
+      <div class="mh-sig-tag">🌟 Ta tâche du jour</div>
+      <div class="mh-sig-task">
+        <button class="mh-ck ${statusIsDone(t)?'done':''}" onclick="event.stopPropagation();SuperApp.markDone('${t.id}')" aria-label="Terminer la tâche"></button>
+        <div class="mh-sig-body" onclick="SuperApp.openEdit('maison','${t.id}')"><b>${escapeHtml(title)}</b><small>${escapeHtml(cat)}</small></div>
+      </div>
+      <div class="mh-report">
+        <button onclick="SuperApp.rescheduleTask('${t.id}','demain')">↪ Demain</button>
+        <button onclick="SuperApp.rescheduleTask('${t.id}','weekend')">Ce week-end</button>
+        <button onclick="SuperApp.rescheduleTask('${t.id}','autre')">Un autre jour…</button>
+      </div>
+    </div>`;
+  }
+  function maisonHubScreen(){
+    const open = getMaisonTasks('open');
+    const activeN = open.length;
+    const todayN = getMaisonTasks('today').length;
+    const lateN = getMaisonTasks('late').length;
+    const sig = getMaisonTasks('today')[0] || open[0] || null;
+    const heroSrc = appHeroSrc('maison');
+    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
+      <section class="maison-hub">
+        <div class="mh-hero" style="background-image:url('${heroSrc}')">
+          <span class="mh-badge">Maison</span>
+          <div class="mh-hero-c"><h2>Maison</h2><small>Le foyer tourne, l'esprit léger 🌿</small></div>
+        </div>
+        <div class="mh-recap">
+          <h3>Récapitulatif</h3>
+          <p class="mh-sub">Touche un chiffre pour voir la liste.</p>
+          <div class="mh-grid">
+            <button class="mh-pill" onclick="SuperApp.openMaisonList('all')"><span class="em">🧹</span><b>${activeN}</b><small>Actives</small></button>
+            <button class="mh-pill" onclick="SuperApp.openMaisonList('today')"><span class="em">📅</span><b>${todayN}</b><small>Aujourd'hui</small></button>
+            <button class="mh-pill" onclick="SuperApp.openMaisonList('late')"><span class="em">⏰</span><b>${lateN}</b><small>En retard</small></button>
+          </div>
+        </div>
+        ${maisonSignatureBlock(sig)}
+        <div class="mh-add"><button onclick="SuperApp.openAdd('maison')">＋ Ajouter une tâche</button></div>
+      </section>`;
+  }
+  // V5.42 — Hub Courses & repas « personnalité » : mandarine, héros, bloc « Repas du jour », tickets de caisse.
+  function coursesSignatureBlock(){
+    const todayIdx = (new Date().getDay()+6)%7;
+    const meals = (data.weeklyMeals||[]).filter(x=>!statusIsHidden(x));
+    const midi = meals.find(m=>Number(m.day)===todayIdx && (m.slot||'soir')==='midi');
+    const soir = meals.find(m=>Number(m.day)===todayIdx && (m.slot||'soir')==='soir');
+    const cell=(slot,meal)=>{
+      const ico = slot==='midi'?'🌞':'🌙'; const lbl = slot==='midi'?'Midi':'Soir';
+      if(meal) return `<div class="ch-meal filled"><span class="ico">${ico}</span><span class="lbl">${lbl}</span><b>${escapeHtml(meal.title||'')}</b></div>`;
+      return `<button class="ch-meal empty" onclick="SuperApp.openAddWeeklyMeal(${todayIdx},'${slot}')"><span class="ico">${ico}</span><span class="lbl">${lbl}</span><span class="plus">＋ planifier</span></button>`;
+    };
+    return `<div class="ch-sig">
+      <div class="ch-sig-tag">🍽️ Repas du jour</div>
+      <div class="ch-sig-grid">${cell('midi',midi)}${cell('soir',soir)}</div>
+    </div>`;
+  }
+  function coursesHubScreen(){
+    const menusN = getMenus().length;
+    const coursesN = getShoppingItems('open').length;
+    const stockN = getStockItems('low').length;
+    const heroSrc = appHeroSrc('courses_repas');
+    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
+      <section class="courses-hub">
+        <div class="ch-hero" style="background-image:url('${heroSrc}')">
+          <span class="ch-badge">Courses & repas</span>
+          <div class="ch-hero-c"><h2>Courses & repas</h2><small>Les repas et le panier, sans prise de tête 🍊</small></div>
+        </div>
+        <div class="ch-recap">
+          <h3>Récapitulatif</h3>
+          <p class="ch-sub">Touche un chiffre pour voir la liste.</p>
+          <div class="ch-grid">
+            <button class="ch-pill" onclick="SuperApp.openAppList('courses_repas','repas')"><span class="em">🍽️</span><b>${menusN}</b><small>Repas</small></button>
+            <button class="ch-pill" onclick="SuperApp.openAppList('courses_repas','courses')"><span class="em">🛒</span><b>${coursesN}</b><small>Courses</small></button>
+            <button class="ch-pill" onclick="SuperApp.openAppList('courses_repas','stock')"><span class="em">⚠️</span><b>${stockN}</b><small>Stock faible</small></button>
+          </div>
+        </div>
+        ${coursesSignatureBlock()}
+        <button class="ch-docs" onclick="SuperApp.openAppList('courses_repas','documents')"><span>🧾 Tickets de caisse</span><span class="chev">›</span></button>
+        <div class="ch-add"><button onclick="SuperApp.openAdd('courses_repas')">＋ Ajouter une course</button></div>
+      </section>`;
+  }
+  // V5.43 — Hub Santé « personnalité » : framboise, héros, bloc « À prendre aujourd'hui ».
+  function santeSignatureBlock(){
+    const todays = getHealthTreatments('today');
+    const apptToday = getHealthAppointments('open').filter(a=>{ const d=a.date||a.startDate; return d && daysDiff(today,d)===0; });
+    if(!todays.length && !apptToday.length){
+      return `<div class="sh-sig empty"><div class="sh-sig-tag">📅 Aujourd'hui</div><p class="sh-sig-empty">Rien de prévu aujourd'hui 🌸</p></div>`;
+    }
+    const labels={matin:'Matin',midi:'Midi',soir:'Soir',coucher:'Coucher'};
+    const doseRows = todays.slice(0,3).map(t=>{
+      const moments=String(t.doseMoments||'').split(',').map(s=>s.trim()).filter(Boolean).map(m=>labels[m]||m);
+      const who = t.member && t.member!=='family' ? memberName(t.member) : '';
+      const sub = [who, moments.join(' · ')].filter(Boolean).join(' — ');
+      return `<div class="sh-dose"><button class="sh-ck ${statusIsDone(t)?'done':''}" onclick="SuperApp.markDone('${t.id}')" aria-label="Marquer pris"></button><div class="sh-dose-body" onclick="SuperApp.openEdit('sante','${t.id}')"><b>${escapeHtml(t.title||'Traitement')}</b>${sub?`<small>${escapeHtml(sub)}</small>`:''}</div></div>`;
+    }).join('');
+    const rdvRows = apptToday.slice(0,2).map(a=>{
+      const who = a.member && a.member!=='family' ? memberName(a.member) : '';
+      const meta = [a.time, a.place, who].filter(Boolean).join(' · ');
+      return `<div class="sh-dose"><span class="sh-rdv-ic">🩺</span><div class="sh-dose-body" onclick="SuperApp.openEdit('sante','${a.id}')"><b>${escapeHtml(a.title||'Rendez-vous')}</b>${meta?`<small>${escapeHtml(meta)}</small>`:''}</div></div>`;
+    }).join('');
+    return `<div class="sh-sig"><div class="sh-sig-tag">📅 Aujourd'hui</div><div class="sh-dose-list">${doseRows}${rdvRows}</div></div>`;
+  }
+  function santeHubScreen(){
+    const traitN = getHealthTreatments('open').length;
+    const rdvN = getHealthAppointments('open').length;
+    const docN = getHealthBookItems().length;
+    const heroSrc = appHeroSrc('sante');
+    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
+      <section class="sante-hub">
+        <div class="sh-hero" style="background-image:url('${heroSrc}')">
+          <span class="sh-badge">Santé</span>
+          <div class="sh-hero-c"><h2>Santé</h2><small>Le carnet de santé du foyer, au clair 🌸</small></div>
+        </div>
+        <div class="sh-recap">
+          <h3>Récapitulatif</h3>
+          <p class="sh-sub">Touche un chiffre pour voir la liste.</p>
+          <div class="sh-grid">
+            <button class="sh-pill" onclick="SuperApp.openAppList('sante','traitements')"><span class="em">💊</span><b>${traitN}</b><small>Traitements</small></button>
+            <button class="sh-pill" onclick="SuperApp.openAppList('sante','rendez_vous')"><span class="em">🩺</span><b>${rdvN}</b><small>Rendez-vous</small></button>
+            <button class="sh-pill" onclick="SuperApp.openAppList('sante','documents')"><span class="em">📄</span><b>${docN}</b><small>Documents</small></button>
+          </div>
+        </div>
+        ${santeSignatureBlock()}
+        <button class="sh-docs" onclick="SuperApp.openAppList('sante','alertes')"><span>🚨 Urgences & alertes</span><span class="chev">›</span></button>
+        <div class="sh-add"><button onclick="SuperApp.openSanteAdd()">＋ Ajouter</button></div>
+      </section>`;
+  }
+  // V5.44 — Hub Éducation « personnalité » : bleu encre, héros, bloc « Vue par enfant ».
+  function educationSignatureBlock(){
+    const items = getSchoolItems('open');
+    const all = (data.family||[]).filter(m=>!statusIsHidden(m));
+    const children = all.filter(m=>m.role==='Enfant');
+    const list = children.length ? children : all;
+    if(!list.length){
+      return `<div class="eh-sig empty"><div class="eh-sig-tag">👧 Vue par enfant</div><p class="eh-sig-empty">Ajoute des membres pour suivre l'école enfant par enfant.</p></div>`;
+    }
+    const rows = list.map(m=>{
+      const n = items.filter(x=>getItemMemberId(x)===m.id).length;
+      return `<button class="eh-child" onclick="SuperApp.openEducationChild('${m.id}')">
+        <img src="${memberAvatarSrc(m)}" alt="" onerror="this.style.visibility='hidden'">
+        <span class="eh-child-name">${escapeHtml(firstMemberName(m.name))}</span>
+        <span class="eh-child-count ${n?'has':''}">${n}</span></button>`;
+    }).join('');
+    return `<div class="eh-sig"><div class="eh-sig-tag">👧 Vue par enfant</div><div class="eh-child-list">${rows}</div></div>`;
+  }
+  function educationHubScreen(){
+    const ecoleN = getSchoolItems('open').length;
+    const notesN = visibleItems('homework').filter(x=>!statusIsDone(x) && (x.type==='note' || x.category==='Notes')).length;
+    const docN = visibleItems('schoolDocs').length;
+    const heroSrc = appHeroSrc('education');
+    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
+      <section class="education-hub">
+        <div class="eh-hero" style="background-image:url('${heroSrc}')">
+          <span class="eh-badge">Éducation</span>
+          <div class="eh-hero-c"><h2>Éducation</h2><small>L'école de chaque enfant, suivie sans stress 📘</small></div>
+        </div>
+        <div class="eh-recap">
+          <h3>Récapitulatif</h3>
+          <p class="eh-sub">Touche un chiffre pour voir la liste.</p>
+          <div class="eh-grid">
+            <button class="eh-pill" onclick="SuperApp.openAppList('education','ecole')"><span class="em">📚</span><b>${ecoleN}</b><small>École</small></button>
+            <button class="eh-pill" onclick="SuperApp.openAppList('education','ecole_notes')"><span class="em">⭐</span><b>${notesN}</b><small>Notes</small></button>
+            <button class="eh-pill" onclick="SuperApp.openAppList('education','documents')"><span class="em">📄</span><b>${docN}</b><small>Documents</small></button>
+          </div>
+        </div>
+        ${educationSignatureBlock()}
+        <div class="eh-add"><button onclick="SuperApp.openAdd('education')">＋ Ajouter un devoir</button></div>
+      </section>`;
+  }
+  // V5.45 — Hub Sport/Loisir/Voyage « personnalité » : turquoise, héros, bloc « Prochaine activité ».
+  function slvNextActivity(){
+    const all=[...getSportActivities('open'),...getLoisirActivities('open'),...getVoyageActivities('open')];
+    const dated=all.map(x=>({x, d:x.startDate||x.date})).filter(o=>o.d && daysDiff(today,o.d)>=0).sort((a,b)=>daysDiff(today,a.d)-daysDiff(today,b.d));
+    return dated[0]?.x || null;
+  }
+  function slvSignatureBlock(){
+    const next = slvNextActivity();
+    if(!next){
+      return `<div class="sp-sig empty"><div class="sp-sig-tag">🔜 Prochaine activité</div><p class="sp-sig-empty">Aucune activité à venir. Ajoutes-en une ! 🏖️</p></div>`;
+    }
+    const d = next.startDate||next.date;
+    const dd = daysDiff(today, d);
+    const countdown = dd===0 ? "Aujourd'hui" : (dd===1 ? 'Demain' : `J‑${dd}`);
+    const cfg = slvConfigFor(slvTabForActivity(next));
+    return `<div class="sp-sig" onclick="SuperApp.openSlvActivityDetail('${next.id}')">
+      <div class="sp-sig-tag">${cfg.emoji} Prochaine activité</div>
+      <div class="sp-sig-row">
+        <div class="sp-sig-body"><b>${escapeHtml(next.title||'Activité')}</b><small>${escapeHtml(shortDate(d))}${next.location?' · 📍 '+escapeHtml(next.location):''}</small></div>
+        <span class="sp-countdown">${countdown}</span>
+      </div>
+    </div>`;
+  }
+  function sportHubScreen(){
+    const sportN=getSportActivities('open').length, loisirN=getLoisirActivities('open').length, voyageN=getVoyageActivities('open').length;
+    const heroSrc=appHeroSrc('sport_loisirs');
+    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
+      <section class="sport-hub">
+        <div class="sp-hero" style="background-image:url('${heroSrc}')">
+          <span class="sp-badge">Sport · Loisir · Voyage</span>
+          <div class="sp-hero-c"><h2>Sport & Loisir</h2><small>Activités et voyages, tout le monde prêt 🌊</small></div>
+        </div>
+        <div class="sp-recap">
+          <h3>Récapitulatif</h3>
+          <p class="sp-sub">Touche un univers pour voir la liste.</p>
+          <div class="sp-grid">
+            <button class="sp-pill" onclick="SuperApp.openSlvUniverse('sport','sport_activites')"><span class="em">⚽</span><b>${sportN}</b><small>Sport</small></button>
+            <button class="sp-pill" onclick="SuperApp.openSlvUniverse('loisir','loisir_activites')"><span class="em">🎨</span><b>${loisirN}</b><small>Loisir</small></button>
+            <button class="sp-pill" onclick="SuperApp.openSlvUniverse('voyage','voyage_activites')"><span class="em">✈️</span><b>${voyageN}</b><small>Voyage</small></button>
+          </div>
+        </div>
+        ${slvSignatureBlock()}
+        <div class="sp-add"><button onclick="SuperApp.openAdd('sport_loisirs')">＋ Ajouter une activité</button></div>
+      </section>`;
+  }
+  // V5.46 — Hub Famille « personnalité » : violet, héros, boutons membres → fiche, bloc « Prochain anniversaire ».
+  function nextBirthday(){
+    const members=(data.family||[]).filter(m=>!statusIsHidden(m) && m.birth);
+    const now=new Date(); now.setHours(0,0,0,0);
+    let best=null;
+    members.forEach(m=>{
+      const d=parseDMY(m.birth); if(!d) return;
+      let next=new Date(now.getFullYear(), d.getMonth(), d.getDate());
+      if(next < now) next=new Date(now.getFullYear()+1, d.getMonth(), d.getDate());
+      const days=Math.round((next-now)/86400000);
+      const turning=next.getFullYear()-d.getFullYear();
+      if(!best || days<best.days) best={m, next, days, turning};
+    });
+    return best;
+  }
+  function familleSignatureBlock(){
+    const b=nextBirthday();
+    if(!b){
+      return `<div class="fh-sig empty"><div class="fh-sig-tag">🎂 Prochain anniversaire</div><p class="fh-sig-empty">Ajoute les dates de naissance pour suivre les anniversaires 🎂</p></div>`;
+    }
+    const cd = b.days===0 ? "Aujourd'hui 🎉" : (b.days===1 ? 'Demain' : `J‑${b.days}`);
+    const dateLabel = b.next.toLocaleDateString('fr-FR',{day:'2-digit',month:'long'});
+    return `<div class="fh-sig" onclick="SuperApp.openMember('${b.m.id}')">
+      <div class="fh-sig-tag">🎂 Prochain anniversaire</div>
+      <div class="fh-sig-row">
+        <img src="${memberAvatarSrc(b.m)}" alt="" onerror="this.style.visibility='hidden'">
+        <div class="fh-sig-body"><b>${escapeHtml(firstMemberName(b.m.name))}</b><small>${escapeHtml(dateLabel)} · ${b.turning} ans</small></div>
+        <span class="fh-countdown">${cd}</span>
+      </div>
+    </div>`;
+  }
+  function familleHubScreen(){
+    const members=(data.family||[]).filter(m=>!statusIsHidden(m));
+    const docN=visibleItems('familyDocuments').length;
+    const heroSrc=appHeroSrc('familles');
+    const memberBtns = members.length
+      ? members.map(m=>`<button class="fh-member" onclick="SuperApp.openMember('${m.id}')"><img src="${memberAvatarSrc(m)}" alt="" onerror="this.style.visibility='hidden'"><span>${escapeHtml(firstMemberName(m.name))}</span></button>`).join('')
+      : `<p class="fh-empty">Aucun membre pour le moment.</p>`;
+    return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
+      <section class="famille-hub">
+        <div class="fh-hero" style="background-image:url('${heroSrc}')">
+          <span class="fh-badge">Famille</span>
+          <div class="fh-hero-c"><h2>Famille</h2><small>Tout le foyer réuni 💜</small></div>
+        </div>
+        <div class="fh-recap">
+          <h3>Les membres</h3>
+          <p class="fh-sub">Touche un membre pour ouvrir sa fiche.</p>
+          <div class="fh-members">${memberBtns}</div>
+        </div>
+        ${familleSignatureBlock()}
+        <button class="fh-docs" onclick="SuperApp.openAppList('familles','documents')"><span>📁 Documents importants ${docN?`· ${docN}`:''}</span><span class="chev">›</span></button>
+        <div class="fh-add"><button onclick="SuperApp.openSettingsMember('')">＋ Ajouter un membre</button></div>
+      </section>`;
+  }
   function paintModule(id, focusKey=''){
     const m=moduleById(canonicalModuleId(id)); if(!m) return;
     ensureV53State(); state.activeModule = m.id;
     const view = $('#view-apps');
+    if(view) view.dataset.app = m.id; // V5.41.2 — scope la couleur de l'app à tout son écran
     // V5.24 — Chaque page module a 3 paliers de couleur (strong / soft / medium) propres à l'app
     const tone = m.cls || ''; // module-home, module-food, module-edu, etc.
     if(m.id==='sante'){
-      view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
-        ${appHeroBlock(m.id)}
-        <section class="palette-soft ${tone}"><div class="v53-recap-head"><b>Récap rapide</b><small>Vue rapide des éléments importants du module.</small></div><div class="v53-summary-grid">${moduleSummary(m.id)}</div></section>
-        <section class="palette-strong ${tone}">${healthQuickActions()}</section>
-        <section class="palette-soft ${tone}">${healthEmergencyBlock()}</section>
-        <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
+      if(appViewMode('sante') === 'list'){
+        const emergency = activeModuleBlock('sante') === 'alertes' ? `<section class="palette-soft ${tone}">${healthEmergencyBlock()}</section>` : '';
+        view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openAppHub('sante')">← Santé</button></div>
+          ${emergency}
+          <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
+      } else {
+        view.innerHTML = santeHubScreen();
+      }
     } else if(m.id === 'maison'){
-      view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
-        ${appHeroBlock(m.id)}
-        <section class="palette-soft ${tone}"><div class="v53-recap-head"><b>Récap rapide</b><small>Vue rapide des éléments importants du module.</small></div><div class="v53-summary-grid">${moduleSummary(m.id)}</div></section>
-        <section class="palette-strong ${tone}">${primaryActionsForModule(m.id)}</section>
+      if(maisonScreenMode() === 'list'){
+        view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openMaisonHub()">← Maison</button></div>
         <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
+      } else {
+        view.innerHTML = maisonHubScreen();
+      }
+    } else if(m.id === 'courses_repas'){
+      if(appViewMode('courses_repas') === 'list'){
+        view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openAppHub('courses_repas')">← Courses & repas</button></div>
+        <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
+      } else {
+        view.innerHTML = coursesHubScreen();
+      }
+    } else if(m.id === 'education'){
+      if(appViewMode('education') === 'list'){
+        view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openAppHub('education')">← Éducation</button></div>
+        <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
+      } else {
+        view.innerHTML = educationHubScreen();
+      }
+    } else if(m.id === 'sport_loisirs'){
+      if(appViewMode('sport_loisirs') === 'list'){
+        view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openAppHub('sport_loisirs')">← Sport · Loisir · Voyage</button></div>
+        <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
+      } else {
+        view.innerHTML = sportHubScreen();
+      }
+    } else if(m.id === 'familles'){
+      if(appViewMode('familles') === 'list'){
+        view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openAppHub('familles')">← Famille</button></div>
+        <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
+      } else {
+        view.innerHTML = familleHubScreen();
+      }
     } else {
-      const familyJump = m.id==='familles' ? familyMemberJumpStrip(getFamilyMembers()) : '';
       view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.renderAppsHome()">← Retour aux apps</button></div>
         ${appHeroBlock(m.id)}
         <section class="palette-soft ${tone}"><div class="v53-recap-head"><b>Récap rapide</b><small>Vue rapide des éléments importants du module.</small></div><div class="v53-summary-grid">${moduleSummary(m.id)}</div></section>
@@ -5209,13 +5620,14 @@
     _findRecord: findRecord, toast,
     setView, openModule, openItem, openCalendarDate, openCalendarModule, setCalendarFilter, setNotificationFilter,
     renderAppsHome:()=>{ state.appsView=null; setView('apps'); }, render:()=>render(),
-    setActiveProfile, openProfilePicker, closeProfileSheet, requestNotify,
+    setActiveProfile, openProfilePicker, closeProfileSheet, requestNotify, openQuickActions, openSanteAdd,
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
     openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, setSlvSubFilter, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, deleteReferenceList, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
     setListCatFilter, setListSubFilter, setGenericChecklistFilter, scrollToMember,
+    openMaisonList, openMaisonHub, rescheduleTask, openAppList, openAppHub, openEducationChild, openSlvUniverse,
     handleCategoryChange, handleSubcategoryChange,
     openCreateCategoryDialog, openCreateSubcategoryDialog, confirmCreateCategory,
     openStyleFamillePanel, selectAvatarChoice,
