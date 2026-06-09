@@ -3038,3 +3038,8 @@ body[data-view="home"] #view-home .home-apps-grid{flex:1;min-height:0;grid-templ
 .settings-head-plain .shp-eyebrow{display:block;font-family:'Baloo 2',ui-rounded,system-ui,sans-serif;font-weight:800;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:#c96a1c}
 .settings-head-plain h2{font-family:'Baloo 2',ui-rounded,system-ui,sans-serif;font-weight:800;font-size:1.5rem;margin:4px 0 3px;color:var(--ink)}
 .settings-head-plain p{color:var(--muted);font-weight:600;font-size:.86rem}
+
+/* V5.55 — État « fait » barré et cohérent dans TOUTES les listes/cartes.
+   (Ne s'applique qu'aux éléments .done : tâches, courses, checklists, RDV, traitements, école…) */
+.done .health-info-main b,
+.done .hrc-body > b{ text-decoration:line-through; opacity:.72; }

@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.54.0';
+  const APP_VERSION = '5.55.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -2868,6 +2868,8 @@
   }
   function visibleItems(collection){ return (data[collection] || []).filter(x=>!statusIsHidden(x)); }
   function openItems(collection){ return visibleItems(collection).filter(x=>!statusIsDone(x)); }
+  // V5.55 — Les éléments « faits » restent visibles (barrés) mais descendent en bas de liste. Tri stable.
+  function sortDoneLast(arr){ return (arr||[]).map((x,i)=>[x,i]).sort((a,b)=>((statusIsDone(a[0])?1:0)-(statusIsDone(b[0])?1:0))||(a[1]-b[1])).map(p=>p[0]); }
   function itemType(x){ return normalizeText(x?.type || x?.category || ''); }
   function itemCategory(x){ return normalizeText(x?.category || x?.title || x?.type || ''); }
   function matchesWords(x, words){ const blob = normalizeText(`${x?.title||''} ${x?.category||''} ${x?.type||''} ${x?.notes||''}`); return words.some(w=>blob.includes(normalizeText(w))); }
@@ -3215,9 +3217,9 @@
   function setSlvTab(tab){ state.slvTab=tab; render(); }
   function slvConfigFor(tab){
     const cfgs={
-      sport:{collection:'sports', checklistCollection:'sportGear', acts:getSportActivities('open'), actKey:'sport_activites', type:'activite', checklistType:'materiel_sport', checklistCategory:'Matériel sport', emoji:'⚽', gearEmoji:'🎽', label:'Sport', tone:'sport tone-sport-1', tone2:'sport tone-sport-2', cta:'Ajouter une activité sportive'},
-      loisir:{collection:'loisirs', checklistCollection:'loisirGear', acts:getLoisirActivities('open'), actKey:'loisir_activites', type:'loisir', checklistType:'materiel_loisir', checklistCategory:'Matériel loisir', emoji:'🎨', gearEmoji:'🎡', label:'Loisir', tone:'loisir tone-loisir-1', tone2:'loisir tone-loisir-2', cta:'Ajouter un loisir'},
-      voyage:{collection:'voyages', checklistCollection:'voyageGear', acts:getVoyageActivities('open'), actKey:'voyage_activites', type:'voyage', checklistType:'materiel_voyage', checklistCategory:'Bagages', emoji:'✈️', gearEmoji:'🧳', label:'Voyage', tone:'voyage tone-voyage-1', tone2:'voyage tone-voyage-2', cta:'Ajouter un voyage'},
+      sport:{collection:'sports', checklistCollection:'sportGear', acts:getSportActivities('open'), actsAll:sortDoneLast(getSportActivities('all')), actKey:'sport_activites', type:'activite', checklistType:'materiel_sport', checklistCategory:'Matériel sport', emoji:'⚽', gearEmoji:'🎽', label:'Sport', tone:'sport tone-sport-1', tone2:'sport tone-sport-2', cta:'Ajouter une activité sportive'},
+      loisir:{collection:'loisirs', checklistCollection:'loisirGear', acts:getLoisirActivities('open'), actsAll:sortDoneLast(getLoisirActivities('all')), actKey:'loisir_activites', type:'loisir', checklistType:'materiel_loisir', checklistCategory:'Matériel loisir', emoji:'🎨', gearEmoji:'🎡', label:'Loisir', tone:'loisir tone-loisir-1', tone2:'loisir tone-loisir-2', cta:'Ajouter un loisir'},
+      voyage:{collection:'voyages', checklistCollection:'voyageGear', acts:getVoyageActivities('open'), actsAll:sortDoneLast(getVoyageActivities('all')), actKey:'voyage_activites', type:'voyage', checklistType:'materiel_voyage', checklistCategory:'Bagages', emoji:'✈️', gearEmoji:'🧳', label:'Voyage', tone:'voyage tone-voyage-1', tone2:'voyage tone-voyage-2', cta:'Ajouter un voyage'},
     };
     return cfgs[tab]||cfgs.sport;
   }
@@ -3274,7 +3276,7 @@
     const all=[...sport.acts,...loisir.acts,...voyage.acts];
     const remaining=all.reduce((sum,a)=>sum+slvChecklistRemaining(a),0);
     const section=(cfg)=>fusedBlock('sport_loisirs',cfg.actKey,cfg.label,cfg.emoji,cfg.tone,'Vue globale organisée',
-      `<div class="agenda-list">${cfg.acts.map(x=>slvActivityCard(x)).join('')||'<div class="empty">Aucun élément.</div>'}</div>`,
+      `<div class="agenda-list">${cfg.actsAll.map(x=>slvActivityCard(x)).join('')||'<div class="empty">Aucun élément.</div>'}</div>`,
       `<button class="link-btn" onclick="SuperApp.setSlvTab('${cfg.label.toLowerCase()==='loisir'?'loisir':cfg.label.toLowerCase()}')">Voir</button>`);
     return `${moduleKpis([[all.length,'activités','▦',''],[remaining,'objets restants','✅',''],[getSportActivities('today').length+getLoisirActivities('today').length+getVoyageActivities('today').length,'aujourd’hui','📅','']])}
       ${section(sport)}${section(loisir)}${section(voyage)}
@@ -3289,7 +3291,7 @@
       ])}
       ${moduleKpis([[cfg.acts.length,'activités',cfg.emoji,`SuperApp.openModuleList('sport_loisirs','${cfg.actKey}')`],[checklistTotal,'checklists à faire',cfg.gearEmoji,`SuperApp.setSlvTab('${tab}')`]])}
       ${fusedBlock('sport_loisirs',cfg.actKey,cfg.label+' — activités',cfg.emoji,cfg.tone,'Page complète '+cfg.label,
-        `<div class="agenda-list">${cfg.acts.map(x=>slvActivityCard(x)).join('')||'<div class="empty">Aucune activité. Ajoute une première fiche.</div>'}</div>`,
+        `<div class="agenda-list">${cfg.actsAll.map(x=>slvActivityCard(x)).join('')||'<div class="empty">Aucune activité. Ajoute une première fiche.</div>'}</div>`,
         `<button class="link-btn" onclick="SuperApp.openAdd('sport_loisirs','${cfg.type}','${cfg.label}')">+ Ajouter</button>`)}
 
     `;
@@ -4661,8 +4663,8 @@
     let arr = [];
     if(cfg.special === 'members') arr = getFamilyMembers();
     else if(module==='maison' || cfg.collection==='tasks'){
-      if(['taches_aujourdhui','taches_du_jour'].includes(key)) arr = getMaisonTasks('today');
-      else if(key==='taches_retard' || cfg.filterName==='late') arr = getMaisonTasks('late');
+      if(['taches_aujourdhui','taches_du_jour'].includes(key)) arr = visibleItems('tasks').filter(x=> x.date === today || (/quotidien|daily/i.test(x.recurrence||'')));
+      else if(key==='taches_retard' || cfg.filterName==='late') arr = visibleItems('tasks').filter(x=> x.date && daysDiff(today,x.date) < 0);
       else if(['taches_recurrentes','routines'].includes(key)) arr = getMaisonTasks('recurrent');
       else if(['taches_terminees'].includes(key)) arr = getMaisonTasks('done');
       else {
@@ -4674,8 +4676,8 @@
         else if(key === 'maison_tache') arr = tasks.filter(x=>!isEntretien(x) && !isRoutine(x));
         else arr = [...tasks, ...getGenericChecklistItems('maison')];
         const period = activeMaisonPeriodFilter();
-        if(period === 'today') arr = arr.filter(x=>!statusIsDone(x) && (x.date === today || (/quotidien|daily/i.test(x.recurrence||''))));
-        else if(period === 'late') arr = arr.filter(x=>!statusIsDone(x) && x.date && daysDiff(today,x.date) < 0);
+        if(period === 'today') arr = arr.filter(x=> x.date === today || (/quotidien|daily/i.test(x.recurrence||'')));
+        else if(period === 'late') arr = arr.filter(x=> x.date && daysDiff(today,x.date) < 0);
         else if(period === 'recurrent') arr = arr.filter(x=>matchesWords(x,['routine','récurrent','recurrent','quotidien','hebdo']));
       }
     } else if(module==='courses_repas'){
@@ -4684,26 +4686,26 @@
       else if(key==='stock_faible') arr = getStockItems('low');
       else if(cfg.collection==='stock') arr = getStockItems();
       else if(cfg.collection==='shopping') arr = getShoppingItems('all');
-      else arr = getShoppingItems('open');
+      else arr = getShoppingItems('all');
     } else if(module==='education'){
       arr = [...getSchoolItems('all'), ...getGenericChecklistItems('education')];
       if(cfg.filter) arr = arr.filter(cfg.filter);          // V5.6 : honorer le filtre (Notes…)
     } else if(module==='sante'){
-      if(key==='tous') arr = [...getHealthAppointments('open'), ...getHealthTreatments('open'), ...getHealthBookItems()];
-      else if(key==='rendez_vous') arr = getHealthAppointments('open');
+      if(key==='tous') arr = [...getHealthAppointments('all'), ...getHealthTreatments('all'), ...getHealthBookItems()];
+      else if(key==='rendez_vous') arr = getHealthAppointments('all');
       else if(key==='documents' || key==='carnet_sante' || (cfg.collections||[]).includes('vaccines')) arr = getHealthBookItems();
       else if(key==='alertes') arr = [...getHealthAppointments('open'), ...getHealthTreatments('today'), ...getHealthBookItems()].filter(x=>isHealthAlertItem(x));
-      else arr = getHealthTreatments('open');
+      else arr = getHealthTreatments('all');
     } else if(module==='sport_loisirs'){
-      if(key==='tout') arr=[...getSportActivities('open'),...getLoisirActivities('open'),...getVoyageActivities('open')];
+      if(key==='tout') arr=[...getSportActivities('all'),...getLoisirActivities('all'),...getVoyageActivities('all')];
       else {
       const _col=cfg.collection||'';
       if(_col==='loisirGear') arr=getLoisirGear();
       else if(_col==='voyageGear') arr=getVoyageGear();
       else if(_col==='sportGear') arr=getSportGear();
-      else if(_col==='loisirs') arr=getLoisirActivities('open');
-      else if(_col==='voyages') arr=getVoyageActivities('open');
-      else arr=getSportActivities('open');
+      else if(_col==='loisirs') arr=getLoisirActivities('all');
+      else if(_col==='voyages') arr=getVoyageActivities('all');
+      else arr=getSportActivities('all');
       }
     } else if(module==='familles'){
       if(key === 'tout') arr = [...getFamilyMembers().map(m=>({...m, _kind:'member'})), ...getFamilyDocuments()];
@@ -4713,7 +4715,7 @@
       arr = names.flatMap(name => (data[name] || []).map(x => ({...x, _sourceCollection:name}))).filter(x=>!statusIsHidden(x));
       if(cfg.filter) arr = arr.filter(cfg.filter);
     }
-    return applyMemberFilter(arr, module);
+    return sortDoneLast(applyMemberFilter(arr, module));
   }
   function moduleListTitle(module, block, cfg){
     const member = activeMemberFilter(module);
