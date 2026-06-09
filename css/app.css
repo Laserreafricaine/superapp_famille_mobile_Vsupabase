@@ -2982,3 +2982,27 @@ html.is-android .create-cat-dialog[open] form{
 body[data-view="home"] #fab{display:none}
 /* V5.50 — Bloc Santé « Aujourd'hui » : icône d'un RDV (pas de coche) */
 .sante-hub .sh-dose .sh-rdv-ic{width:24px;height:24px;border-radius:8px;background:#fce7ee;display:grid;place-items:center;font-size:.95rem;flex:none}
+
+/* ===== V5.52 — Zéro-scroll : Accueil + onglet Apps ===== */
+/* -- Accueil : héros photo FIN + date/météo + cloche -- */
+.home-hero.home-hero-slim{min-height:0;padding:13px 15px;margin:0;border-radius:22px;align-items:center}
+.home-hero.home-hero-slim .hero-copy{max-width:70%}
+.home-hero.home-hero-slim h2{font-size:20px;margin:5px 0 3px}
+.home-hero.home-hero-slim p{font-size:12px;opacity:.95}
+.home-hero-bell{position:absolute;top:10px;right:11px;z-index:3;width:34px;height:34px;border-radius:11px;border:0;background:rgba(255,255,255,.92);display:grid;place-items:center;font-size:.98rem;box-shadow:0 4px 10px rgba(0,0,0,.16)}
+
+/* -- Accueil : la vue remplit l'écran, bouton collé en bas, pas de scroll -- */
+body[data-view="home"] .topbar{display:none}
+body[data-view="home"] .mobile-frame{height:100dvh;min-height:0;overflow:hidden;padding:14px 18px calc(86px + env(safe-area-inset-bottom));display:flex;flex-direction:column}
+body[data-view="home"] #view-home{flex:1;min-height:0;display:flex;flex-direction:column;gap:11px}
+body[data-view="home"] #view-home .home-recap-grid{margin:0}
+body[data-view="home"] #view-home .home-add-cta{margin-top:auto}
+
+/* -- Onglet Apps (lanceur uniquement) : grille 2x3 qui remplit l'écran -- */
+body[data-view="apps"][data-apps-screen="launcher"] .mobile-frame{height:100dvh;min-height:0;overflow:hidden;padding:14px 18px calc(86px + env(safe-area-inset-bottom));display:flex;flex-direction:column}
+body[data-view="apps"][data-apps-screen="launcher"] .topbar{flex:none;margin-bottom:10px}
+body[data-view="apps"][data-apps-screen="launcher"] #view-apps{flex:1;min-height:0;display:flex}
+body[data-view="apps"][data-apps-screen="launcher"] .app-grid.large{flex:1;height:100%;grid-template-rows:repeat(3,1fr);margin:0;gap:11px}
+body[data-view="apps"][data-apps-screen="launcher"] .app-tile-v59.large{min-height:0;padding:8px 10px;gap:5px}
+body[data-view="apps"][data-apps-screen="launcher"] .app-tile-v59.large .app-tile-icon{width:56px;height:56px}
+body[data-view="apps"][data-apps-screen="launcher"] .app-tile-v59.large .app-logo{width:50px;height:50px}

@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.51.0';
+  const APP_VERSION = '5.52.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -871,7 +871,9 @@
     }
   }
   function restoreAppsView(){
-    const v = state.appsView; if(!v) return;            // null = grille des apps (déjà peinte)
+    const v = state.appsView;
+    try { document.body.dataset.appsScreen = v ? 'module' : 'launcher'; } catch {}
+    if(!v) return;            // null = grille des apps (déjà peinte)
     if(v.kind==='module') paintModule(v.id, v.focus||'');
     else if(v.kind==='list') paintModuleList(v.module, v.block);
     else if(v.kind==='budget') paintBudgetBoard();
@@ -992,7 +994,7 @@
     };
     const tile = (emoji,val,label,onclick,pal,isTxt)=>`<button class="home-recap-tile" type="button" style="--soft:${pal.soft};--bd:${pal.bd};--core:${pal.core};--deep:${pal.deep}" onclick="${onclick}"><span class="hr-em">${emoji}</span><span class="hr-v${isTxt?' txt':''}">${escapeHtml(String(val))}</span><span class="hr-l">${escapeHtml(label)}</span></button>`;
 
-    const recap = `<div class="home-recap-title">Récapitulatif</div><div class="home-recap-grid">`
+    const recap = `<div class="home-recap-grid">`
       + tile('🏠', tasksToday, 'Tâches du jour', "SuperApp.openModule('maison')", PAL.maison, false)
       + tile('🩺', rdvVal, 'Prochain RDV', "SuperApp.openModule('sante')", PAL.sante, true)
       + tile('🛒', coursesOpen, 'Courses', "SuperApp.openModule('courses_repas')", PAL.courses, false)
@@ -1001,15 +1003,12 @@
       + tile('🔔', alertsCount, 'Alertes', "SuperApp.setView('notifications')", PAL.alertes, false)
       + `</div>`;
 
+    const homeDateLine = displayDate(today).replace(/^./,c=>c.toUpperCase());
     $('#view-home').innerHTML = `
-      <article class="home-hero clickable-card" onclick="SuperApp.openProfilePicker()">
-        <div class="hero-copy"><span>SUPERAPP FAMILLE</span><h2>${greeting}</h2><p>${isMemberProfile()?'Voici ta journée. Touche pour changer de profil.':'Voici l’essentiel de votre foyer aujourd’hui.'}</p></div>
+      <article class="home-hero home-hero-slim clickable-card" onclick="SuperApp.openProfilePicker()">
+        <button class="home-hero-bell" type="button" onclick="event.stopPropagation();SuperApp.setView('notifications')" aria-label="Notifications">🔔</button>
+        <div class="hero-copy"><span>SUPERAPP FAMILLE</span><h2>${greeting}</h2><p>${homeDateLine} · ${currentWeatherIcon()} ${weatherTemperatureText()}</p></div>
         <img src="${profileAvatar()}" alt="" onerror="this.style.display='none'" />
-      </article>
-      ${sbUserBarHtml()}
-      <article class="card weather weather-premium clickable-card" onclick="SuperApp.openSettings('localisation')">
-        <div class="sun" aria-label="Icône météo">${currentWeatherIcon()}</div><div><strong>${weatherTemperatureText()}</strong><br><small>${weatherMainLine()}</small></div>
-        <div class="right"><b>${weatherCityLabel()}</b><br><small>${weatherSummary()}</small><br><small>${displayDate(today).replace(/^./,c=>c.toUpperCase())}</small></div>
       </article>
       ${recap}
       <div class="home-add-cta"><button type="button" class="btn primary" onclick="SuperApp.openQuickActions()">＋ Ajouter</button></div>`;
