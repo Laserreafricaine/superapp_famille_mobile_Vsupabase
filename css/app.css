@@ -3043,3 +3043,10 @@ body[data-view="home"] #view-home .home-apps-grid{flex:1;min-height:0;grid-templ
    (Ne s'applique qu'aux éléments .done : tâches, courses, checklists, RDV, traitements, école…) */
 .done .health-info-main b,
 .done .hrc-body > b{ text-decoration:line-through; opacity:.72; }
+
+/* V5.56 — Cases « fait » sur cartes riches (RDV / traitement) + tâche du jour barrée */
+.health-rich-card .rich-check{flex:none;width:36px;height:36px;border-radius:12px;font-size:17px;display:grid;place-items:center}
+.health-rich-card .rich-check.checked{background:var(--accent,#2f8452);color:#fff;border-color:transparent}
+.treatment-card-expanded .rich-check{align-self:center}
+.mh-sig.done .mh-sig-body b{text-decoration:line-through;opacity:.72}
+.treatment-done-note{color:#2f8452;font-weight:800;background:#e9f7ef;border-radius:14px;padding:11px 12px;text-align:center}

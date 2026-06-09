@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.55.0';
+  const APP_VERSION = '5.56.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -1435,8 +1435,10 @@
     const freq=treatmentFrequencyLabel(x);
     const dr=x.startDate?`${shortDate(x.startDate)}${x.endDate?' → '+shortDate(x.endDate):''}`:(x.date?shortDate(x.date):'');
     const dos=x.dosage||'';
-    return `<article class="health-rich-card treatment-card treatment-card-expanded">
+    const done=statusIsDone(x);
+    return `<article class="health-rich-card treatment-card treatment-card-expanded ${done?'done':''}">
       <div class="treatment-card-top">
+        <button type="button" class="shopping-check rich-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')" aria-label="${done?'Traitement terminé (réactiver)':'Marquer le traitement comme terminé'}">${done?'✓':''}</button>
         <div class="hrc-avatar"><img src="${av}" alt=""><span class="hrc-member-name">${mn}</span></div>
         <div class="hrc-body" onclick="SuperApp.openItem('${x.id}')">
           <div class="hrc-top"><span class="hrc-icon">💊</span><b>${escapeHtml(x.title||'Traitement')}</b></div>
@@ -1448,7 +1450,7 @@
           </div>
         </div>
       </div>
-      <div class="treatment-doses"><div class="treatment-dose-title"><b>Prises du jour</b><small>${escapeHtml(today)}</small></div>${healthTreatmentDoseRows(x)}</div>
+      ${done?'<div class="treatment-doses treatment-done-note">✓ Traitement terminé</div>':`<div class="treatment-doses"><div class="treatment-dose-title"><b>Prises du jour</b><small>${escapeHtml(today)}</small></div>${healthTreatmentDoseRows(x)}</div>`}
     </article>`;
   }
   function healthRdvCard(x){
@@ -1458,6 +1460,7 @@
     const mn=mb?escapeHtml(shortMemberName(mb.name)):'Famille';
     const cp=x.companion?(data.family||[]).find(m=>m.id===x.companion):null;
     return `<article class="health-rich-card rdv-card ${done?'done':''}">
+      <button type="button" class="shopping-check rich-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')" aria-label="${done?'Rendez-vous fait (remettre à venir)':'Marquer le rendez-vous comme fait'}">${done?'✓':''}</button>
       <div class="hrc-avatar"><img src="${av}" alt=""><span class="hrc-member-name">${mn}</span></div>
       <div class="hrc-body" onclick="SuperApp.openItem('${x.id}')">
         <div class="hrc-top"><span class="hrc-icon">🧠</span><b>${escapeHtml(x.title||'Rendez-vous')}</b></div>
@@ -4816,16 +4819,18 @@
     }
     const title = t.title || t.titre || t.nom || 'Tâche';
     const cat = t.category || t.categorie || 'Maison';
-    return `<div class="mh-sig">
-      <div class="mh-sig-tag">🌟 Ta tâche du jour</div>
+    const done = statusIsDone(t);
+    return `<div class="mh-sig ${done?'done':''}">
+      <div class="mh-sig-tag">${done?'✓ Fait, bravo !':'🌟 Ta tâche du jour'}</div>
       <div class="mh-sig-task">
-        <button class="mh-ck ${statusIsDone(t)?'done':''}" onclick="event.stopPropagation();SuperApp.markDone('${t.id}')" aria-label="Terminer la tâche"></button>
+        <button class="mh-ck ${done?'done':''}" onclick="event.stopPropagation();SuperApp.markDone('${t.id}')" aria-label="${done?'Remettre à faire':'Terminer la tâche'}"></button>
         <div class="mh-sig-body" onclick="SuperApp.openEdit('maison','${t.id}')"><b>${escapeHtml(title)}</b><small>${escapeHtml(cat)}</small></div>
       </div>
-      <div class="mh-report">
-        <button onclick="SuperApp.rescheduleTask('${t.id}','demain')">↪ Demain</button>
+      <div class="mh-report">${done
+        ? `<button onclick="event.stopPropagation();SuperApp.deleteItem('${t.id}')">🗑️ Retirer</button>`
+        : `<button onclick="SuperApp.rescheduleTask('${t.id}','demain')">↪ Demain</button>
         <button onclick="SuperApp.rescheduleTask('${t.id}','weekend')">Ce week-end</button>
-        <button onclick="SuperApp.rescheduleTask('${t.id}','autre')">Un autre jour…</button>
+        <button onclick="SuperApp.rescheduleTask('${t.id}','autre')">Un autre jour…</button>`}
       </div>
     </div>`;
   }
@@ -4834,7 +4839,11 @@
     const activeN = open.length;
     const todayN = getMaisonTasks('today').length;
     const lateN = getMaisonTasks('late').length;
-    const sig = getMaisonTasks('today')[0] || open[0] || null;
+    // V5.56 — Signature « collante » : on reste sur la tâche affichée (même cochée → barrée)
+    // jusqu'à ce qu'elle soit supprimée. Elle ne saute plus à la suivante dès qu'on coche.
+    let sig = state.maisonSigId ? (data.tasks||[]).find(t=>t.id===state.maisonSigId && !statusIsHidden(t)) : null;
+    if(!sig) sig = getMaisonTasks('today')[0] || open[0] || null;
+    state.maisonSigId = sig ? sig.id : null;
     const heroSrc = appHeroSrc('maison');
     return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.setView('home')">← Accueil</button></div>
       <section class="maison-hub">
