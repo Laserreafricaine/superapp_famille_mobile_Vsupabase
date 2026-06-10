@@ -2668,3 +2668,15 @@ dialog.create-cat-dialog.kbd-open[open] form{
 .compact-visibility .settings-notif-card b{font-size:.9rem}
 .compact-visibility .settings-notif-card small{font-size:.72rem;line-height:1.3}
 .compact-visibility .settings-notif-card em{font-size:.8rem}
+
+/* ===== V5.60 — 3 boutons par élément : Résumé / Checklist / Supprimer ===== */
+.row-acts-b{gap:7px}
+.row-acts-b .ra-btn{flex:1;justify-content:center;white-space:nowrap;padding:8px 8px;font-size:.76rem;gap:3px}
+.ra-btn.ra-resume{background:#eef2f7;color:#3a5170;border:1px solid #dde4ee}
+.ra-btn.ra-check{background:#e7f4ec;color:#2f8452;border:1px solid #cfe9da}
+.ra-btn.ra-del{background:#fdecec;color:#c0392b;border:1px solid #f3c9c9}
+/* hubs : barre des 3 boutons en 2e ligne pleine largeur */
+.mh-sig .row-acts-b,.sp-sig .row-acts-b{margin-top:11px;padding-top:10px;border-top:1px dashed rgba(20,40,60,.12)}
+.sh-dose{flex-wrap:wrap}
+.sh-dose .row-acts-b{flex-basis:100%;width:100%;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(20,40,60,.10)}
+@media (max-width:360px){.row-acts-b .ra-btn{font-size:.71rem;padding:8px 4px}}

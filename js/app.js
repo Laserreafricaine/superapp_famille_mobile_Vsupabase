@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.59.0';
+  const APP_VERSION = '5.60.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -2013,11 +2013,19 @@
     dlg.showModal();
   }
   // Deux boutons « Résumé / Modifier » communs à toutes les rangées de liste.
-  function rowActionsB(id, resumeAction){
-    const ra = resumeAction || `SuperApp.openItemSummary('${id}')`;
+  // Action « Checklist » selon le type d'élément :
+  // activités Sport/Loisir/Voyage → fiche détaillée (bagages/matériel) ; autres → checklist d'étapes.
+  function checklistActionFor(id){
+    const f = findRecord(id);
+    if(f && ['sports','loisirs','voyages'].includes(f.collection)) return `SuperApp.openSlvActivityDetail('${id}')`;
+    const kind = (f && canonicalModuleId(f.item.module) === 'education' && String(f.item.type||'') !== 'note') ? 'education' : 'maison';
+    return `SuperApp.openGenericChecklist('${id}','${kind}')`;
+  }
+  function rowActionsB(id){
     return `<div class="row-acts-b">`
-      + `<button type="button" class="ra-btn ra-resume" onclick="event.stopPropagation();${ra}">👁 Résumé</button>`
-      + `<button type="button" class="ra-btn ra-modif" onclick="event.stopPropagation();SuperApp.openItemEdit('${id}')">✏️ Modifier</button>`
+      + `<button type="button" class="ra-btn ra-resume" onclick="event.stopPropagation();SuperApp.openItemSummary('${id}')">👁 Résumé</button>`
+      + `<button type="button" class="ra-btn ra-check" onclick="event.stopPropagation();${checklistActionFor(id)}">✅ Checklist</button>`
+      + `<button type="button" class="ra-btn ra-del" onclick="event.stopPropagation();SuperApp.deleteItem('${id}')">🗑️ Supprimer</button>`
       + `</div>`;
   }
   // V5.58 — Assistance clavier : recentre le champ actif au-dessus du clavier
@@ -3210,7 +3218,7 @@
         <small>${escapeHtml(mems)}${escapeHtml(rec)}${loc}</small>
         ${dl?`<em>${escapeHtml(dl)}${total?` · ${remaining}/${total} checklist`:''}</em>`:''}</div>
       <button type="button" class="shopping-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')" aria-label="Marquer fait">${done?'✓':''}</button>
-      ${rowActionsB(x.id, "SuperApp.openSlvActivityDetail('"+x.id+"')")}
+      ${rowActionsB(x.id)}
     </article>`;
   }
   function slvChecklistRows(gear, activityId=''){
@@ -4707,6 +4715,7 @@
         <button onclick="SuperApp.rescheduleTask('${t.id}','weekend')">Ce week-end</button>
         <button onclick="SuperApp.rescheduleTask('${t.id}','autre')">Un autre jour…</button>`}
       </div>
+      ${rowActionsB(t.id)}
     </div>`;
   }
   function maisonHubScreen(){
@@ -4792,12 +4801,12 @@
       const moments=String(t.doseMoments||'').split(',').map(s=>s.trim()).filter(Boolean).map(m=>labels[m]||m);
       const who = t.member && t.member!=='family' ? memberName(t.member) : '';
       const sub = [who, moments.join(' · ')].filter(Boolean).join(' — ');
-      return `<div class="sh-dose"><button class="sh-ck ${statusIsDone(t)?'done':''}" onclick="SuperApp.markDone('${t.id}')" aria-label="Marquer pris"></button><div class="sh-dose-body" onclick="SuperApp.openItemSummary('${t.id}')"><b>${escapeHtml(t.title||'Traitement')}</b>${sub?`<small>${escapeHtml(sub)}</small>`:''}</div></div>`;
+      return `<div class="sh-dose"><button class="sh-ck ${statusIsDone(t)?'done':''}" onclick="SuperApp.markDone('${t.id}')" aria-label="Marquer pris"></button><div class="sh-dose-body" onclick="SuperApp.openItemSummary('${t.id}')"><b>${escapeHtml(t.title||'Traitement')}</b>${sub?`<small>${escapeHtml(sub)}</small>`:''}</div>${rowActionsB(t.id)}</div>`;
     }).join('');
     const rdvRows = apptToday.slice(0,2).map(a=>{
       const who = a.member && a.member!=='family' ? memberName(a.member) : '';
       const meta = [a.time, a.place, who].filter(Boolean).join(' · ');
-      return `<div class="sh-dose"><span class="sh-rdv-ic">🩺</span><div class="sh-dose-body" onclick="SuperApp.openItemSummary('${a.id}')"><b>${escapeHtml(a.title||'Rendez-vous')}</b>${meta?`<small>${escapeHtml(meta)}</small>`:''}</div></div>`;
+      return `<div class="sh-dose"><span class="sh-rdv-ic">🩺</span><div class="sh-dose-body" onclick="SuperApp.openItemSummary('${a.id}')"><b>${escapeHtml(a.title||'Rendez-vous')}</b>${meta?`<small>${escapeHtml(meta)}</small>`:''}</div>${rowActionsB(a.id)}</div>`;
     }).join('');
     return `<div class="sh-sig"><div class="sh-sig-tag">📅 Aujourd'hui</div><div class="sh-dose-list">${doseRows}${rdvRows}</div></div>`;
   }
@@ -4883,12 +4892,13 @@
     const dd = daysDiff(today, d);
     const countdown = dd===0 ? "Aujourd'hui" : (dd===1 ? 'Demain' : `J‑${dd}`);
     const cfg = slvConfigFor(slvTabForActivity(next));
-    return `<div class="sp-sig" onclick="SuperApp.openSlvActivityDetail('${next.id}')">
+    return `<div class="sp-sig">
       <div class="sp-sig-tag">${cfg.emoji} Prochaine activité</div>
       <div class="sp-sig-row">
         <div class="sp-sig-body"><b>${escapeHtml(next.title||'Activité')}</b><small>${escapeHtml(shortDate(d))}${next.location?' · 📍 '+escapeHtml(next.location):''}</small></div>
         <span class="sp-countdown">${countdown}</span>
       </div>
+      ${rowActionsB(next.id)}
     </div>`;
   }
   function sportHubScreen(){
