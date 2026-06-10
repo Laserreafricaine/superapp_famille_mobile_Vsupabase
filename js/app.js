@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.58.0';
+  const APP_VERSION = '5.59.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -1894,7 +1894,13 @@
   }
   function openAdd(module,type='',category='',title='',member=''){
     // V5.11 — Fusionner avec un preset existant (ex. day/slot posés par openAddWeeklyMeal)
-    state.preset = {...(state.preset || {}), type, category, title, member};
+    // V5.59 — Si aucun membre explicite, pré-remplir « Pour qui ? » avec le membre filtré.
+    let mem = member;
+    if(!mem){
+      const mf = activeMemberFilter(module);
+      if(mf && mf !== 'all' && mf !== 'family') mem = mf;
+    }
+    state.preset = {...(state.preset || {}), type, category, title, member: mem};
     openEdit(module);
   }
   function openMember(memberId){
@@ -4693,7 +4699,7 @@
       <div class="mh-sig-tag">${done?'✓ Fait, bravo !':'🌟 Ta tâche du jour'}</div>
       <div class="mh-sig-task">
         <button class="mh-ck ${done?'done':''}" onclick="event.stopPropagation();SuperApp.markDone('${t.id}')" aria-label="${done?'Remettre à faire':'Terminer la tâche'}"></button>
-        <div class="mh-sig-body" onclick="SuperApp.openEdit('maison','${t.id}')"><b>${escapeHtml(title)}</b><small>${escapeHtml(cat)}</small></div>
+        <div class="mh-sig-body" onclick="SuperApp.openItemSummary('${t.id}')"><b>${escapeHtml(title)}</b><small>${escapeHtml(cat)}</small></div>
       </div>
       <div class="mh-report">${done
         ? `<button onclick="event.stopPropagation();SuperApp.deleteItem('${t.id}')">🗑️ Retirer</button>`
@@ -4741,7 +4747,7 @@
     const soir = meals.find(m=>Number(m.day)===todayIdx && (m.slot||'soir')==='soir');
     const cell=(slot,meal)=>{
       const ico = slot==='midi'?'🌞':'🌙'; const lbl = slot==='midi'?'Midi':'Soir';
-      if(meal) return `<div class="ch-meal filled"><span class="ico">${ico}</span><span class="lbl">${lbl}</span><b>${escapeHtml(meal.title||'')}</b></div>`;
+      if(meal) return `<div class="ch-meal filled" onclick="SuperApp.openItemSummary('${meal.id}')" style="cursor:pointer"><span class="ico">${ico}</span><span class="lbl">${lbl}</span><b>${escapeHtml(meal.title||'')}</b></div>`;
       return `<button class="ch-meal empty" onclick="SuperApp.openAddWeeklyMeal(${todayIdx},'${slot}')"><span class="ico">${ico}</span><span class="lbl">${lbl}</span><span class="plus">＋ planifier</span></button>`;
     };
     return `<div class="ch-sig">
@@ -4786,12 +4792,12 @@
       const moments=String(t.doseMoments||'').split(',').map(s=>s.trim()).filter(Boolean).map(m=>labels[m]||m);
       const who = t.member && t.member!=='family' ? memberName(t.member) : '';
       const sub = [who, moments.join(' · ')].filter(Boolean).join(' — ');
-      return `<div class="sh-dose"><button class="sh-ck ${statusIsDone(t)?'done':''}" onclick="SuperApp.markDone('${t.id}')" aria-label="Marquer pris"></button><div class="sh-dose-body" onclick="SuperApp.openEdit('sante','${t.id}')"><b>${escapeHtml(t.title||'Traitement')}</b>${sub?`<small>${escapeHtml(sub)}</small>`:''}</div></div>`;
+      return `<div class="sh-dose"><button class="sh-ck ${statusIsDone(t)?'done':''}" onclick="SuperApp.markDone('${t.id}')" aria-label="Marquer pris"></button><div class="sh-dose-body" onclick="SuperApp.openItemSummary('${t.id}')"><b>${escapeHtml(t.title||'Traitement')}</b>${sub?`<small>${escapeHtml(sub)}</small>`:''}</div></div>`;
     }).join('');
     const rdvRows = apptToday.slice(0,2).map(a=>{
       const who = a.member && a.member!=='family' ? memberName(a.member) : '';
       const meta = [a.time, a.place, who].filter(Boolean).join(' · ');
-      return `<div class="sh-dose"><span class="sh-rdv-ic">🩺</span><div class="sh-dose-body" onclick="SuperApp.openEdit('sante','${a.id}')"><b>${escapeHtml(a.title||'Rendez-vous')}</b>${meta?`<small>${escapeHtml(meta)}</small>`:''}</div></div>`;
+      return `<div class="sh-dose"><span class="sh-rdv-ic">🩺</span><div class="sh-dose-body" onclick="SuperApp.openItemSummary('${a.id}')"><b>${escapeHtml(a.title||'Rendez-vous')}</b>${meta?`<small>${escapeHtml(meta)}</small>`:''}</div></div>`;
     }).join('');
     return `<div class="sh-sig"><div class="sh-sig-tag">📅 Aujourd'hui</div><div class="sh-dose-list">${doseRows}${rdvRows}</div></div>`;
   }

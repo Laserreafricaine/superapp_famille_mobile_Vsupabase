@@ -2589,8 +2589,29 @@ body[data-view="home"] #view-home .home-apps-grid{flex:1;min-height:0;grid-templ
 .ra-btn.ra-modif{background:var(--accent,#2FA66B);color:#fff}
 .ra-btn:active{transform:scale(.96)}
 /* la rangée reste lisible quand les deux boutons s'ajoutent */
-.maison-task-row .row-acts-b,.shopping-check-row .row-acts-b,.slv-activity-card .row-acts-b,.checklist-list-row .row-acts-b{margin-left:auto}
-.health-rich-card .row-acts-b{margin-left:auto;align-self:center}
+/* V5.59 — boutons Résumé/Modifier sur une 2e ligne, jamais hors cadre */
+.health-info-row .row-acts-b,
+.common-info-row .row-acts-b,
+.checklist-list-row .row-acts-b{
+  grid-column:1 / -1;
+  justify-content:flex-end;
+  margin:9px 0 0 0;
+  padding-top:9px;
+  border-top:1px dashed rgba(20,40,60,.10);
+}
+.school-card,.slv-activity-card,.health-rich-card.rdv-card{flex-wrap:wrap}
+.school-card .row-acts-b,
+.slv-activity-card .row-acts-b,
+.health-rich-card .row-acts-b{
+  flex-basis:100%;
+  width:100%;
+  justify-content:flex-end;
+  align-self:auto;
+  margin:9px 0 0 0;
+  padding-top:9px;
+  border-top:1px dashed rgba(20,40,60,.10);
+}
+
 @media (max-width:360px){.ra-btn{padding:8px 9px;font-size:.72rem}}
 
 /* ===== V5.58 — Feuille « Résumé » (lecture seule) ===== */
@@ -2630,3 +2651,20 @@ dialog.create-cat-dialog.kbd-open[open] form{
   max-height:calc(var(--kbd-vh,100dvh) - 12px)!important;
   overflow-y:auto!important;
 }
+
+
+/* V5.59 — Carte « Visibilité » : plus compacte + fond gris */
+.compact-visibility .visibility-title{font-size:.82rem;font-weight:800;color:#52617a;margin-bottom:6px}
+.compact-visibility .settings-notif-card{
+  grid-template-columns:auto 1fr auto;
+  gap:10px;
+  padding:9px 11px;
+  border-radius:13px;
+  background:#eef1f5;
+  border:1px solid #e1e6ee;
+  box-shadow:none;
+}
+.compact-visibility .settings-notif-card div span{font-size:17px}
+.compact-visibility .settings-notif-card b{font-size:.9rem}
+.compact-visibility .settings-notif-card small{font-size:.72rem;line-height:1.3}
+.compact-visibility .settings-notif-card em{font-size:.8rem}
