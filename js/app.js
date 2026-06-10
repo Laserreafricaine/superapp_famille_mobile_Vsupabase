@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.61.0';
+  const APP_VERSION = '5.62.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -72,7 +72,7 @@
     appsRegistry: makeAppsRegistry(),
     family: [],
     categories: {
-      maison: { 'Ménage':['Sols','Linge','Cuisine'], 'Entretien':['Plomberie','Électricité','Jardin'], 'Administratif':['Assurance','Factures','Documents'] },
+      maison: { 'Ménage':['Sols','Linge','Cuisine'], 'Entretien':['Plomberie','Électricité','Jardin'], 'Suivi Paiement Factures':['Eau','Électricité','Internet','Loyer','Assurance','Autre'] },
       courses_repas: { 'Alimentation':['Riz','Pâtes','Huile'], 'Épicerie sénégalaise':['Riz brisé','Bouillon','Bissap'], 'Stock':['Frigo','Congélateur','Placard'] },
       education: { 'Devoirs':['Maths','Français','Histoire'], 'Contrôles':['Contrôle','Exposé'], 'Notes':['Bulletin','Appréciation','Examen blanc'], 'Activités scolaires':['Sortie','Réunion','Voyage'], 'Documents école':['Autorisation','Assurance scolaire'] },
       sante: { 'Rendez-vous':['Généraliste','Dentiste','Ophtalmo'], 'Traitements':['Journalier','Hebdomadaire'], 'Documents santé':['Ordonnance','Mutuelle','Certificat'] },
@@ -3643,18 +3643,18 @@
     return ({maison:'Maison', education:'Éducation', sante:'Santé', sport_loisirs:'Sport / Loisir / Voyage', familles:'Familles'}[canonicalModuleId(module)] || moduleLabel(module));
   }
   function supportsSupabaseDocs(module){
-    return ['education','sante','sport_loisirs','familles','courses_repas'].includes(canonicalModuleId(module));
+    return ['sante','sport_loisirs','familles','courses_repas'].includes(canonicalModuleId(module));
   }
-  function healthDocsFieldHtml(item={}, module='sante'){
+  function healthDocsFieldHtml(item={}, module='sante', ctxLabel=''){
     module = canonicalModuleId(module);
-    const label = documentModuleLabel(module);
+    const title = ctxLabel || '📎 Documents attachés';
     const id = item && item.id ? String(item.id) : '';
     if(!id){
-      return `<section class="sb-health-doc-zone locked"><div class="sb-doc-test-intro"><b>📎 Documents attachés</b></div></section>`;
+      return `<section class="sb-health-doc-zone locked"><div class="sb-doc-test-intro"><b>${title}</b></div><small class="sb-doc-locked-note">Enregistre d'abord la fiche, puis tu pourras joindre le document.</small></section>`;
     }
     const safeId = escapeAttr(id);
     const safeModule = escapeAttr(module);
-    return `<section class="sb-health-doc-zone" data-sb-health-docs="${safeId}" data-sb-doc-module="${safeModule}"><div class="sb-doc-test-intro"><b>📎 Documents attachés</b></div><input id="sb-health-doc-input-${safeId}" type="file" hidden onchange="window.sbUploadHealthItemDocument?.(this,'${safeId}','${safeModule}')"><button type="button" class="btn primary sb-doc-test-upload" onclick="document.getElementById('sb-health-doc-input-${safeId}')?.click()">📤 Charger un document</button><div class="sb-health-doc-status info">Chargement des documents…</div><div class="sb-health-doc-list"><div class="empty">Chargement…</div></div></section>`;
+    return `<section class="sb-health-doc-zone" data-sb-health-docs="${safeId}" data-sb-doc-module="${safeModule}"><div class="sb-doc-test-intro"><b>${title}</b></div><input id="sb-health-doc-input-${safeId}" type="file" hidden onchange="window.sbUploadHealthItemDocument?.(this,'${safeId}','${safeModule}')"><button type="button" class="btn primary sb-doc-test-upload" onclick="document.getElementById('sb-health-doc-input-${safeId}')?.click()">📤 Charger le document</button><div class="sb-health-doc-status info">Chargement des documents…</div><div class="sb-health-doc-list"><div class="empty">Chargement…</div></div></section>`;
   }
 
   function genericChecklistFieldHtml(type, item={}){
@@ -3669,6 +3669,39 @@
       return `<section class="slv-checklist-form-panel always-visible-checklist"><div class="slv-mini-help"><b>✅ ${title}</b></div><button type="button" class="btn primary" onclick="SuperApp.openGenericChecklist('${escapeAttr(item.id)}','${kind}')">✅ Ouvrir la checklist ${label}</button></section>`;
     }
     return `<section class="slv-checklist-form-panel always-visible-checklist"><div class="slv-mini-help"><b>✅ ${title}</b></div><button type="submit" class="btn primary" data-open-generic-checklist="1" data-checklist-kind="${kind}">✅ Créer et ouvrir la checklist ${label}</button></section>`;
+  }
+
+  // V5.62 — Libellé contextuel du bouton « pièce jointe » (vide = pas de document dans ce contexte).
+  function docContextLabel(type, item){
+    const m = canonicalModuleId(type);
+    const cat = String(item.category || '').toLowerCase();
+    const sub = String(item.subcategory || item.subcategorie || item.subCategory || '').toLowerCase();
+    const it = String(item.type || '').toLowerCase();
+    const hay = cat + ' ' + sub;
+    if(m === 'maison') return /facture|paiement/.test(hay) ? '🧾 Joindre la facture' : '';
+    if(m === 'courses_repas') return (/course/.test(it) || /course|alimentation|épicerie|epicerie/.test(cat)) && !/repas|stock/.test(it) ? '🧾 Joindre le ticket de caisse' : '';
+    if(m === 'sante'){
+      if(isAppointment(item)) return '📄 Joindre l’ordonnance ou le compte-rendu';
+      if(/document/.test(it)){
+        if(/mutuelle/.test(hay)) return '💳 Joindre la carte de mutuelle';
+        if(/certificat/.test(hay)) return '📄 Joindre le certificat';
+        if(/vaccin/.test(hay)) return '💉 Joindre le carnet de vaccination';
+        return '📄 Joindre l’ordonnance';
+      }
+      return '📄 Joindre l’ordonnance'; // traitement
+    }
+    if(m === 'sport_loisirs'){
+      if(/voyage/.test(it)) return '✈️ Joindre les billets et réservations';
+      if(/sport|activite|activité/.test(it) && !/loisir/.test(it)) return '🩺 Joindre le certificat médical';
+      return '';
+    }
+    if(m === 'familles'){
+      if(/identit/.test(cat)) return '🪪 Joindre la pièce d’identité';
+      if(/scolar/.test(cat)) return '🎓 Joindre le bulletin / diplôme / document scolaire';
+      if(/administr/.test(cat)) return '📑 Joindre le justificatif';
+      return '📎 Joindre le document';
+    }
+    return ''; // Éducation : aucun document (centralisé dans Familles › Scolarité)
   }
 
   // V5.8 — Formulaire standardisé : MÊME séquence partout, peu importe le module.
@@ -3726,9 +3759,10 @@
       : '';
 
     const checklistField = genericChecklistFieldHtml(type, item);
-    const docsField = supportsSupabaseDocs(type) ? healthDocsFieldHtml(item, type) : '';
+    const docLabel = docContextLabel(type, item);
+    const docsField = docLabel ? healthDocsFieldHtml(item, type, docLabel) : '';
     const visibilityField = ['maison','education','sante','sport_loisirs','familles','calendrier'].includes(type) ? setHomeVisibilityFields(item) : '';
-    return `${hiddenRouting}${titleField}${dateField}${hourField}${memberField}${categoryField}${moduleDetails}${checklistField}${notesField}${statusField}${danger}${docsField}${visibilityField}`;
+    return `${hiddenRouting}<div class="form-grp">✦ L'essentiel</div>${titleField}${categoryField}${memberField}${dateField}${hourField}<div class="form-grp form-grp-opt">⚙️ Options</div>${moduleDetails}${checklistField}${docsField}${notesField}${statusField}${visibilityField}${danger}`;
   }
 
   // Champs cachés pour le routage : module + type sont déduits du bouton cliqué, jamais demandés à l'utilisateur (sauf depuis le calendrier).
@@ -3910,7 +3944,13 @@
             </div>
           </div>
           <div class="task-freq-section task-freq-custom" style="${freqMode==='personnalisee'?'':'display:none'}">
-            <div class="form-field"><label>Tous les X jours</label>
+            <div class="form-field"><label>Jours précis</label>
+              <div class="member-checkbox-list week-days-grid">
+                ${dayBtn('1','Lun')}${dayBtn('2','Mar')}${dayBtn('3','Mer')}${dayBtn('4','Jeu')}${dayBtn('5','Ven')}${dayBtn('6','Sam')}${dayBtn('0','Dim')}
+              </div>
+              <small>Coche les jours où la tâche revient (ex : Lun + Jeu).</small>
+            </div>
+            <div class="form-field"><label>Ou : tous les X jours</label>
               <input name="frequenceInterval" type="number" min="1" step="1" value="${item.frequenceInterval||2}" placeholder="Ex : 3">
               <small>Exemple : 3 = tous les 3 jours, 14 = toutes les 2 semaines.</small>
             </div>
@@ -3918,16 +3958,15 @@
         </section>`;
     }
     if(!inside) return extraAfterDetails;
-    // V5.50 — Santé : détails affichés directement (pas de « ＋ Plus de détails »).
-    if(type === 'sante') return `${inside}${extraAfterDetails}`;
-    return `<details class="form-collapse"><summary>＋ Plus de détails</summary>${inside}</details>${extraAfterDetails}`;
+    // V5.62 — Plus de volet « ＋ Plus de détails » : tous les champs sont visibles directement.
+    return `<div class="form-section-inline">${inside}</div>${extraAfterDetails}`;
   }
 
   // ---- V5.6 : Catégories vraiment connectées aux paramètres -----------------
   // Liste les catégories d'un module, en lisant data.categories en priorité,
   // avec un repli sur des valeurs par défaut si rien n'est paramétré.
   const DEFAULT_CATEGORIES = {
-    maison:{'Ménage':[],'Rangement':[],'Entretien':[],'Réparation':[],'Urgence':[],'Routine':[],'Administratif':[]},
+    maison:{'Ménage':[],'Rangement':[],'Entretien':[],'Réparation':[],'Urgence':[],'Routine':[],'Suivi Paiement Factures':[]},
     courses_repas:{'Alimentation':[],'Épicerie':[],'Stock':[]},
     education:{'Devoirs':[],'Contrôles':[],'Documents école':[],'Notes':[],'Activités scolaires':[]},
     sante:{'Traitements':[],'Médicaments':[],'Rendez-vous':[],'Vaccins':[],'Documents santé':[],'Urgences':[]},
