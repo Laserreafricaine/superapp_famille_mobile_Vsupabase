@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.56.0';
+  const APP_VERSION = '5.57.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -21,8 +21,7 @@
   };
   const LEGACY_MODULE_IDS = {maison:'home', courses_repas:'food', education:'education', sante:'health', sport_loisirs:'sport', familles:'family', calendrier:'calendar'};
   function canonicalModuleId(id){ return MODULE_ALIASES[id] || id || 'calendrier'; }
-  function legacyModuleId(id){ return LEGACY_MODULE_IDS[canonicalModuleId(id)] || id; }
-
+  
   const modules = [
     { id:'maison', name:'Maison', short:'Maison', icon:'🏡', cls:'module-home', image:'assets/images/illustrations/home-task.png', badge:'assets/icons/icon_maison.png', desc:'Une seule liste de tâches avec catégories et filtres.' },
     { id:'courses_repas', name:'Courses & repas', short:'Courses & repas', icon:'🛒', cls:'module-food', image:'assets/images/illustrations/grocery-fridge.png', badge:'assets/icons/icon_courses.png', desc:'Menus, courses et stock regroupés clairement.' },
@@ -293,11 +292,7 @@
     }
     if(cancelBtn) cancelBtn.textContent = cancelLabel;
   }
-  function preferredTheme(){
-    // V5.36.32 — Le thème sombre reste retiré : mode clair ou auto clair.
-    return 'clair';
-  }
-  const APPEARANCE_ACCENTS = {
+    const APPEARANCE_ACCENTS = {
     familial:{label:'Familial', accent:'#e8745f', accent2:'#0d67d4', themeColor:'#fff8f1'},
     bleu:{label:'Bleu doux', accent:'#2473bf', accent2:'#0d67d4', themeColor:'#f1f8ff'},
     vert:{label:'Vert nature', accent:'#5d8f4f', accent2:'#2473bf', themeColor:'#f4fbf0'},
@@ -339,13 +334,7 @@
   }
   function shortDate(dmy){ const d=parseDMY(dmy); return d ? d.toLocaleDateString('fr-FR',{day:'2-digit', month:'short'}) : dmy; }
   function memberName(id){ return id === 'family' ? 'Toute la famille' : data.family.find(m=>m.id===id)?.name || 'Famille'; }
-  function splitMemberName(full=''){
-    const parts = String(full || '').trim().split(/\s+/).filter(Boolean);
-    if(!parts.length) return {prenom:'À renseigner', nom:'À renseigner'};
-    if(parts.length === 1) return {prenom:parts[0], nom:'À renseigner'};
-    return {prenom:parts[0], nom:parts.slice(1).join(' ')};
-  }
-  function birthdayLabel(birth=''){
+    function birthdayLabel(birth=''){
     const d = parseDMY(birth);
     return d ? d.toLocaleDateString('fr-FR',{day:'2-digit', month:'long'}) : (birth || 'À renseigner');
   }
@@ -382,46 +371,22 @@
   function isCoreModule(id){ return CORE_MODULE_IDS.includes(canonicalModuleId(id)); }
   function isAppActive(id){ id = canonicalModuleId(id); return isCoreModule(id) || !!appRecord(id)?.actif; }
   function activeModules(){ return modules.filter(m=>isAppActive(m.id)); }
-  function inactiveAppModules(){ return modules.filter(m=>APP_MODULE_IDS.includes(m.id) && !isAppActive(m.id)); }
-  function ensureActiveAccess(id){ if(isAppActive(id)) return true; openActivationPanel(id); return false; }
+    function ensureActiveAccess(id){ if(isAppActive(id)) return true; openActivationPanel(id); return false; }
   function dmyToISO(dmy){ const d=parseDMY(dmy); return d ? `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}` : ''; }
   function daysDiff(d1,d2){ const a=parseDMY(d1), b=parseDMY(d2); if(!a||!b) return 9999; a.setHours(0,0,0,0); b.setHours(0,0,0,0); return Math.round((b-a)/86400000); }
   function startOfWeek(date){ const d=new Date(date); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); d.setHours(0,0,0,0); return d; }
   function addDays(date,n){ const d=new Date(date); d.setDate(d.getDate()+n); return d; }
   function weekDays(){ const selected=parseDMY(state.selectedDate)||todayObj; const start=startOfWeek(selected); return Array.from({length:7},(_,i)=>addDays(start,i)); }
   function mealForDay(index){ return data.weeklyMeals.find(m=>Number(m.day)===index) || {title:'À définir', type:'Repas'}; }
-  function todayMeal(){ const dayIndex=(todayObj.getDay()+6)%7; return mealForDay(dayIndex); }
-  function currency(value){ return `${Number(value||0).toLocaleString('fr-FR')} ${data.foodBudget?.currency || data.settings.currency || 'EUR'}`; }
+    function currency(value){ return `${Number(value||0).toLocaleString('fr-FR')} ${data.foodBudget?.currency || data.settings.currency || 'EUR'}`; }
   function foyer(){ data.foyer = data.foyer || {}; return data.foyer; }
-  function weatherCityLabel(){ const f=foyer(); return `${f.weatherCity || f.city || data.settings.city || 'Eulmont'}${f.postalCode ? ' — ' + f.postalCode : ''}`; }
-  function foyerAddressLabel(){ const f=foyer(); const parts=[f.address, f.addressComplement, [f.postalCode, f.city].filter(Boolean).join(' '), f.country].filter(Boolean); return parts.join(', ') || 'Adresse non renseignée'; }
+    function foyerAddressLabel(){ const f=foyer(); const parts=[f.address, f.addressComplement, [f.postalCode, f.city].filter(Boolean).join(' '), f.country].filter(Boolean); return parts.join(', ') || 'Adresse non renseignée'; }
   function weatherTemperatureText(){
     const w = data.weather || {};
     const temp = Number(w.temperature);
     return Number.isFinite(temp) ? `${Math.round(temp)}°C` : '--°C';
   }
-  function weatherMainLine(){
-    const w = data.weather || {}; const f = foyer();
-    if(f.weatherAuto===false) return 'Météo automatique désactivée';
-    if(w.temperature !== null && w.temperature !== undefined && w.temperature !== '') return `${w.summary || 'Météo'} · actuelle`;
-    return 'Météo à actualiser';
-  }
-  function weatherSummary(){
-    const w = data.weather || {}; const f = foyer();
-    if(f.weatherAuto===false) return 'Météo désactivée';
-    if(w.temperature !== null && w.temperature !== undefined && w.temperature !== ''){
-      const temp = Math.round(Number(w.temperature));
-      const wind = w.wind !== null && w.wind !== undefined && w.wind !== '' ? ` · vent ${Math.round(Number(w.wind))} km/h` : '';
-      return `Actuel ${temp}° · ${w.summary || 'météo'}${wind}`;
-    }
-    return 'Météo à actualiser';
-  }
-  function weatherUpdatedText(){
-    const w = data.weather || {};
-    if(!w.updatedAt) return 'Actualisation automatique à l’ouverture';
-    return `Actualisée à ${new Date(w.updatedAt).toLocaleTimeString('fr-FR',{hour:'2-digit', minute:'2-digit'})}`;
-  }
-  const FRANCOPHONE_COUNTRIES = ['Sénégal','Côte d’Ivoire','Mali','Burkina Faso','Niger','Guinée','Bénin','Togo','Cameroun','Gabon','Congo','RDC','Mauritanie','Maroc','Tunisie','Algérie','Madagascar','France','Belgique','Suisse','Canada'];
+        const FRANCOPHONE_COUNTRIES = ['Sénégal','Côte d’Ivoire','Mali','Burkina Faso','Niger','Guinée','Bénin','Togo','Cameroun','Gabon','Congo','RDC','Mauritanie','Maroc','Tunisie','Algérie','Madagascar','France','Belgique','Suisse','Canada'];
   const WEATHER_CITY_PRESETS = [
     {city:'Eulmont', postalCode:'54690', country:'France', lat:48.747, lon:6.230},
     {city:'Nancy', postalCode:'54000', country:'France', lat:48.692, lon:6.184},
@@ -857,7 +822,7 @@
   function render(){
     const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
     applyAppearance();
-    renderHome(); renderCalendar(); renderApps(); renderNotifications(); renderSettings(); updateBadges();
+    renderHome(); renderCalendar(); renderNotifications(); renderSettings(); updateBadges();
     const familyMini = document.getElementById('familyMiniImg');
     if(familyMini){
       familyMini.src = profileAvatar();
@@ -945,12 +910,7 @@
     });
   }
   
-  function noticeVisibleOnHome(n){
-    const found = findRecord(n.id);
-    if(!found?.item) return true;
-    return found.item.showOnHome !== false && found.item.afficherAccueil !== false;
-  }
-  function renderHome(){
+    function renderHome(){
     const who = isMemberProfile() ? profileFirstName().replace(/^./,c=>c.toUpperCase()) : familyGreetingName();
     const greeting = `Bonjour ${who} 👋`;
 
@@ -1029,30 +989,9 @@
       ${appsGrid}
       <div class="home-add-cta"><button type="button" class="btn primary" onclick="SuperApp.openQuickActions()">＋ Ajouter</button></div>`;
   }
-  function moduleImage(m,variant='tile'){
-    return `<div class="app-icon-large ${variant}" aria-hidden="true"><span>${m.icon}</span></div>`;
-  }
-  // V5.9 — Cartes uniformes : grande icône emoji centrée, mêmes dimensions partout (accueil + Applications).
-  function moduleTileSmall(m){
-    const active=isAppActive(m.id);
-    return `<button class="app-tile-v59 ${m.cls} ${active?'':'locked'}" onclick="${active?`SuperApp.openModule('${m.id}')`:`SuperApp.openActivationPanel('${m.id}')`}">
-      <div class="app-tile-icon app-tile-icon-logo">${appLogoHtml(m.id, 72)}</div>
-      <h3 class="app-tile-label">${m.short}</h3>
-      <span class="app-tile-count">${active?countForModule(m.id):'🔒'}</span>
-    </button>`;
-  }
-  function moduleTileLarge(m){
-    const active=isAppActive(m.id); const rec=appRecord(m.id);
-    return `<button class="app-tile-v59 large ${m.cls} ${active?'':'locked'}" onclick="${active?`SuperApp.openModule('${m.id}')`:`SuperApp.openActivationPanel('${m.id}')`}">
-      <div class="app-tile-icon app-tile-icon-logo">${appLogoHtml(m.id, 96)}</div>
-      <h3 class="app-tile-label">${m.short}</h3>
-      <p class="app-tile-desc">${active ? countForModule(m.id) + ' · à voir' : 'À activer'}</p>
-      ${!active ? `<span class="app-tile-locked-mark">🔒</span>` : ''}
-    </button>`;
-  }
-
-  function renderApps(){ $('#view-apps').innerHTML = `<div class="app-grid large">${modules.filter(m=>m.id !== 'calendrier').map(moduleTileLarge).join('')}</div>`; }
-
+    // V5.9 — Cartes uniformes : grande icône emoji centrée, mêmes dimensions partout (accueil + Applications).
+    
+  
   function openModule(id, focusKey=''){
     state.returnList = null;
     id = canonicalModuleId(id);
@@ -1067,20 +1006,8 @@
     state.appsView = {kind:'module', id, focus:focusKey};
     setView('apps');          // render() -> restoreAppsView() -> paintModule()
   }
-    function moduleContent(id){
-    if(id==='courses_repas') return foodModuleContent();
-    if(id==='maison') return homeModuleContent();
-    if(id==='education') return educationModuleContent();
-    if(id==='sante') return healthModuleContent();
-    if(id==='sport_loisirs') return sportModuleContent();
-    if(id==='familles') return familyModuleContent();
-    return '';
-  }
-
-    function subsection(title, action, body){
-    return `<div class="section-title compact-title"><h2>${title}</h2>${action || ''}</div>${body}`;
-  }
-  const cardImg = name => `assets/images/cards/${String(name).replace(/\.png$/,'')}.png`;  // accepte 'nom' ou 'nom.png' sans casser le chemin
+    
+      const cardImg = name => `assets/images/cards/${String(name).replace(/\.png$/,'')}.png`;  // accepte 'nom' ou 'nom.png' sans casser le chemin
   function playfulBlock(opts){
     const {title, emoji='', img='', tone='neutral', body='', action='', kicker='', block='', onClick=''} = opts || {};
     const click = onClick ? ` onclick="if(!event.target.closest('button,a,input,select,textarea')){${onClick}}"` : '';
@@ -1096,8 +1023,7 @@
     return playfulBlock({title, block, onClick:`SuperApp.openModuleList('${module}','${block}')`, emoji, img:'', tone, kicker, action, body});
   }
   function miniChips(list){ return `<div class="settings-chips embedded">${list.map(x=>`<span>${x}</span>`).join('')}</div>`; }
-          function xIconHealth(){ return '💗'; }
-      function ageFromBirth(birth){
+                function ageFromBirth(birth){
     const b = parseDMY(birth); if(!b) return '';
     const now = todayObj;
     let age = now.getFullYear() - b.getFullYear();
@@ -1113,21 +1039,7 @@
   function firstMemberName(name){
     return String(name || '').trim().split(/\s+/)[0] || 'Membre';
   }
-    function memberDossierTiles(m){
-    const tiles = [
-      ['🪪','Carte d’identité','Identité'],
-      ['🟩','Passeport','Identité'],
-      ['🎓','Diplômes','Scolarité'],
-      ['💗','Santé','Santé'],
-      ['📚','Scolarité','Scolarité'],
-      ['🛡️','Assurances','Administratif']
-    ];
-    return tiles.map(([icon,title,category])=>`<button class="member-doc-tile" type="button" onclick="SuperApp.openMemberDocList('${m.id}','${category}','${title}')"><span>${icon}</span><b>${title}</b><small>${category}</small></button>`);
-  }
-  function docCard(d){
-    return `<article class="doc-card"><div class="agenda-icon">📄</div><div><b>${d.title}</b><small>${d.desc || d.category}</small></div><span>Prévu</span></article>`;
-  }
-
+      
 
   const MODULE_LISTS = {
     maison: {
@@ -1876,11 +1788,7 @@
       <div class="family-spaces">${members.length ? members.map(memberCard).join('') : `<article class="empty cute-empty"><b>👤 Aucun membre</b><small>Ajoute un premier membre du foyer.</small><button class="btn primary" onclick="SuperApp.openSettingsMember('')">+ Ajouter</button></article>`}</div>`;
   }
 
-    function calendarFilterLabel(){
-    const found = calendarFilters().find(([id])=>id === state.calendarFilter);
-    return found ? found[1] : 'Tous';
-  }
-  function calendarDayView(events){
+      function calendarDayView(events){
     return `<div class="calendar-day-view"><article class="day-focus-card"><div><span>📅 Vue jour</span><h3>${displayDate(state.selectedDate)}</h3><p>${events.length ? events.length + ' élément(s) pour cette journée.' : 'Journée libre pour ce filtre.'}</p></div><button type="button" class="btn primary" onclick="SuperApp.openEdit('calendrier')">📅 Ajouter</button></article>${events.length ? `<div class="day-focus-list">${events.map(x=>agendaRow(x,x.icon,x.label)).join('')}</div>` : '<div class="empty cute-empty"><b>🌿 Rien de prévu</b><small>Change de filtre ou ajoute un événement.</small></div>'}</div>`;
   }
   function calendarFilters(){ return [['all','Tous','▦'],['maison','Maison','🏠'],['courses_repas','Courses & repas','🍽️'],['education','Éducation','📘'],['sante','Santé','💗'],['sport_loisirs','Sport, Loisir & Voyage','⚽'],['familles','Familles','👨‍👩‍👧‍👦'],['calendrier','Autres','📌']]; }
@@ -1894,8 +1802,7 @@
   }
   function agendaRow(x,icon,label){ return commonInfoRow({...x, icon, category:label || x.category || 'Calendrier', module:x.module || 'calendrier'}, {module:x.module || 'calendrier', emoji:icon, category:label || 'Calendrier'}); }
 
-      function notificationCountFor(filter, all){ return filteredNotificationsFor(filter, all).length; }
-      function setNotificationFilter(filter){ state.notifFilter = filter || 'all'; renderNotifications(); }
+            function setNotificationFilter(filter){ state.notifFilter = filter || 'all'; renderNotifications(); }
   function notificationRow(n){ return homeDigestRow(n); }
 
   
@@ -2000,12 +1907,7 @@
   function memberOptions(selected='family'){
     return `<option value="family" ${selected==='family'?'selected':''}>Toute la famille</option>${data.family.map(m=>`<option value="${m.id}" ${selected===m.id?'selected':''}>${m.name}</option>`).join('')}`;
   }
-  function memberMultiOptions(selected='family'){
-    const vals = Array.isArray(selected) ? selected.map(String) : String(selected||'').split(',').map(x=>x.trim()).filter(Boolean);
-    const isSelected = id => vals.includes(id) || (!vals.length && id==='family');
-    return `<option value="family" ${isSelected('family')?'selected':''}>Toute la famille</option>${data.family.map(m=>`<option value="${m.id}" ${isSelected(m.id)?'selected':''}>${escapeHtml(m.name)}</option>`).join('')}`;
-  }
-  function moduleOptions(selected='calendrier'){
+    function moduleOptions(selected='calendrier'){
     selected = canonicalModuleId(selected);
     return [['calendrier','Événement simple'], ...activeModules().filter(m=>APP_MODULE_IDS.includes(m.id)).map(m=>[m.id,m.name])].map(([id,label])=>`<option value="${id}" ${selected===id?'selected':''}>${label}</option>`).join('');
   }
@@ -2049,18 +1951,7 @@
     const module = canonicalModuleId(found.item.module || 'calendrier');
     openEdit(module === 'calendrier' ? 'calendrier' : module, id);
   }
-  function openCalendarDate(dmy,id=''){
-    state.selectedDate = dmy || today;
-    state.calendarMode = 'day';
-    setView('calendar');
-    if(id) setTimeout(()=>openItem(id),120);
-  }
-  function openCalendarModule(module){
-    state.calendarFilter = module === 'all' ? 'all' : canonicalModuleId(module || 'all');
-    state.calendarMode = 'week';
-    setView('calendar');
-  }
-  function setCalendarFilter(module){ state.calendarFilter = module === 'all' ? 'all' : canonicalModuleId(module); renderCalendar(); }
+      function setCalendarFilter(module){ state.calendarFilter = module === 'all' ? 'all' : canonicalModuleId(module); renderCalendar(); }
   function openSettings(section,module=''){
     setView('settings');
     setTimeout(()=>showSettingsPanel(section,module),60);
@@ -2068,18 +1959,10 @@
   function normalizeSettingsSection(section){
     return String(section || 'parametres').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
   }
-  function activeAppSelect(selected='maison'){
-    selected = canonicalModuleId(selected);
-    return activeModules().filter(m=>APP_MODULE_IDS.includes(m.id)).map(m=>`<option value="${m.id}" ${selected===m.id?'selected':''}>${m.name}</option>`).join('');
-  }
-  function encodeKey(value){ return encodeURIComponent(String(value || '')); }
+    function encodeKey(value){ return encodeURIComponent(String(value || '')); }
   function decodeKey(value){ try { return decodeURIComponent(String(value || '')); } catch { return String(value || ''); } }
   function lineArray(value){ return String(value || '').split(/[\n,;]/).map(x=>x.trim()).filter(Boolean); }
-  function labelsForModule(module){
-    const cats = data.categories?.[canonicalModuleId(module)] || {};
-    return Object.keys(cats).length ? Object.keys(cats) : ['Général'];
-  }
-  function showSettingsPanel(section,module=''){
+    function showSettingsPanel(section,module=''){
     const key = normalizeSettingsSection(section);
     // V5.9 — Nouveau panneau visuel pour le choix du style de famille
     if(key.includes('stylefamille') || key === 'style_famille' || key.includes('style_famille')){
@@ -2114,13 +1997,7 @@
     function settingsModuleTabs(selected, targetLabel){
     return `<div class="settings-module-tabs">${activeModules().filter(m=>APP_MODULE_IDS.includes(m.id)).map(m=>`<button class="settings-module-tab ${selected===m.id?'active':''}" type="button" onclick="SuperApp.openSettings('${targetLabel}','${m.id}')"><span class="settings-tab-emoji">${appLogoHtml(m.id, 28)}</span><b>${m.short}</b></button>`).join('')}</div>`;
   }
-    function settingImageForModule(id){
-    return moduleById(id).image || 'assets/images/mobile/superapp.png';
-  }
-  function notificationImage(id){
-    return {maison:'assets/images/cards/notifications_maison.png',courses_repas:'assets/images/cards/notifications_courses.png',education:'assets/images/cards/notifications_education.png',sante:'assets/images/cards/notifications_sante.png',sport_loisirs:'assets/images/cards/notifications_sport.png',familles:'assets/images/cards/calendar_family.png'}[canonicalModuleId(id)] || 'assets/images/cards/notifications_alert.png';
-  }
-    function settingsLocationPanel(){
+          function settingsLocationPanel(){
     const f = foyer();
     const country = f.country || data.settings?.country || 'France';
     const selected = findWeatherPreset(country, f.weatherCity || '');
@@ -2326,13 +2203,7 @@
       if(first) selectWeatherCity(scope, first.city, first.postalCode, first.country, first.lat, first.lon);
     }
   }
-    function applyWeatherCity(city, postalCode, country='France', lat=null, lon=null){
-    data.foyer = {...(data.foyer||{}), city, postalCode, country, weatherCity:city, latitude:lat, longitude:lon, useDeviceLocation:false, updatedAt:nowISO(), updatedFrom:'application_mobile', syncStatus:'local_only'};
-    data.settings.city = city; data.settings.postalCode = postalCode; data.settings.country = country; data.settings.weatherCity = city;
-    save(); render(); showSettingsPanel('Localisation du foyer');
-    refreshWeather({silent:true, keepCurrentPanel:true});
-  }
-  function useCurrentPosition(){
+      function useCurrentPosition(){
     if(!navigator.geolocation){ toast('La géolocalisation n’est pas disponible sur ce téléphone.'); return; }
     navigator.geolocation.getCurrentPosition(pos=>{
       const nearest = closestWeatherPreset(pos.coords.latitude, pos.coords.longitude);
@@ -2442,15 +2313,7 @@
     if(data.appsRegistry[id]){ Object.assign(data.appsRegistry[id], {actif:true, installe:true, licence:'active', sourceActivation:'cockpit_mobile', activatedAt:nowISO(), connectedToMobile:true, syncStatus:'pending_update'}); }
     save(); if($('#editDialog').open) $('#editDialog').close(); render(); openModule(id);
   }
-  function deactivateApp(id){
-    id = canonicalModuleId(id); data.appsRegistry = makeAppsRegistry(data.appsRegistry || {});
-    const activeCount = APP_MODULE_IDS.filter(x=>data.appsRegistry[x]?.actif).length;
-    if(activeCount <= 1){ toast('Le cockpit mobile doit garder au moins une application active.'); return; }
-    confirmDialog('Désactiver cette application ? Ses données restent sauvegardées mais ne seront plus affichées dans le calendrier ni les notifications.', () => {
-      Object.assign(data.appsRegistry[id], {actif:false, licence:'inactive', syncStatus:'pending_update'}); save(); render();
-    });
-  }
-
+  
   function buildExportData(){
     const sourceCollections = structuredClone(data);
     const categories = [];
@@ -2624,8 +2487,7 @@
     setTimeout(()=>startOnboarding(true), 120);
   }
   function clearDemoData(){ openResetConfirmDialog('local'); }
-  function resetData(){ openResetConfirmDialog('local'); }
-  function resetCloudData(){ openResetConfirmDialog('cloud'); }
+    function resetCloudData(){ openResetConfirmDialog('cloud'); }
   // ---- Accueil guidé : configuration minimale + première action familiale ----------
   function maybeStartOnboarding(){ if(!data.settings || !data.settings.onboarded) startOnboarding(true); }
   function closeOnboarding(){ document.getElementById('onboarding')?.remove(); }
@@ -2870,8 +2732,7 @@
     return item.active === false || item.deleted === true || sync === 'pending_delete' || ['archive','archivé','archived','supprime','supprimé','deleted','hidden','masque','masqué'].includes(s);
   }
   function visibleItems(collection){ return (data[collection] || []).filter(x=>!statusIsHidden(x)); }
-  function openItems(collection){ return visibleItems(collection).filter(x=>!statusIsDone(x)); }
-  // V5.55 — Les éléments « faits » restent visibles (barrés) mais descendent en bas de liste. Tri stable.
+    // V5.55 — Les éléments « faits » restent visibles (barrés) mais descendent en bas de liste. Tri stable.
   function sortDoneLast(arr){ return (arr||[]).map((x,i)=>[x,i]).sort((a,b)=>((statusIsDone(a[0])?1:0)-(statusIsDone(b[0])?1:0))||(a[1]-b[1])).map(p=>p[0]); }
   function itemType(x){ return normalizeText(x?.type || x?.category || ''); }
   function itemCategory(x){ return normalizeText(x?.category || x?.title || x?.type || ''); }
@@ -3150,73 +3011,14 @@
     ).join('')}</div>`;
   }
 
-  function homeModuleContent(){
-    const open=getMaisonTasks('open'), todayItems=getMaisonTasks('today'), late=getMaisonTasks('late'), recurrent=getMaisonTasks('recurrent');
-    return `${primaryActionBar([['＋ Nouvelle tâche',`SuperApp.openAdd('maison','tache','Ménage')`,true]])}
-      ${moduleKpis([[todayItems.length,'aujourd’hui','🏠',`SuperApp.openModuleList('maison','taches_aujourdhui')`],[late.length,'en retard','⏰',`SuperApp.openModuleList('maison','taches_retard')`],[recurrent.length,'récurrentes','🔁',`SuperApp.openModuleList('maison','taches_recurrentes')`],[open.length,'toutes','✅',`SuperApp.openModuleList('maison','taches')`]])}
-      ${fusedBlock('maison','taches','Tâches Maison','🏠','home tone-home-1','Une seule vraie liste',`<p class="play-copy">Ménage, rangement, entretien, réparation, urgence, routine et administratif sont réunis ici.</p>${miniChips(['Toutes','Aujourd’hui','En retard','Récurrentes','Par membre','Terminées'])}`,`<button class="link-btn" onclick="SuperApp.openModuleList('maison','taches')">+ Ajouter</button>`)}
-      <div class="module-secondary-note">📅 Les tâches datées apparaissent automatiquement dans le calendrier global.</div>`;
-  }
-  function foodModuleContent(){
-    const menuJour=getMenus().filter(x=>x.date===today || x.category==='Repas du jour');
-    const menuSem=(data.weeklyMeals||[]).filter(x=>!statusIsHidden(x));
-    const shopping=getShoppingItems('all'), stock=getStockItems(), low=getStockItems('low');
-    return `${primaryActionBar([
-      ['＋ Course',`SuperApp.openAdd('courses_repas','course','Alimentation')`,true],
-      ['＋ Repas',`SuperApp.openAdd('courses_repas','repas_semaine','Menu de la semaine')`,false],
-      ['＋ Stock',`SuperApp.openAdd('courses_repas','stock','Stock')`,false]
-    ])}
-      ${moduleKpis([[menuSem.length,'menu semaine','📅',`SuperApp.openModuleList('courses_repas','menu_semaine')`],[shopping.length,'courses','🛒',`SuperApp.openModuleList('courses_repas','courses')`],[stock.length,'stock','🧺',`SuperApp.openModuleList('courses_repas','stock')`],[low.length,'stock faible','⚠️',`SuperApp.openModuleList('courses_repas','stock_faible')`]])}
-      ${fusedBlock('courses_repas','menu_semaine','Menu de la semaine','📅','food tone-food-1','Lundi → dimanche',`<p class="play-copy">Le menu de toute la semaine en un coup d'œil. Lundi, mardi, mercredi… midi et soir.</p>${miniChips(['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'])}`,`<button class="link-btn" onclick="SuperApp.openModuleList('courses_repas','menu_semaine')">+ Ajouter</button>`)}
-      ${fusedBlock('courses_repas','menu_jour','Menu du jour','🍽️','food tone-food-2','Aujourd’hui',rowList(menuJour,'🍽️','Repas du jour'),`<button class="link-btn" onclick="SuperApp.openModuleList('courses_repas','menu_jour')">+ Ajouter</button>`)}
-      ${fusedBlock('courses_repas','courses','Liste de courses','🛒','food tone-food-3','À cocher',rowList(shopping,'🛒','Courses'),`<button class="link-btn" onclick="SuperApp.openModuleList('courses_repas','courses')">+ Ajouter</button>`)}
-      ${fusedBlock('courses_repas','stock','Stock','🧺','food tone-food-4','Frigo · placard',`<div class="stock-grid">${stock.map(x=>`<article class="stock-card ${String(x.level).toLowerCase()==='faible'?'alert':''}"><b>${escapeHtml(x.title)}</b><small>${escapeHtml(x.qty||'')} · ${escapeHtml(x.place||'')}</small><span>${escapeHtml(x.level||'')}</span></article>`).join('')}</div>`)}
-    `;
-  }
-  function schoolAverage(){
+      function schoolAverage(){
     const notes=(data.homework||[]).filter(x=>!statusIsHidden(x)&&(x.type==='note'||x.category==='Notes')&&x.score!==undefined&&x.score!=='');
     if(!notes.length) return null;
     const sum=notes.reduce((a,x)=>a+(Number(x.score)/Number(x.scoreMax||20))*20,0);
     return Math.round((sum/notes.length)*10)/10;
   }
-  function educationModuleContent(){
-    const school=getSchoolItems('all'), grades=school.filter(x=>x.type==='note' || x.category==='Notes');
-    const avg=schoolAverage();
-    return `${primaryActionBar([
-      ['＋ Nouveau devoir',`SuperApp.openAdd('education','devoir','Devoirs')`,true],
-      ['＋ Note',`SuperApp.openAdd('education','note','Notes')`,false],
-      ['＋ Document',`SuperApp.openAdd('education','document_ecole','Documents école')`,false]
-    ])}
-      ${moduleKpis([[school.length,'école','📚',`SuperApp.openModuleList('education','ecole')`],[grades.length,'notes','⭐',`SuperApp.openModuleList('education','ecole_notes')`],[avg!==null?avg+'/20':'—','moyenne','📊',`SuperApp.openModuleList('education','ecole_notes')`]])}
-      ${fusedBlock('education','ecole','École','📚','edu tone-edu-1','Devoirs · contrôles · documents',`<p class="play-copy">Devoirs, contrôles, activités, sorties, réunions et documents sont regroupés dans la même liste. La chip <b>Notes</b> isole les notes et appréciations.</p>${miniChips(['Devoir','Contrôle','Note','Document','Sortie','Réunion'])}`,`<button class="link-btn" onclick="SuperApp.openModuleList('education','ecole')">+ Ajouter</button>`)}
-      <div class="module-secondary-note">📅 Les éléments scolaires datés alimentent le calendrier global.</div>`;
-  }
-  function healthModuleContent(){
-    return `${healthEmergencyBlock()}${healthQuickActions()}${renderDirectList('sante')}`;
-  }
-
-  function sportModuleContent(){
-    const tS=getSportActivities('today').length,tL=getLoisirActivities('today').length,tV=getVoyageActivities('today').length;
-    const tab=activeSlvTab();
-    const totalToday=tS+tL+tV;
-    return `
-      <div class="slv-tabs">
-        <button type="button" class="slv-tab slv-tout ${tab==='tout'?'active':''}" onclick="SuperApp.setSlvTab('tout')">
-          <span>▦</span><b>Tout</b>${totalToday?`<em class="slv-badge">${totalToday}</em>`:''}
-        </button>
-        <button type="button" class="slv-tab slv-sport ${tab==='sport'?'active':''}" onclick="SuperApp.setSlvTab('sport')">
-          <span>⚽</span><b>Sport</b>${tS?`<em class="slv-badge">${tS}</em>`:''}
-        </button>
-        <button type="button" class="slv-tab slv-loisir ${tab==='loisir'?'active':''}" onclick="SuperApp.setSlvTab('loisir')">
-          <span>🎨</span><b>Loisir</b>${tL?`<em class="slv-badge">${tL}</em>`:''}
-        </button>
-        <button type="button" class="slv-tab slv-voyage ${tab==='voyage'?'active':''}" onclick="SuperApp.setSlvTab('voyage')">
-          <span>✈️</span><b>Voyage</b>${tV?`<em class="slv-badge">${tV}</em>`:''}
-        </button>
-      </div>
-      ${tab==='tout' ? slvAllContent() : slvVoletContent(tab)}`;
-  }
-  function activeSlvTab(){ return state.slvTab||'tout'; }
+    
+    function activeSlvTab(){ return state.slvTab||'tout'; }
   function setSlvTab(tab){ state.slvTab=tab; render(); }
   function slvConfigFor(tab){
     const cfgs={
@@ -3492,14 +3294,7 @@
       </section>`;
   }
 
-  function openAddSlvChecklist(activityId){
-    const activity=slvActivityById(activityId);
-    if(!activity){ toast('Activité introuvable.'); return; }
-    const cfg=slvConfigFor(slvTabForActivity(activity));
-    state.preset={type:cfg.checklistType, category:cfg.checklistCategory, parentId:activity.id, activityId:activity.id, member:activity.member||'family', members:activity.members||activity.member||'family'};
-    openEdit('sport_loisirs');
-  }
-  function slvChecklistSuggestions(tab){
+    function slvChecklistSuggestions(tab){
     return {
       voyage:['Passeports','Billets','Chargeurs','Médicaments','T-shirts','Sandales','Trousse de toilette','Documents administratifs'],
       sport:['Tenue','Chaussures','Gourde','Serviette','Certificat médical','Équipement','Sac de sport'],
@@ -3606,10 +3401,8 @@
       </section>`;
     setTimeout(()=>document.getElementById('slvQuickItemInput')?.focus(), 30);
   }
-  function ensureSlvChecklistDialog(){ return null; }
-  function refreshSlvChecklistDialog(activityId){ if(state.appsView?.kind==='slvChecklist' && state.appsView.id===activityId) paintSlvChecklistPage(activityId); }
-  function paintSlvChecklistDialog(activity){ if(activity) paintSlvChecklistPage(activity.id); }
-  function openSlvChecklistLight(activityId){
+    function refreshSlvChecklistDialog(activityId){ if(state.appsView?.kind==='slvChecklist' && state.appsView.id===activityId) paintSlvChecklistPage(activityId); }
+    function openSlvChecklistLight(activityId){
     // V5.36.20 — ferme les modales avant d'afficher la checklist.
     // Cela garde les boutons visibles et évite que la fiche reste au-dessus de la page checklist.
     try{ closeEditDialog(); }catch{}
@@ -3617,8 +3410,7 @@
     state.appsView={kind:'slvChecklist', id:activityId};
     setView('apps');
   }
-  function closeSlvChecklistLight(){ if(state.appsView?.kind==='slvChecklist') openModule('sport_loisirs'); }
-  function finishSlvChecklist(activityId){ const a=slvActivityById(activityId); if(a){ state.slvTab=slvTabForActivity(a); } state.appsView={kind:'module', id:'sport_loisirs'}; setView('apps'); }
+    function finishSlvChecklist(activityId){ const a=slvActivityById(activityId); if(a){ state.slvTab=slvTabForActivity(a); } state.appsView={kind:'module', id:'sport_loisirs'}; setView('apps'); }
   function addSlvChecklistLine(activityId, forcedTitle=''){
     const activity = slvActivityById(activityId);
     if(!activity){ toast('Activité introuvable.'); return; }
@@ -3667,21 +3459,7 @@
     el.classList.add('member-jump-highlight');
     setTimeout(()=>el.classList.remove('member-jump-highlight'), 2200);
   }
-  function familyModuleContent(){
-    const members=getFamilyMembers(), docs=getFamilyDocuments();
-    return `${primaryActionBar([
-      ['＋ Nouveau document',`SuperApp.openAdd('familles','document_famille','Identité')`,true],
-      ['＋ Membre',`SuperApp.openSettingsMember('')`,false]
-    ])}
-      ${moduleKpis([[members.length,'membres','👨‍👩‍👧‍👦',`SuperApp.openFamilyMembersManager('all')`],[docs.length,'documents','📁',`SuperApp.openModuleList('familles','documents')`]])}
-      ${familyStyleInlineBlock()}
-      ${familyMemberJumpStrip(members)}
-      <div class="section-title compact-title"><h2>👨‍👩‍👧‍👦 Membres du foyer</h2><button class="link-btn" onclick="SuperApp.openSettingsMember('')">+ Ajouter</button></div>
-      <div class="family-spaces">${members.map(memberCard).join('')}</div>
-      ${fusedBlock('familles','documents','Documents importants','📁','family tone-family-2','Identité · assurances',`<p class="play-copy">Identité, passeport, diplômes, santé, scolarité et assurances dans un seul espace documentaire.</p>${miniChips(['Identité','Passeport','Diplômes','Santé','Scolarité','Assurances'])}`,`<button class="link-btn" onclick="SuperApp.openModuleList('familles','documents')">+ Ajouter</button>`)}
-    `;
-  }
-  function updateHeader(){
+    function updateHeader(){
     const v = state.appsView;
     const logoEl = document.getElementById('screenLogo');
     // V5.27 — Logo 3D du module dans l'entête (à la place de l'emoji collé au titre)
@@ -5674,13 +5452,13 @@
     _getData: ()=>data,
     _mergeData: (d)=>{ const m=ensureDataShape(d); Object.assign(data,m); localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); },
     _findRecord: findRecord, toast,
-    setView, openModule, openItem, openCalendarDate, openCalendarModule, setCalendarFilter, setNotificationFilter,
-    renderAppsHome:()=>{ state.appsView=null; setView('apps'); }, render:()=>render(),
+    setView, openModule, openItem, setCalendarFilter, setNotificationFilter,
+    render:()=>render(),
     setActiveProfile, openProfilePicker, closeProfileSheet, requestNotify, openQuickActions, openSanteAdd, openSlvAdd, openCoursesAdd, openEducationAdd, openFamilleAdd,
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
-    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openAddSlvChecklist, openSlvChecklistLight, closeSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, setSlvSubFilter, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, deactivateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, deleteReferenceList, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, applyWeatherCity, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
+    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, setSlvSubFilter, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, deleteReferenceList, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
     setListCatFilter, setListSubFilter, setGenericChecklistFilter, scrollToMember,
     openMaisonList, openMaisonHub, rescheduleTask, openAppList, openAppHub, openEducationChild, openSlvUniverse,
