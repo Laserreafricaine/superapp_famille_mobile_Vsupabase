@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.57.0';
+  const APP_VERSION = '5.58.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -594,7 +594,7 @@
     if(isAndroidDevice()) document.documentElement.classList.add('is-android');
     sanitizeLegacyPersonalDemoData();
     normaliseCalendarProjections();
-    bindNavigation(); bindDialogs(); bindAndroidDialogSafety(); render();
+    bindNavigation(); bindDialogs(); bindAndroidDialogSafety(); installKeyboardAssist(); render();
     autoRefreshWeatherOnOpen();
     if(window.matchMedia){
       try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance); } catch {}
@@ -1240,11 +1240,11 @@
   }
   function commonInfoRow(x,cfg={}){
     const done = statusIsDone(x);
-    return `<article class="health-info-row common-info-row clickable-card ${done?'done':''}" onclick="SuperApp.openItem('${x.id}')">
+    return `<article class="health-info-row common-info-row ${done?'done':''}">
       <div class="health-type-icon">${commonTypeIcon(x,cfg)}</div>
       <div class="health-info-main"><b>${escapeHtml(x.title || x.meal || 'Élément')}</b><small>${escapeHtml(commonLine2(x,cfg))}</small><em>${escapeHtml(commonLine3(x))}</em></div>
       ${memberBadgeHtml(getItemMemberId(x) || x.member || 'family')}
-      <div class="health-row-arrow">›</div>
+      ${rowActionsB(x.id)}
     </article>`;
   }
   function homeDigestRow(n){
@@ -1261,11 +1261,11 @@
     if(_isTreat) return healthTreatmentCard(x);
     if(_isAppt) return healthRdvCard(x);
     const done=statusIsDone(x);
-    return `<article class="health-info-row clickable-card ${done?'done':''}" onclick="SuperApp.openItem('${x.id}')">
+    return `<article class="health-info-row ${done?'done':''}">
       <div class="health-type-icon">${healthTypeIcon(x,cfg)}</div>
       <div class="health-info-main"><b>${escapeHtml(x.title||'Information santé')}</b><small>${escapeHtml(healthLine2(x,cfg))}</small><em>${escapeHtml(healthLine3(x))}</em></div>
       ${memberBadgeHtml(x.member||'family')}
-      <div class="health-row-arrow">›</div>
+      ${rowActionsB(x.id)}
     </article>`;
   }
   function timeToMinutes(t){ const m=String(t||'').match(/^(\d{1,2}):(\d{2})/); return m ? Number(m[1])*60+Number(m[2]) : 0; }
@@ -1352,7 +1352,7 @@
       <div class="treatment-card-top">
         <button type="button" class="shopping-check rich-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')" aria-label="${done?'Traitement terminé (réactiver)':'Marquer le traitement comme terminé'}">${done?'✓':''}</button>
         <div class="hrc-avatar"><img src="${av}" alt=""><span class="hrc-member-name">${mn}</span></div>
-        <div class="hrc-body" onclick="SuperApp.openItem('${x.id}')">
+        <div class="hrc-body">
           <div class="hrc-top"><span class="hrc-icon">💊</span><b>${escapeHtml(x.title||'Traitement')}</b></div>
           <div class="hrc-details">
             <span class="hrc-pill">${escapeHtml(freq)}</span>
@@ -1363,6 +1363,7 @@
         </div>
       </div>
       ${done?'<div class="treatment-doses treatment-done-note">✓ Traitement terminé</div>':`<div class="treatment-doses"><div class="treatment-dose-title"><b>Prises du jour</b><small>${escapeHtml(today)}</small></div>${healthTreatmentDoseRows(x)}</div>`}
+      ${rowActionsB(x.id)}
     </article>`;
   }
   function healthRdvCard(x){
@@ -1374,7 +1375,7 @@
     return `<article class="health-rich-card rdv-card ${done?'done':''}">
       <button type="button" class="shopping-check rich-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')" aria-label="${done?'Rendez-vous fait (remettre à venir)':'Marquer le rendez-vous comme fait'}">${done?'✓':''}</button>
       <div class="hrc-avatar"><img src="${av}" alt=""><span class="hrc-member-name">${mn}</span></div>
-      <div class="hrc-body" onclick="SuperApp.openItem('${x.id}')">
+      <div class="hrc-body">
         <div class="hrc-top"><span class="hrc-icon">🧠</span><b>${escapeHtml(x.title||'Rendez-vous')}</b></div>
         <div class="hrc-details">
           ${x.date?`<span class="hrc-pill">📅 ${escapeHtml(shortDate(x.date))}${x.time?' à '+x.time:''}</span>`:''}
@@ -1383,7 +1384,7 @@
           ${cp?`<span class="hrc-pill">🤝 ${escapeHtml(shortMemberName(cp.name))}</span>`:''}
         </div>
       </div>
-      <div class="health-row-arrow" onclick="SuperApp.openItem('${x.id}')">›</div>
+      ${rowActionsB(x.id)}
     </article>`;
   }
 
@@ -1408,7 +1409,7 @@
     return `<article class="common-info-row checklist-list-row ${done?'done':''}">
       <button type="button" class="shopping-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.toggleGenericChecklistItem('${x.id}')">${done?'✓':''}</button>
       <div class="health-info-main" onclick="SuperApp.openGenericChecklist('${escapeAttr(x.parentId||'')}','${kind}')"><b>${escapeHtml(x.title||'Élément checklist')}</b><small>${escapeHtml(x.category||'Checklist')}${escapeHtml(linked)}</small><em>${qty} unité${qty>1?'s':''}${done?' · Fait':''}</em></div>
-      <button type="button" class="row-action del btn-sm ghost danger" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">Supprimer</button>
+      ${rowActionsB(x.id)}
     </article>`;
   }
 
@@ -1421,7 +1422,7 @@
       <div class="health-type-icon">${icon}</div>
       <div class="health-info-main"><b>${escapeHtml(x.title || 'Tâche')}</b><small>${escapeHtml(commonLine2(x,{...cfg,module:'maison'}))}</small><em>${escapeHtml(commonLine3(x))}</em></div>
       ${memberBadgeHtml(getItemMemberId(x) || x.member || 'family')}
-      <div class="shopping-row-actions"><button type="button" class="btn-sm ghost" onclick="event.stopPropagation();SuperApp.openEdit('${moduleId}','${x.id}')">✏️</button><button type="button" class="btn-sm ghost danger" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">🗑️</button></div>
+      ${rowActionsB(x.id)}
     </article>`;
   }
   function schoolUrgencyClass(x){
@@ -1449,7 +1450,7 @@
     const subject=x.subject||x.category||'';
     const scoreLabel=(x.score!==undefined&&x.score!=='')?`${x.score}/${x.scoreMax||20}`:'';
     const dl=x.date?shortDate(x.date):'';
-    return `<article class="school-card common-info-row clickable-card ${done?'done':''} ${urg}" onclick="SuperApp.openItem('${x.id}')">
+    return `<article class="school-card common-info-row ${done?'done':''} ${urg}">
       <div class="school-card-left">
         <span class="school-type-icon">${icon}</span>
         <button type="button" class="shopping-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')">${done?'✓':''}</button>
@@ -1459,7 +1460,7 @@
         <small>${escapeHtml(subject?subject+' · ':'')}${escapeHtml(members)}${scoreLabel?' · ⭐ '+scoreLabel:''}</small>
         ${dl?`<em class="${urg}">${escapeHtml(dl)}</em>`:''}
       </div>
-      <div class="health-row-arrow">›</div>
+      ${rowActionsB(x.id)}
     </article>`;
   }
   function shoppingRow(x,cfg={}){
@@ -1469,9 +1470,9 @@
     const detailText = moduleId === 'courses_repas' ? (qtyLabel(x) || 'Quantité à préciser') : (x.notes || x.desc || 'À préparer');
     return `<article class="health-info-row common-info-row shopping-check-row ${done?'done':''}">
       <button type="button" class="shopping-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')" aria-label="Cocher ou décocher">${done?'✓':''}</button>
-      <div class="health-info-main" onclick="SuperApp.openItem('${x.id}')"><b>${escapeHtml(x.title || 'Article')}</b><small>${escapeHtml(x.category || 'Checklist')}${done?' · '+statusLabel:''}</small><em>${escapeHtml(detailText)}${done?' · Fait':''}</em></div>
+      <div class="health-info-main"><b>${escapeHtml(x.title || 'Article')}</b><small>${escapeHtml(x.category || 'Checklist')}${done?' · '+statusLabel:''}</small><em>${escapeHtml(detailText)}${done?' · Fait':''}</em></div>
       ${done?`<span class="shopping-status-pill">${statusLabel}</span>`:''}
-      <div class="shopping-row-actions"><button type="button" class="btn-sm ghost" onclick="event.stopPropagation();SuperApp.openEdit('${moduleId}','${x.id}')">✏️</button><button type="button" class="btn-sm ghost danger" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">🗑️</button></div>
+      ${rowActionsB(x.id)}
     </article>`;
   }
   function openBudgetBoard(){ state.appsView={kind:'budget'}; setView('apps'); }
@@ -1819,7 +1820,9 @@
       ['📄','Documents famille',"SuperApp.openAdd('familles','document_famille','Documents')"]
     ];
     $('#quickActions').innerHTML = items.map(([icon,label,act])=>`<button class="quick-action" type="button" onclick="${act}"><span>${icon}</span>${label}</button>`).join('');
-    $('#actionDialog').showModal();
+    const _qd = $('#actionDialog'); _qd.removeAttribute('data-app');
+    const _qh = _qd.querySelector('.dialog-head h2'); if(_qh) _qh.textContent = 'Ajouter rapidement';
+    _qd.showModal();
   }
   // V5.49 — Le ＋ Ajouter du hub Santé doit demander quoi ajouter (sinon il créait
   // un traitement par défaut, jamais un vrai rendez-vous).
@@ -1833,8 +1836,10 @@
   // V5.51 — Mêmes règles que Santé : le ＋ Ajouter de chaque app à plusieurs types
   // ouvre une petite fenêtre de choix → puis le bon formulaire.
   function openAddSheet(items){
+    const dlg = $('#actionDialog'); dlg.removeAttribute('data-app');
+    const h2 = dlg.querySelector('.dialog-head h2'); if(h2) h2.textContent = 'Ajouter rapidement';
     $('#quickActions').innerHTML = items.map(([icon,label,act])=>`<button class="quick-action" type="button" onclick="${act}"><span>${icon}</span>${label}</button>`).join('');
-    $('#actionDialog').showModal();
+    dlg.showModal();
   }
   function openSlvAdd(){
     openAddSheet([
@@ -1950,6 +1955,91 @@
     }
     const module = canonicalModuleId(found.item.module || 'calendrier');
     openEdit(module === 'calendrier' ? 'calendrier' : module, id);
+  }
+
+  // V5.58 — « Modifier » : ouvre toujours le formulaire d'édition (pas la page détail).
+  function openItemEdit(id){
+    const f = findRecord(id);
+    if(!f){ toast('Élément introuvable ou déjà archivé.'); return; }
+    const module = canonicalModuleId(f.item.module || 'calendrier');
+    openEdit(module === 'calendrier' ? 'calendrier' : module, id);
+  }
+  function summaryRecurrence(x){
+    const r = String(x.recurrence || x.recurrence_label || '').toLowerCase();
+    if(!r || r==='ponctuel' || r==='none' || r==='aucune') return 'Ponctuel';
+    if(/quotidien|daily|jour/.test(r)) return 'Tous les jours';
+    if(/hebdo|weekly|semaine/.test(r)) return 'Chaque semaine';
+    if(/mensuel|monthly|mois/.test(r)) return 'Chaque mois';
+    if(/annuel|yearly|an/.test(r)) return 'Chaque année';
+    return x.recurrence;
+  }
+  // V5.58 — « Résumé » : vue lecture seule d'un élément (toutes listes).
+  function openItemSummary(id){
+    const f = findRecord(id);
+    if(!f){ toast('Élément introuvable ou déjà archivé.'); return; }
+    const x = f.item;
+    const module = canonicalModuleId(x.module || 'calendrier');
+    const done = statusIsDone(x);
+    const mid = (typeof getItemMemberId==='function' ? getItemMemberId(x) : null) || x.member;
+    const mem = (data.family||[]).find(m=>m.id===mid);
+    const ech = (x.startDate||x.date) ? displayDate(x.startDate||x.date) : '—';
+    const note = x.notes || x.note || x.description || x.details || '';
+    const lines = [
+      ['Statut', done ? '✓ Fait' : '🟢 À faire'],
+      ['Catégorie', x.category || x.categorie || moduleLabel(module)],
+      ['Échéance', ech],
+      ['Récurrence', summaryRecurrence(x)],
+      ['Pour', mem ? shortMemberName(mem.name) : 'Toute la famille']
+    ];
+    const body = `<div class="item-summary">
+        <div class="isum-title">${escapeHtml(x.title || x.nom || 'Élément')}</div>
+        ${lines.map(([l,v])=>`<div class="isum-line"><span class="isl-lab">${l}</span><span class="isl-val">${escapeHtml(String(v||'—'))}</span></div>`).join('')}
+        ${note?`<div class="isum-note"><span class="isl-lab">Note</span><p>${escapeHtml(note)}</p></div>`:''}
+        <div class="isum-foot">
+          <button type="button" class="btn ghost danger" onclick="event.stopPropagation();document.getElementById('actionDialog').close();SuperApp.deleteItem('${id}')">🗑️ Supprimer</button>
+          <button type="button" class="btn primary" onclick="event.stopPropagation();document.getElementById('actionDialog').close();SuperApp.openItemEdit('${id}')">✏️ Modifier</button>
+        </div>
+      </div>`;
+    const dlg = $('#actionDialog');
+    dlg.setAttribute('data-app', module);
+    const h2 = dlg.querySelector('.dialog-head h2'); if(h2) h2.textContent = 'Résumé';
+    $('#quickActions').innerHTML = body;
+    dlg.showModal();
+  }
+  // Deux boutons « Résumé / Modifier » communs à toutes les rangées de liste.
+  function rowActionsB(id, resumeAction){
+    const ra = resumeAction || `SuperApp.openItemSummary('${id}')`;
+    return `<div class="row-acts-b">`
+      + `<button type="button" class="ra-btn ra-resume" onclick="event.stopPropagation();${ra}">👁 Résumé</button>`
+      + `<button type="button" class="ra-btn ra-modif" onclick="event.stopPropagation();SuperApp.openItemEdit('${id}')">✏️ Modifier</button>`
+      + `</div>`;
+  }
+  // V5.58 — Assistance clavier : recentre le champ actif au-dessus du clavier
+  // et cale le dialogue ouvert sur la zone réellement visible (iOS + Android).
+  function installKeyboardAssist(){
+    document.addEventListener('focusin', e=>{
+      const dlg = document.querySelector('dialog[open]');
+      if(!dlg || !dlg.contains(e.target)) return;
+      if(!/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+      setTimeout(()=>{ try{ e.target.scrollIntoView({block:'center', behavior:'smooth'}); }catch(_){} }, 280);
+    });
+    const vv = window.visualViewport;
+    function fit(){
+      const dlg = document.querySelector('dialog[open]');
+      if(!dlg || !vv) return;
+      const kbd = (window.innerHeight - vv.height) > 120;
+      if(kbd){
+        dlg.classList.add('kbd-open');
+        dlg.style.setProperty('--kbd-vh', Math.round(vv.height) + 'px');
+        dlg.style.setProperty('--kbd-top', Math.round(vv.offsetTop || 0) + 'px');
+      } else {
+        dlg.classList.remove('kbd-open');
+        dlg.style.removeProperty('--kbd-vh');
+        dlg.style.removeProperty('--kbd-top');
+      }
+    }
+    if(vv){ vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); }
+    document.addEventListener('focusout', ()=>setTimeout(fit, 120));
   }
       function setCalendarFilter(module){ state.calendarFilter = module === 'all' ? 'all' : canonicalModuleId(module); renderCalendar(); }
   function openSettings(section,module=''){
@@ -3109,11 +3199,12 @@
     const loc=x.location?` · 📍 ${escapeHtml(x.location)}`:'';
     const remaining=slvChecklistRemaining(x);
     const total=slvChecklistForActivity(x).length;
-    return `<article class="slv-activity-card common-info-row clickable-card ${done?'done':''}" onclick="event.stopPropagation();SuperApp.openSlvActivityDetail('${x.id}')">
+    return `<article class="slv-activity-card common-info-row ${done?'done':''}">
       <div class="health-info-main"><b>${escapeHtml(x.title||'Activité')}</b>
         <small>${escapeHtml(mems)}${escapeHtml(rec)}${loc}</small>
         ${dl?`<em>${escapeHtml(dl)}${total?` · ${remaining}/${total} checklist`:''}</em>`:''}</div>
       <button type="button" class="shopping-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')" aria-label="Marquer fait">${done?'✓':''}</button>
+      ${rowActionsB(x.id, "SuperApp.openSlvActivityDetail('"+x.id+"')")}
     </article>`;
   }
   function slvChecklistRows(gear, activityId=''){
@@ -5452,7 +5543,7 @@
     _getData: ()=>data,
     _mergeData: (d)=>{ const m=ensureDataShape(d); Object.assign(data,m); localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); },
     _findRecord: findRecord, toast,
-    setView, openModule, openItem, setCalendarFilter, setNotificationFilter,
+    setView, openModule, openItem, openItemEdit, openItemSummary, setCalendarFilter, setNotificationFilter,
     render:()=>render(),
     setActiveProfile, openProfilePicker, closeProfileSheet, requestNotify, openQuickActions, openSanteAdd, openSlvAdd, openCoursesAdd, openEducationAdd, openFamilleAdd,
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},

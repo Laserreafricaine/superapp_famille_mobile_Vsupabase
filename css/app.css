@@ -2196,14 +2196,14 @@ body[data-theme="sombre"] .dialog-actions{
     left:50%!important;
     transform:translate3d(-50%,-50%,0)!important;
     -webkit-transform:translate3d(-50%,-50%,0)!important;
-    max-height:calc(100vh - 22px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;
+    max-height:calc(100dvh - 22px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;
     -webkit-overflow-scrolling:touch!important;
   }
   dialog.dialog-card[open] form,
   #editDialog[open] form,
   #actionDialog[open] form,
   .create-cat-dialog[open] form{
-    max-height:calc(100vh - 22px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;
+    max-height:calc(100dvh - 22px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;
   }
 }
 
@@ -2581,3 +2581,52 @@ body[data-view="home"] #view-home .home-apps-grid{flex:1;min-height:0;grid-templ
 .treatment-card-expanded .rich-check{align-self:center}
 .mh-sig.done .mh-sig-body b{text-decoration:line-through;opacity:.72}
 .treatment-done-note{color:#2f8452;font-weight:800;background:#e9f7ef;border-radius:14px;padding:11px 12px;text-align:center}
+
+/* ===== V5.58 — Boutons Résumé / Modifier sur les rangées ===== */
+.row-acts-b{display:flex;gap:6px;flex:none;align-items:center}
+.ra-btn{font-family:'Baloo 2',ui-rounded,system-ui,sans-serif;font-weight:800;font-size:.76rem;line-height:1;border:none;border-radius:11px;padding:9px 11px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.ra-btn.ra-resume{background:var(--accent-soft,#eef2f7);color:var(--accent2,#3a5170);border:1px solid var(--accent-border,#dde4ee)}
+.ra-btn.ra-modif{background:var(--accent,#2FA66B);color:#fff}
+.ra-btn:active{transform:scale(.96)}
+/* la rangée reste lisible quand les deux boutons s'ajoutent */
+.maison-task-row .row-acts-b,.shopping-check-row .row-acts-b,.slv-activity-card .row-acts-b,.checklist-list-row .row-acts-b{margin-left:auto}
+.health-rich-card .row-acts-b{margin-left:auto;align-self:center}
+@media (max-width:360px){.ra-btn{padding:8px 9px;font-size:.72rem}}
+
+/* ===== V5.58 — Feuille « Résumé » (lecture seule) ===== */
+.item-summary{display:flex;flex-direction:column}
+.item-summary .isum-title{font-family:'Baloo 2',ui-rounded,system-ui,sans-serif;font-weight:800;font-size:1.15rem;color:var(--accent2,#1b3a5e);margin:2px 2px 10px}
+.item-summary .isum-line{display:flex;gap:10px;padding:9px 2px;border-bottom:1px solid #f1f3f8;font-size:.92rem}
+.item-summary .isum-line .isl-lab{color:#6c7a93;font-weight:700;width:104px;flex:none}
+.item-summary .isum-line .isl-val{font-weight:700;color:#1b3a5e}
+.item-summary .isum-note{padding:10px 2px 2px}
+.item-summary .isum-note .isl-lab{color:#6c7a93;font-weight:700;display:block;margin-bottom:3px;font-size:.86rem}
+.item-summary .isum-note p{margin:0;font-weight:600;color:#33405a;line-height:1.45;white-space:pre-wrap}
+.item-summary .isum-foot{display:flex;gap:9px;margin-top:16px}
+.item-summary .isum-foot button{flex:1;font-family:'Baloo 2',ui-rounded,system-ui,sans-serif;font-weight:800;font-size:.95rem;border-radius:13px;padding:12px;border:none;cursor:pointer}
+.item-summary .isum-foot .primary{background:var(--accent,#2FA66B);color:#fff}
+.item-summary .isum-foot .ghost.danger{background:#fff;border:1px solid #f3c9c9;color:#c0392b}
+/* couleur d'app pour la feuille Résumé (réutilise les variables du dialogue) */
+#actionDialog[data-app="maison"]{--accent:#2fa66b;--accent2:#1e7c4d}
+#actionDialog[data-app="courses_repas"]{--accent:#f08a3c;--accent2:#c76717}
+#actionDialog[data-app="education"]{--accent:#4c6fe0;--accent2:#3350b4}
+#actionDialog[data-app="sante"]{--accent:#e45c86;--accent2:#be3c66}
+#actionDialog[data-app="sport_loisirs"]{--accent:#149fc4;--accent2:#0f7d9b}
+#actionDialog[data-app="familles"]{--accent:#8a6fd1;--accent2:#6b50b0}
+#actionDialog[data-app="calendrier"]{--accent:#e2a52b;--accent2:#b67f12}
+
+/* ===== V5.58 — Clavier : caler le dialogue ouvert sur la zone visible ===== */
+dialog#editDialog.kbd-open[open],
+dialog#actionDialog.kbd-open[open],
+dialog.create-cat-dialog.kbd-open[open]{
+  top:var(--kbd-top,8px)!important;
+  transform:translateX(-50%)!important;
+  -webkit-transform:translateX(-50%)!important;
+  max-height:var(--kbd-vh,100dvh)!important;
+}
+dialog#editDialog.kbd-open[open] form,
+dialog#actionDialog.kbd-open[open] form,
+dialog.create-cat-dialog.kbd-open[open] form{
+  max-height:calc(var(--kbd-vh,100dvh) - 12px)!important;
+  overflow-y:auto!important;
+}
