@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.79.0';
+  const APP_VERSION = '5.80.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -273,7 +273,7 @@
     if(!window._sbPauseAutoPush && typeof sbPushData === "function") sbPushData(data).catch(()=>{});
   }
   // V5.76 — Apps en mode "assistant" (fiche à étapes). Pour ajouter une future app : l'inscrire ici.
-  function isWizardModule(m){ return ['maison','education','sante'].includes(m); }
+  function isWizardModule(m){ return ['maison','education','sante','sport_loisirs'].includes(m); }
   function closeEditDialog(){
     state.preset = null;
     try { if($('#editDialog')?.open) $('#editDialog').close(); } catch {}
@@ -747,7 +747,7 @@
         $('#editForm').dataset.type = docModule;
         $('#editForm').dataset.id = savedRecord.id;
         renderEditFields(docModule, savedRecord);
-        if(canonicalModuleId(docModule)==='maison' || canonicalModuleId(docModule)==='education') wizGo(2);
+        if(isWizardModule(canonicalModuleId(docModule))) wizGo(2);
         toast('✅ Fiche enregistrée. Tu peux maintenant joindre le document.');
         setTimeout(()=>{ window.sbHydrateHealthItemDocs?.(savedRecord.id, docModule); if(wantsAttachAfterSave){ setTimeout(()=>document.getElementById('sb-health-doc-input-'+savedRecord.id)?.click(), 250); } }, 120);
         return;
@@ -1287,6 +1287,7 @@
     </article>`;
   }
   function healthInfoRow(x,cfg){
+    if(batchOn()) return batchRowHtml(x.id, x.title||'Santé', x.category||'');
     const _isAppt=isAppointment(x);
     const _isTreat=!_isAppt&&(x.type==='medication'||x.type==='medicament'||x.type==='traitement'||(x.category||'').toLowerCase().includes('traitement')||(x.category||'').toLowerCase().includes('médicament'));
     if(_isTreat) return healthTreatmentCard(x);
@@ -1501,6 +1502,7 @@
     return bits.join(' · ') || 'À planifier';
   }
   function schoolItemCard(x,cfg={}){
+    if(batchOn()) return batchRowHtml(x.id, x.title||'Devoir', x.subject||x.category||'');
     const done=statusIsDone(x);
     const urg=schoolUrgencyClass(x);
     const title=x.title||'Élément scolaire';
@@ -2285,6 +2287,72 @@
   function santePickDays(el,precise){ el.parentElement.querySelectorAll('.wiz-chip').forEach(c=>c.classList.remove('sel')); el.classList.add('sel'); const days=document.getElementById('wizDays'); if(days) days.classList.toggle('on',!!precise); const m=document.getElementById('wizDaysMode'); if(m) m.value=precise?'week_days':'every_day'; }
 
 
+  function slvPickRec(el,val){
+    const row=el.parentElement; row.querySelectorAll('.wiz-chip').forEach(c=>c.classList.remove('sel')); el.classList.add('sel');
+    const h=document.getElementById('slvRec'); if(h) h.value=val;
+    const wrap=document.getElementById('slvEndWrap');
+    if(wrap){ const recurring=val&&val!=='ponctuelle'; wrap.style.display=recurring?'block':'none'; if(!recurring){ const e=document.getElementById('wizEnd'); if(e) e.value=''; } }
+  }
+  function slvTogPart(cb){
+    const row=cb.closest('.wiz-avrow'); if(!row) return;
+    if(cb.value==='family' && cb.checked){ row.querySelectorAll('input[name="members_cb"]').forEach(o=>{ if(o!==cb){o.checked=false;o.closest('.wiz-av')?.classList.remove('sel');} }); }
+    else if(cb.value!=='family' && cb.checked){ const f=row.querySelector('input[value="family"]'); if(f){f.checked=false;f.closest('.wiz-av')?.classList.remove('sel');} }
+    cb.closest('.wiz-av')?.classList.toggle('sel', cb.checked);
+    if(![...row.querySelectorAll('input[name="members_cb"]:checked')].length){ const f=row.querySelector('input[value="family"]'); if(f){f.checked=true;f.closest('.wiz-av')?.classList.add('sel');} }
+  }
+  function slvTaskWizardHtml(item={}){
+    const isEditing=!!item.id;
+    const sub=item.type||'activite';
+    const isVoyage=sub==='voyage';
+    const cat=item.category||(isVoyage?'Voyage':(sub==='loisir'?'Loisir':'Sport'));
+    const pers=isVoyage
+      ? {q:'Quelle destination ?',ph:'Ex : Marseille chez Mamie',part:'Qui part ?',ckLabel:'Préparer les bagages',ckSub:'vêtements, papiers, trousse de toilette…',docBtn:'Joindre réservations, billets, hôtel…',docZone:'📎 Réservations / billets'}
+      : (sub==='loisir'
+      ? {q:'Quel loisir ?',ph:'Ex : Cinéma, atelier dessin, sortie au parc…',part:'Qui en profite ?',ckLabel:'À emporter',ckSub:'tickets, tenue, encas…',docBtn:'Joindre billet, réservation, inscription…',docZone:'📎 Billet / réservation'}
+      : {q:'Quelle activité sportive ?',ph:'Ex : Entraînement foot, natation, judo…',part:'Qui participe ?',ckLabel:'Préparer le sac de sport',ckSub:'maillot, chaussures, gourde…',docBtn:'Joindre licence, inscription au club…',docZone:'📎 Licence / inscription'});
+    const fam=(data.family||[]).filter(m=>!statusIsHidden(m));
+    const todayIso=dmyToISO(today)||new Date().toISOString().slice(0,10);
+    const startIso=dmyToISO(item.startDate||item.date)||todayIso;
+    const endIso=dmyToISO(item.endDate)||'';
+    const selIds=String(item.members||item.member||'family').split(',').map(s=>s.trim()).filter(Boolean);
+    const hasFamily=!item.members||item.members==='family'||selIds.includes('family');
+    const pTous=`<label class="wiz-av wiz-av-ck${hasFamily?' sel':''}"><input type="checkbox" name="members_cb" value="family" ${hasFamily?'checked':''} onchange="SuperApp.slvTogPart(this)"><span class="wiz-bub emoji">👨‍👩‍👧</span><span class="wiz-avn">Tous</span></label>`;
+    const pMembers=fam.map(m=>`<label class="wiz-av wiz-av-ck${(!hasFamily&&selIds.includes(m.id))?' sel':''}"><input type="checkbox" name="members_cb" value="${escapeAttr(m.id)}" ${(!hasFamily&&selIds.includes(m.id))?'checked':''} onchange="SuperApp.slvTogPart(this)"><img class="wiz-bub" src="${memberAvatarSrc(m)}" alt=""><span class="wiz-avn">${escapeHtml(String(m.name||'').split(' ')[0])}</span></label>`).join('');
+    const partBlock=`<div class="wiz-lbl mt">🧑‍🤝‍🧑 ${pers.part}</div><p class="wiz-hint">${isVoyage?'Le voyage':"L'activité"} apparaîtra dans le calendrier de chacun.</p><div class="wiz-avrow wiz-avrow-wrap">${pTous}${pMembers}</div>`;
+    const rec=item.recurrence||'ponctuelle';
+    const recChip=(v,l)=>`<button type="button" class="wiz-chip sm${rec===v?' sel':''}" onclick="SuperApp.slvPickRec(this,'${v}')">${l}</button>`;
+    const locBlock=`<div class="wiz-lbl mt">📍 Lieu</div><input class="wiz-title wiz-subject" id="activityLocationInput" name="location" placeholder="Ex : Gymnase, Cinéma, Paris…" value="${escapeAttr(item.location||'')}"><div class="map-action-row"><button type="button" class="btn ghost" onclick="SuperApp.useActivityPosition()">📍 Ma position</button><button type="button" class="btn ghost" onclick="SuperApp.openActivityInMaps()">🗺️ Maps</button></div><input type="hidden" name="locationLat" id="activityLatInput" value="${escapeAttr(item.locationLat||'')}"><input type="hidden" name="locationLng" id="activityLngInput" value="${escapeAttr(item.locationLng||'')}">`;
+    const docInfo={ico:'📎',btn:pers.docBtn,zone:pers.docZone};
+    const docInner=isEditing?healthDocsFieldHtml(item,'sport_loisirs',docInfo.zone):`<button type="submit" class="wiz-choice" data-attach-after-save="1"><span class="ico">${docInfo.ico}</span><span class="tx"><b>${docInfo.btn}</b><small>Enregistre la fiche en 1 clic</small></span><span class="chev">›</span></button>`;
+    const docWrap=`<div style="margin-top:11px">${docInner}</div>`;
+    const ckLabel=pers.ckLabel;
+    const checklistBtn=isEditing?`<button type="button" class="wiz-choice" onclick="SuperApp.openGenericChecklist('${escapeAttr(item.id)}','sport_loisirs')"><span class="ico">✅</span><span class="tx"><b>${ckLabel}</b><small>${pers.ckSub}</small></span><span class="chev">›</span></button>`:`<button type="submit" class="wiz-choice" data-open-generic-checklist="1" data-checklist-kind="sport_loisirs"><span class="ico">✅</span><span class="tx"><b>${ckLabel}</b><small>${pers.ckSub}</small></span><span class="chev">›</span></button>`;
+    const subDefault=isVoyage?'Affaires\nPapiers\nHygiène\nPharmacie\nÉlectronique':'';
+    const subVal=subcategoriesText(item)||subDefault;
+    const subBlock=isVoyage?`<div class="wiz-lbl mt">🧳 Catégories de bagages</div><p class="wiz-hint">Chaque ligne devient un onglet de la checklist.</p><textarea class="wiz-title slv-wiz-textarea" name="subcategories" rows="4">${escapeHtml(subVal)}</textarea>`:`<input type="hidden" name="subcategories" value="${escapeAttr(subcategoriesText(item))}">`;
+    const danger=isEditing?`<div class="wiz-danger"><button type="button" class="btn ghost" onclick="SuperApp.archiveItem('${escapeAttr(item.id)}')">Archiver</button><button type="button" class="btn ghost danger" onclick="SuperApp.deleteItem('${escapeAttr(item.id)}')">🗑️ Supprimer</button></div>`:'';
+    let step1,step2;
+    if(isVoyage){
+      step1=`<div class="wiz-q">${pers.q}</div><input class="wiz-title" id="wizTitle" name="title" placeholder="${pers.ph}" value="${escapeAttr(item.title||'')}" required>${partBlock}`;
+      step2=`<div class="wiz-lbl">🗓️ Dates du séjour</div><div class="wiz-when"><input class="wiz-date" type="date" name="startDate" id="wizDate" value="${startIso}" data-today="${todayIso}" required><input class="wiz-date" type="date" name="endDate" id="wizEnd" value="${endIso||startIso}" required></div><div class="wiz-recnote">🧳 Le voyage couvrira toute la période, du départ au retour.</div><input type="hidden" name="recurrence" value="ponctuelle">${locBlock}${checklistBtn}${docWrap}${danger}`;
+    } else {
+      step1=`<div class="wiz-q">${pers.q}</div><input class="wiz-title" id="wizTitle" name="title" placeholder="${pers.ph}" value="${escapeAttr(item.title||'')}" required>${partBlock}`;
+      step2=`<div class="wiz-lbl">🔁 Fréquence</div><input type="hidden" name="recurrence" id="slvRec" value="${escapeAttr(rec)}"><div class="wiz-chips">${recChip('ponctuelle','Ponctuelle')}${recChip('quotidienne','Tous les jours')}${recChip('hebdomadaire','Chaque semaine')}${recChip('mensuelle','Chaque mois')}</div><div class="wiz-lbl mt">📅 Quand ?</div><div class="wiz-when"><input class="wiz-date" type="date" name="startDate" id="wizDate" value="${startIso}" data-today="${todayIso}" required><input class="wiz-time" type="time" name="time" value="${escapeAttr(item.time||'')}"></div><div class="wiz-endwrap" id="slvEndWrap" style="display:${rec!=='ponctuelle'?'block':'none'}"><div class="wiz-lbl mt">📅 Jusqu'à quand ?</div><input class="wiz-date" type="date" name="endDate" id="wizEnd" value="${endIso}"></div>${locBlock}${checklistBtn}${docWrap}${danger}`;
+    }
+    return `
+      <input type="hidden" name="type" value="${escapeAttr(sub)}">
+      <input type="hidden" name="category" value="${escapeAttr(cat)}">
+      <input type="hidden" name="status" value="${escapeAttr(item.status||'a_faire')}">
+      <div class="wiz-step on" data-wiz-step="1">
+        ${step1}
+        <div class="wiz-nav"><button type="button" class="btn ghost" onclick="SuperApp.exitWizardFiche()">Annuler</button><button type="button" class="btn primary" onclick="SuperApp.wizNext()">Suivant →</button></div>
+      </div>
+      <div class="wiz-step" data-wiz-step="2">
+        ${step2}
+        <div class="wiz-nav"><button type="button" class="btn ghost" onclick="SuperApp.wizBack()">← Retour</button><button type="submit" class="btn primary">Enregistrer ✓</button></div>
+      </div>`;
+  }
+
   function wizGo(n){ document.querySelectorAll('#editForm .wiz-step').forEach(el=>el.classList.toggle('on', el.dataset.wizStep===String(n))); }
   function wizNext(){ const t=document.getElementById('wizTitle'); if(t && t.type !== 'hidden' && !t.value.trim()){ t.focus(); t.classList.add('wiz-err'); return; } wizGo(2); }
   function wizBack(){ wizGo(1); }
@@ -2305,6 +2373,9 @@
       actions?.setAttribute('hidden','');
     } else if(canonicalModuleId(type)==='sante'){
       $('#editFields').innerHTML = santeTaskWizardHtml(item);
+      actions?.setAttribute('hidden','');
+    } else if(canonicalModuleId(type)==='sport_loisirs' && !['materiel_sport','materiel_loisir','materiel_voyage','document_sport'].includes(item.type||'')){
+      $('#editFields').innerHTML = slvTaskWizardHtml(item);
       actions?.setAttribute('hidden','');
     } else {
       $('#editFields').innerHTML = fieldsFor(type,item);
@@ -2347,6 +2418,10 @@
   }
   function openSanteTaskWizardStep(id, step=2){
     openEdit('sante', id);
+    setTimeout(()=>wizGo(step || 2), 0);
+  }
+  function openSlvTaskWizardStep(id, step=2){
+    openEdit('sport_loisirs', id);
     setTimeout(()=>wizGo(step || 2), 0);
   }
   function openAdd(module,type='',category='',title='',member=''){
@@ -2414,7 +2489,7 @@
     if(!found){ toast('Élément introuvable ou déjà archivé.'); return; }
     // Activités sport/loisir/voyage → page détail avec checklist liée
     if(['sports','loisirs','voyages'].includes(found.collection)){
-      openSlvActivityDetail(id); return;
+      openEdit('sport_loisirs', id); return;
     }
     const module = canonicalModuleId(found.item.module || 'calendrier');
     openEdit(module === 'calendrier' ? 'calendrier' : module, id);
@@ -2474,7 +2549,7 @@
   // activités Sport/Loisir/Voyage → fiche détaillée (bagages/matériel) ; autres → checklist d'étapes.
   function checklistActionFor(id){
     const f = findRecord(id);
-    if(f && ['sports','loisirs','voyages'].includes(f.collection)) return `SuperApp.openSlvActivityDetail('${id}')`;
+    if(f && ['sports','loisirs','voyages'].includes(f.collection)) return `SuperApp.openGenericChecklist('${id}','sport_loisirs')`;
     const kind = (f && canonicalModuleId(f.item.module) === 'education') ? 'education' : 'maison';
     return `SuperApp.openGenericChecklist('${id}','${kind}')`;
   }
@@ -3694,6 +3769,7 @@
     `;
   }
   function slvActivityCard(x){
+    if(batchOn()) return batchRowHtml(x.id, x.title||'Activité', x.startDate?shortDate(x.startDate):(x.date?shortDate(x.date):''));
     const done=statusIsDone(x);
     const mems=x.members&&x.members!=='family'?String(x.members).split(',').map(id=>{const m=(data.family||[]).find(m=>m.id===id.trim());return m?firstMemberName(m.name):id;}).join(', '):(x.member==='family'||!x.member?'Famille':memberName(x.member));
     const rec=x.recurrence&&x.recurrence!=='ponctuelle'?` · ${x.recurrence}`:'';
@@ -3702,7 +3778,7 @@
     const remaining=slvChecklistRemaining(x);
     const total=slvChecklistForActivity(x).length;
     return `<article class="slv-activity-card common-info-row ${done?'done':''}">
-      <div class="health-info-main"><b>${escapeHtml(x.title||'Activité')}</b>
+      <div class="health-info-main clickable-card" onclick="SuperApp.openItem('${x.id}')"><b>${escapeHtml(x.title||'Activité')}</b>
         <small>${escapeHtml(mems)}${escapeHtml(rec)}${loc}</small>
         ${dl?`<em>${escapeHtml(dl)}${total?` · ${remaining}/${total} checklist`:''}</em>`:''}</div>
       <button type="button" class="shopping-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')" aria-label="Marquer fait">${done?'✓':''}</button>
@@ -3769,6 +3845,7 @@
   }
   function openSlvActivityDetail(id){ state.appsView={kind:'slvDetail', id}; setView('apps'); }
   function genericChecklistConfig(kind='maison'){
+    if(kind === 'sport_loisirs') return {kind:'sport_loisirs', module:'sport_loisirs', title:'Matériel & bagages', emoji:'🎽', itemPlaceholder:'Objet à prévoir', type:'checklist_sport_loisirs', category:'Matériel', suggestions:['Tenue','Chaussures','Gourde','Trousse de toilette','Papiers']};
     if(kind === 'sante') return {kind:'sante', module:'sante', title:'Préparer le rendez-vous', emoji:'🩺', itemPlaceholder:'À prévoir', type:'checklist_sante', category:'Santé', suggestions:['Carte vitale','Ordonnance','Carnet de santé','Questions à poser']};
     return kind === 'education'
       ? {kind:'education', module:'education', title:'Checklist devoirs', emoji:'📚', itemPlaceholder:'Étape du devoir', type:'checklist_devoir', category:'Devoirs', suggestions:['Lire la consigne','Faire les exercices','Relire','Mettre dans le cartable']}
@@ -3784,6 +3861,10 @@
   // V5.67 — Sélection multiple + suppression par lot (hub & checklist)
   function batchOn(){ return !!(state.batch && state.batch.on); }
   function batchHas(id){ return !!(state.batch && state.batch.ids && state.batch.ids.includes(String(id))); }
+  function batchRowHtml(id, title, meta=''){
+    const picked = batchHas(id);
+    return `<div class="mh-sig-item batch-row ${picked?'picked':''}" onclick="SuperApp.batchToggle('${id}')"><div class="mh-sig-task"><span class="mh-selbox">${picked?'✓':''}</span><div class="mh-sig-body"><b>${escapeHtml(title||'Élément')}</b>${meta?`<small>${escapeHtml(meta)}</small>`:''}</div></div></div>`;
+  }
   function batchEnter(){ state.batch = {on:true, ids:[]}; render(); }
   function batchExit(){ state.batch = {on:false, ids:[]}; render(); }
   function batchToggle(id){ id=String(id); if(!state.batch||!state.batch.on) state.batch={on:true, ids:[]}; const a=state.batch.ids; const i=a.indexOf(id); if(i>=0) a.splice(i,1); else a.push(id); render(); }
@@ -3895,7 +3976,8 @@
       ? `SuperApp.openMaisonTaskWizardStep('${parentId}',2)`
       : (cfg.module==='education' ? `SuperApp.openEducationTaskWizardStep('${parentId}',2)`
       : (cfg.module==='sante' ? `SuperApp.openSanteTaskWizardStep('${parentId}',2)`
-      : `SuperApp.openEdit('${cfg.module}','${parentId}')`));
+      : (cfg.module==='sport_loisirs' ? `SuperApp.openSlvTaskWizardStep('${parentId}',2)`
+      : `SuperApp.openEdit('${cfg.module}','${parentId}')`)));
     const foot = on
       ? batchBarHtml(idsCsv)
       : `<footer class="gc-foot"><button type="button" class="btn primary gc-finish" onclick="${returnAction}">✓ Terminer la checklist</button></footer>`;
@@ -5226,16 +5308,18 @@
           return managementRow(x,cfg);
         }).join('') : `<article class="empty cute-empty"><b>${cfg.emoji} Rien pour le moment</b><small>Ajoute un premier élément. Tout élément affiché peut ensuite être modifié ou supprimé.</small><button class="btn primary" onclick="${addAction}">+ Ajouter</button></article>`);
     const onB = batchOn();
-    const selBtn = (module==='maison') ? (onB
+    const _allowBatch = ['maison','education','sante','sport_loisirs'].includes(module);
+    const selBtn = _allowBatch ? (onB
       ? `<button type="button" class="link-btn sel-link" onclick="SuperApp.batchExit()">Annuler</button>`
       : `<button type="button" class="link-btn sel-link" onclick="SuperApp.batchEnter()">Sélectionner</button>`) : '';
     const titleBar = module === 'sante' ? '' : `<div class="section-title compact-title v53-list-title"><h2>${cfg.emoji} ${escapeHtml(moduleListTitle(module, block, cfg))}</h2>${selBtn}<button class="link-btn" onclick="${addAction}">+ Ajouter</button></div>`;
+    const santeSelBar = (module === 'sante' && _allowBatch) ? `<div class="sante-sel-bar">${selBtn}</div>` : '';
     const listIdsCsv = items.map(x=>x.id).join(',');
-    const batchFoot = (module==='maison' && onB) ? batchBarHtml(listIdsCsv, {taskActions:true}) : '';
+    const batchFoot = (_allowBatch && onB) ? batchBarHtml(listIdsCsv, {taskActions: module==='maison'}) : '';
     return `<section class="v53-direct-list ${module==='sante'?'health-direct-list':''}" data-block="${escapeAttr(block)}">
       <section class="filter-zone"><h3>${module==='sante'?'Filtrer la liste':'Filtrer'}</h3>${listTabsForModule(module)}</section>
       ${memberFilterRow(module)}
-      ${titleBar}
+      ${titleBar}${santeSelBar}
       <div class="management-list">${rows}</div>
       ${batchFoot}
       ${docsPanelInline}
@@ -5386,7 +5470,13 @@
       const meta = [a.time, a.place, who].filter(Boolean).join(' · ');
       return `<div class="sh-dose"><span class="sh-rdv-ic">🩺</span><div class="sh-dose-body" onclick="SuperApp.openItemSummary('${a.id}')"><b>${escapeHtml(a.title||'Rendez-vous')}</b>${meta?`<small>${escapeHtml(meta)}</small>`:''}</div>${rowActionsB(a.id)}</div>`;
     }).join('');
-    return `<div class="sh-sig"><div class="sh-sig-tag">📅 Aujourd'hui</div><div class="sh-dose-list">${doseRows}${rdvRows}</div></div>`;
+    const _on=batchOn();
+    const _ids=[...todays.slice(0,3),...apptToday.slice(0,2)].map(i=>i.id);
+    if(_on){
+      const _rows=[...todays.slice(0,3),...apptToday.slice(0,2)].map(i=>batchRowHtml(i.id, i.title||'Santé', i.category||'')).join('');
+      return `<div class="sh-sig"><div class="sh-sig-head"><div class="sh-sig-tag">📅 Aujourd'hui</div><button type="button" class="mh-selbtn" onclick="SuperApp.batchExit()">Annuler</button></div><div class="sh-dose-list">${_rows}</div>${batchBarHtml(_ids.join(','))}</div>`;
+    }
+    return `<div class="sh-sig"><div class="sh-sig-head"><div class="sh-sig-tag">📅 Aujourd'hui</div>${_ids.length?`<button type="button" class="mh-selbtn" onclick="SuperApp.batchEnter()">Sélectionner</button>`:''}</div><div class="sh-dose-list">${doseRows}${rdvRows}</div></div>`;
   }
   function santeHubScreen(){
     const traitN = getHealthTreatments('open').length;
@@ -5469,23 +5559,27 @@
     const dated=all.map(x=>({x, d:x.startDate||x.date})).filter(o=>o.d && daysDiff(today,o.d)>=0).sort((a,b)=>daysDiff(today,a.d)-daysDiff(today,b.d));
     return dated[0]?.x || null;
   }
+  function slvNextByType(){
+    const pick=(g)=>{ const arr=g('open').map(x=>({x,d:x.startDate||x.date})).filter(o=>o.d&&daysDiff(today,o.d)>=0).sort((a,b)=>daysDiff(today,a.d)-daysDiff(today,b.d)); return arr[0]?arr[0].x:null; };
+    return [{cfg:slvConfigFor('sport'),x:pick(getSportActivities)},{cfg:slvConfigFor('loisir'),x:pick(getLoisirActivities)},{cfg:slvConfigFor('voyage'),x:pick(getVoyageActivities)}].filter(o=>o.x);
+  }
   function slvSignatureBlock(){
-    const next = slvNextActivity();
-    if(!next){
+    const list = slvNextByType();
+    if(!list.length){
       return `<div class="sp-sig empty"><div class="sp-sig-tag">🔜 Prochaine activité</div><p class="sp-sig-empty">Aucune activité à venir. Ajoutes-en une ! 🏖️</p></div>`;
     }
-    const d = next.startDate||next.date;
-    const dd = daysDiff(today, d);
-    const countdown = dd===0 ? "Aujourd'hui" : (dd===1 ? 'Demain' : `J‑${dd}`);
-    const cfg = slvConfigFor(slvTabForActivity(next));
-    return `<div class="sp-sig">
-      <div class="sp-sig-tag">${cfg.emoji} Prochaine activité</div>
-      <div class="sp-sig-row">
-        <div class="sp-sig-body"><b>${escapeHtml(next.title||'Activité')}</b><small>${escapeHtml(shortDate(d))}${next.location?' · 📍 '+escapeHtml(next.location):''}</small></div>
-        <span class="sp-countdown">${countdown}</span>
-      </div>
-      ${rowActionsB(next.id)}
-    </div>`;
+    const on = batchOn();
+    const ids = list.map(o=>o.x.id);
+    const selBtn = on ? `<button type="button" class="mh-selbtn" onclick="SuperApp.batchExit()">Annuler</button>` : `<button type="button" class="mh-selbtn" onclick="SuperApp.batchEnter()">Sélectionner</button>`;
+    const cards = list.map(o=>{
+      const x=o.x, d=x.startDate||x.date, dd=daysDiff(today,d);
+      const cd = dd===0 ? "Aujourd'hui" : (dd===1 ? 'Demain' : `J‑${dd}`);
+      const meta = `${escapeHtml(shortDate(d))}${x.location?' · 📍 '+escapeHtml(x.location):''}`;
+      if(on){ const picked=batchHas(x.id); return `<div class="sp-sig-row sel ${picked?'picked':''}" onclick="SuperApp.batchToggle('${x.id}')"><span class="mh-selbox">${picked?'✓':''}</span><div class="sp-sig-body"><b>${o.cfg.emoji} ${escapeHtml(x.title||'Activité')}</b><small>${meta}</small></div><span class="sp-countdown">${cd}</span></div>`; }
+      return `<div class="sp-sig-row" onclick="SuperApp.openItem('${x.id}')"><div class="sp-sig-body"><b>${o.cfg.emoji} ${escapeHtml(x.title||'Activité')}</b><small>${meta}</small></div><span class="sp-countdown">${cd}</span></div>`;
+    }).join('');
+    const bar = on ? batchBarHtml(ids.join(',')) : '';
+    return `<div class="sp-sig"><div class="sp-sig-head"><div class="sp-sig-tag">🔜 Prochaines activités</div>${selBtn}</div><div class="sp-sig-list">${cards}</div>${bar}</div>`;
   }
   function sportHubScreen(){
     const sportN=getSportActivities('open').length, loisirN=getLoisirActivities('open').length, voyageN=getVoyageActivities('open').length;
@@ -6151,7 +6245,7 @@
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
-    openEdit, openMaisonTaskWizardStep, openEducationTaskWizardStep, openSanteTaskWizardStep, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, setSlvSubFilter, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, exitWizardFiche, batchEnter, batchExit, batchToggle, batchSelectAll, batchDelete, batchRescheduleToday, batchMarkDoneAll, openSettings, openActivationPanel, activateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, deleteReferenceList, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, wizNext, wizBack, wizPickCat, wizPickMember, wizPickDate, wizPickFreq, santeToggleAcc, santePickDays, eduWizPickCat, eduWizSyncTitle, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
+    openEdit, openMaisonTaskWizardStep, openEducationTaskWizardStep, openSanteTaskWizardStep, openSlvTaskWizardStep, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, setSlvSubFilter, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, exitWizardFiche, batchEnter, batchExit, batchToggle, batchSelectAll, batchDelete, batchRescheduleToday, batchMarkDoneAll, openSettings, openActivationPanel, activateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, deleteReferenceList, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, wizNext, wizBack, wizPickCat, wizPickMember, wizPickDate, wizPickFreq, santeToggleAcc, santePickDays, slvPickRec, slvTogPart, eduWizPickCat, eduWizSyncTitle, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
     setListCatFilter, setListSubFilter, setGenericChecklistFilter, scrollToMember,
     openMaisonList, openMaisonHub, rescheduleTask, openAppList, openAppHub, openEducationChild, openSlvUniverse,
