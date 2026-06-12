@@ -2976,3 +2976,40 @@ dialog.create-cat-dialog.kbd-open[open] form{
   font-weight:950;
   font-size:.72rem;
 }
+
+
+/* V5.77.0 — Correctif ciblé responsive : éviter le débordement des champs/blocs d'ajout */
+html,body{max-width:100%;overflow-x:hidden;}
+*,*::before,*::after{box-sizing:border-box;}
+.mobile-frame,.view,.card,.dialog-card,.dialog-card form,.dialog-head,.quick-actions,.form-stack,.dialog-actions{max-width:100%;min-width:0;}
+.dialog-card,dialog.dialog-card[open]{width:min(calc(100vw - 24px),420px)!important;max-width:calc(100vw - 24px)!important;}
+.dialog-card .form-stack,.dialog-card .quick-actions{width:100%;max-width:100%;overflow-x:hidden!important;}
+.form-field,.form-field label,.form-grid-2,.member-health-form,.treatment-planner,.week-days-grid,.treatment-moments-grid,.member-check-item,.settings-chips,.chip-row,.quick-action{min-width:0;max-width:100%;}
+.form-field input,.form-field select,.form-field textarea,
+.onb-form-card input,.onb-form-grid input,.onb-form-grid select,
+.slv-checklist-form-panel input,.slv-checklist-form-panel select,.slv-checklist-form-panel textarea,
+.slv-add-object-card input,.slv-add-object-card select,
+.treatment-moment-row input[type=time],
+.member-health-form input,.member-health-form select,.member-health-form textarea{width:100%;max-width:100%;min-width:0;display:block;box-sizing:border-box;}
+.form-field textarea,.slv-checklist-form-panel textarea,.member-health-form textarea{overflow-wrap:anywhere;word-break:break-word;}
+.form-grid-2{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
+.dialog-actions{flex-wrap:wrap;}
+.dialog-actions .btn{min-width:0;max-width:100%;}
+.quick-action{width:100%;overflow:hidden;}
+.quick-action div,.quick-action strong,.quick-action small{min-width:0;overflow-wrap:anywhere;}
+.chip-row,.settings-chips,.map-action-row{max-width:100%;min-width:0;flex-wrap:wrap;overflow-x:hidden;}
+.chip,.settings-chips span,.map-action-row .btn,.map-action-row button{max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:center;}
+.member-check-item{overflow:hidden;}
+.member-check-item span,.member-check-item b,.member-check-item small{min-width:0;overflow-wrap:anywhere;}
+.treatment-moment-row{grid-template-columns:auto minmax(0,74px) minmax(0,1fr);max-width:100%;}
+.slv-add-object-card{max-width:100%;min-width:0;}
+@media(max-width:420px){
+  .dialog-card,dialog.dialog-card[open]{width:calc(100vw - 18px)!important;max-width:calc(100vw - 18px)!important;}
+  .dialog-head{padding-left:12px;padding-right:12px;}
+  .quick-actions,.form-stack{padding-left:12px!important;padding-right:12px!important;}
+  .dialog-actions{padding-left:12px!important;padding-right:12px!important;}
+  .form-grid-2{grid-template-columns:1fr;}
+  .treatment-moment-row{grid-template-columns:1fr;gap:8px;align-items:stretch;}
+  .treatment-moment-row input[type=time]{width:100%;}
+  .week-days-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
