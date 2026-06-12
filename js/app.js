@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.62.0';
+  const APP_VERSION = '5.76.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -72,9 +72,9 @@
     appsRegistry: makeAppsRegistry(),
     family: [],
     categories: {
-      maison: { 'Ménage':['Sols','Linge','Cuisine'], 'Entretien':['Plomberie','Électricité','Jardin'], 'Suivi Paiement Factures':['Eau','Électricité','Internet','Loyer','Assurance','Autre'] },
+      maison: { 'Ménage':['Sols','Linge','Cuisine'], 'Entretien':['Plomberie','Électricité','Jardin'], 'Suivi Paiement Factures':['Eau','Électricité','Internet','Loyer','Assurance','Autre'], 'Jardin / Extérieur':['Arrosage','Tonte','Plantes','Terrasse'], 'Animaux':['Nourriture','Litière','Vétérinaire','Toilettage'], 'Véhicule':['Vidange','Contrôle technique','Assurance','Lavage'], 'Démarches administratives':['Renouvellement','Rendez-vous','Courrier','Impôts'] },
       courses_repas: { 'Alimentation':['Riz','Pâtes','Huile'], 'Épicerie sénégalaise':['Riz brisé','Bouillon','Bissap'], 'Stock':['Frigo','Congélateur','Placard'] },
-      education: { 'Devoirs':['Maths','Français','Histoire'], 'Contrôles':['Contrôle','Exposé'], 'Notes':['Bulletin','Appréciation','Examen blanc'], 'Activités scolaires':['Sortie','Réunion','Voyage'], 'Documents école':['Autorisation','Assurance scolaire'] },
+      education: { 'Devoirs':['Maths','Français','Histoire'], 'Contrôles':['Contrôle','Exposé','Révision'], 'Notes':['Bulletin','Appréciation','Examen blanc'], 'Rendez-vous école':['Réunion parent-prof','Convocation','Inscription'], 'Documents école':['Autorisation','Assurance scolaire','Certificat','Bulletin'], 'Fournitures':['Cartable','Liste scolaire','Matériel'], 'Activités scolaires':['Sortie','Voyage','Spectacle'], 'Cantine / administratif':['Cantine','Paiement','Justificatif'] },
       sante: { 'Rendez-vous':['Généraliste','Dentiste','Ophtalmo'], 'Traitements':['Journalier','Hebdomadaire'], 'Documents santé':['Ordonnance','Mutuelle','Certificat'] },
       sport_loisirs: { 'Sport':['Football','Danse','Natation'], 'Loisirs':['Cinéma','Parc','Sortie'], 'Matériel':['Sac','Chaussures','Gourde'] },
       familles: { 'Identité':['Carte d’identité','Passeport','Titre de séjour'], 'Scolarité':['Diplômes','Certificats','Bulletins'], 'Administratif':['Livret de famille','Assurance','Justificatif de domicile'] }
@@ -272,10 +272,18 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     if(!window._sbPauseAutoPush && typeof sbPushData === "function") sbPushData(data).catch(()=>{});
   }
+  // V5.76 — Apps en mode "assistant" (fiche à étapes). Pour ajouter une future app : l'inscrire ici.
+  function isWizardModule(m){ return ['maison','education','sante'].includes(m); }
   function closeEditDialog(){
     state.preset = null;
     try { if($('#editDialog')?.open) $('#editDialog').close(); } catch {}
     resetDialogActions({submit:true, submitLabel:'Enregistrer', cancelLabel:'Annuler'});
+  }
+  // V5.76 — Sortie cohérente d'une fiche-assistant : ferme puis va au hub de l'app (jamais "l'écran qui était dessous").
+  function exitWizardFiche(){
+    const mod = $('#editForm')?.dataset.type || '';
+    closeEditDialog();
+    if(isWizardModule(mod)) setTimeout(()=>openModule(mod), 20);
   }
   function closeActionDialog(){
     try { if($('#actionDialog')?.open) $('#actionDialog').close(); } catch {}
@@ -577,7 +585,7 @@
         handler(event, btn);
       }, {capture:true, passive:false});
     };
-    closeIf('#cancelEdit,#closeEdit', () => closeEditDialog());
+    closeIf('#cancelEdit,#closeEdit', () => exitWizardFiche());
     closeIf('#closeAction', () => closeActionDialog());
     closeIf('#editForm button[type="submit"]', (event, btn) => {
       const form = btn.closest('form');
@@ -686,8 +694,8 @@
   }
 
   function bindDialogs(){
-    $('#cancelEdit')?.addEventListener('click', closeEditDialog);
-    $('#closeEdit')?.addEventListener('click', closeEditDialog);
+    $('#cancelEdit')?.addEventListener('click', exitWizardFiche);
+    $('#closeEdit')?.addEventListener('click', exitWizardFiche);
     $('#closeAction')?.addEventListener('click', closeActionDialog);
     $('#editForm').addEventListener('submit', e=>{
       e.preventDefault();
@@ -696,6 +704,7 @@
       const wantsSlvChecklistAfterSave = e.submitter && (e.submitter.name === 'openChecklistAfterSave' || e.submitter.dataset?.openChecklist === '1');
       const wantsGenericChecklistAfterSave = e.submitter && e.submitter.dataset?.openGenericChecklist === '1';
       const genericChecklistKind = e.submitter?.dataset?.checklistKind || '';
+      const wantsAttachAfterSave = e.submitter && e.submitter.dataset?.attachAfterSave === '1';
       const item = Object.fromEntries(form.entries());
       const multiStudents = e.currentTarget.querySelector('select[name="students"][multiple]');
       if(multiStudents) item.students = [...multiStudents.selectedOptions].map(o=>o.value).join(',');
@@ -705,15 +714,25 @@
         const vals=[...checkedMembers].map(c=>c.value).filter(v=>v&&v!=='family');
         item.members = hasFamily || !vals.length ? 'family' : vals.join(',');
       }
+      if(item.accompagnants !== undefined){
+        const _acc = String(item.accompagnants||'').split(',').map(s=>s.trim()).filter(Boolean);
+        const _base = (item.member && item.member!=='family') ? [item.member] : [];
+        const _all = [...new Set([..._base, ..._acc])];
+        item.members = _all.length ? _all.join(',') : (item.member||'family');
+        delete item.accompagnants;
+      }
       if(e.currentTarget.querySelector('[name="showOnHome"]')) item.showOnHome = form.has('showOnHome');
       const checkedWeekDays = e.currentTarget.querySelectorAll('[name="treatmentWeekDays_cb"]:checked');
       if(checkedWeekDays.length) item.treatmentWeekDays = [...checkedWeekDays].map(c=>c.value).join(',');
       const checkedMoments = e.currentTarget.querySelectorAll('[name="doseMoments_cb"]:checked');
       if(checkedMoments.length) item.doseMoments = [...checkedMoments].map(c=>c.value).join(',');
+      const checkedFreqDays = e.currentTarget.querySelectorAll('[name="frequenceWeekDays_cb"]:checked');
+      if(checkedFreqDays.length) item.frequenceWeekDays = [...checkedFreqDays].map(c=>c.value).join(',');
+      else if(e.currentTarget.querySelector('[name="frequenceWeekDays_cb"]')) item.frequenceWeekDays = '';
       if(String(type).startsWith('settings_')){ saveSettingsForm(type,item,e.currentTarget.dataset.id || ''); return; }
       if(type === 'settings' || type === 'reset_confirm'){ closeEditDialog(); return; }
       const docModule = canonicalModuleId(type);
-      const wasNewDocModule = supportsSupabaseDocs(docModule) && !e.currentTarget.dataset.id;
+      const wasNewDocModule = ((supportsSupabaseDocs(docModule) && (docModule !== 'education' || wantsAttachAfterSave)) || wantsAttachAfterSave) && !e.currentTarget.dataset.id;
       const savedRecord = addItem(type,item);
       const backToList = state.returnList ? {...state.returnList} : null;
       state.preset=null;
@@ -727,9 +746,10 @@
         $('#editTitle').textContent = 'Modifier l’élément';
         $('#editForm').dataset.type = docModule;
         $('#editForm').dataset.id = savedRecord.id;
-        $('#editFields').innerHTML = fieldsFor(docModule, savedRecord);
-        toast('✅ Fiche enregistrée. Tu peux maintenant déposer un document.');
-        setTimeout(()=>window.sbHydrateHealthItemDocs?.(savedRecord.id, docModule), 120);
+        renderEditFields(docModule, savedRecord);
+        if(canonicalModuleId(docModule)==='maison' || canonicalModuleId(docModule)==='education') wizGo(2);
+        toast('✅ Fiche enregistrée. Tu peux maintenant joindre le document.');
+        setTimeout(()=>{ window.sbHydrateHealthItemDocs?.(savedRecord.id, docModule); if(wantsAttachAfterSave){ setTimeout(()=>document.getElementById('sb-health-doc-input-'+savedRecord.id)?.click(), 250); } }, 120);
         return;
       }
       closeEditDialog();
@@ -737,8 +757,10 @@
       if(savedRecord && canonicalModuleId(type)==='sport_loisirs' && wantsSlvChecklistAfterSave){
         setTimeout(()=>openSlvChecklistLight(savedRecord.id), 90);
       } else {
-        if(backToList) setTimeout(()=>openModuleList(backToList.module, backToList.block), 30);
-        if(savedRecord && canonicalModuleId(type)==='sport_loisirs') setTimeout(()=>refreshSlvChecklistDialog(savedRecord.id), 80);
+        const _cm = canonicalModuleId(type);
+        if(savedRecord && isWizardModule(_cm)){ setTimeout(()=>openModule(_cm), 30); }
+        else if(backToList) setTimeout(()=>openModuleList(backToList.module, backToList.block), 30);
+        if(savedRecord && _cm==='sport_loisirs') setTimeout(()=>refreshSlvChecklistDialog(savedRecord.id), 80);
       }
     });
 
@@ -862,7 +884,7 @@
     }
     return arr;
   }
-  function itemsForDate(dmy){ return filteredEvents(getAllEvents().filter(x=>x.date===dmy)); }
+  function itemsForDate(dmy){ const dd=parseDMY(dmy); const ev=getAllEvents().flatMap(x=>{ if(x.date===dmy) return [x]; if(isRecurringOnDate(x, dd)) return [{...x,date:dmy,_occurrenceDate:dmy}]; return []; }); return filteredEvents(ev); }
     // ---- Profil actif + notifications personnelles par membre (V4.5) ----------
   function activeProfile(){ return data.settings?.activeProfile || 'family'; }
   function isMemberProfile(){ const p=activeProfile(); return p && p !== 'family'; }
@@ -1067,10 +1089,19 @@
       menus:{title:'Repas', emoji:'🍽️', collection:'weeklyMeals', type:'repas_semaine', category:'Repas', special:'mealsView', aliasOf:'repas'}
     },
     education: {
-      tout:{title:'Tout', emoji:'📚', collections:['homework','schoolDocs'], collection:'homework', type:'devoir', category:'Devoirs', help:'École, notes et documents.'},
-      ecole:{title:'École', emoji:'📚', collections:['homework','schoolDocs'], collection:'homework', type:'devoir', category:'Devoirs', help:'Devoirs, contrôles et activités.'},
-      ecole_notes:{title:'École — Notes', emoji:'⭐', collection:'homework', type:'note', category:'Notes', filter:x=>x.type==='note' || x.category==='Notes', help:'Notes et appréciations.'},
-      documents:{title:'Documents Éducation', emoji:'📄', collection:'schoolDocs', type:'document_ecole', category:'Documents école', help:'Documents Supabase liés aux devoirs, notes et fiches Éducation.'},
+      tout:{title:'Tout', emoji:'📚', collections:['homework','schoolDocs'], collection:'homework', type:'devoir', category:'Devoirs', help:'Tous les éléments scolaires.'},
+      today:{title:'Aujourd’hui', emoji:'📅', collections:['homework','schoolDocs'], collection:'homework', type:'devoir', category:'Devoirs', filterName:'today', help:'Éléments scolaires du jour, faits compris.'},
+      retard:{title:'En retard', emoji:'⏰', collections:['homework','schoolDocs'], collection:'homework', type:'devoir', category:'Devoirs', filterName:'late', help:'Échéances scolaires en retard non terminées.'},
+      devoirs:{title:'Devoirs', emoji:'📘', collection:'homework', type:'devoir', category:'Devoirs', filterName:'devoirs', help:'Devoirs à faire.'},
+      controles:{title:'Contrôles', emoji:'🧪', collection:'homework', type:'controle', category:'Contrôles', filterName:'controles', help:'Contrôles, interrogations et révisions.'},
+      ecole_notes:{title:'Notes', emoji:'⭐', collection:'homework', type:'note', category:'Notes', filterName:'notes', help:'Notes et appréciations.'},
+      documents:{title:'Documents Éducation', emoji:'📄', collection:'schoolDocs', type:'document_ecole', category:'Documents école', filterName:'documents', help:'Documents Supabase liés aux devoirs, notes et fiches Éducation.'},
+      fournitures:{title:'Fournitures', emoji:'🎒', collection:'homework', type:'fournitures_ecole', category:'Fournitures', filterName:'fournitures', help:'Listes et besoins de fournitures.'},
+      rdv:{title:'RDV école', emoji:'🤝', collection:'homework', type:'rendez_vous_ecole', category:'Rendez-vous école', filterName:'rdv', help:'Rendez-vous, réunions et convocations.'},
+      sorties:{title:'Sorties', emoji:'🚌', collection:'homework', type:'activite_scolaire', category:'Activités scolaires', filterName:'sorties', help:'Sorties, activités et voyages scolaires.'},
+      admin:{title:'Cantine / admin', emoji:'🍽️', collection:'homework', type:'administratif_ecole', category:'Cantine / administratif', filterName:'admin', help:'Cantine, paiements, inscriptions et justificatifs.'},
+      terminees:{title:'Terminées', emoji:'✅', collections:['homework','schoolDocs'], collection:'homework', type:'devoir', category:'Devoirs', filterName:'done', help:'Éléments scolaires terminés, barrés, en attente de suppression.'},
+      ecole:{title:'École', emoji:'📚', collections:['homework','schoolDocs'], collection:'homework', type:'devoir', category:'Devoirs', aliasOf:'tout', help:'Alias — tous les éléments scolaires.'},
     },
     sante: {
       tous:{title:'Tous', emoji:'🩺', collections:['health','vaccines','healthDocs'], collection:'health', type:'rendez_vous_medical', category:'Santé', help:'Rendez-vous, traitements, documents et alertes santé du foyer.'},
@@ -1123,14 +1154,14 @@
       : cfg.special === 'checklistView'
           ? `<div class="management-list">${visibleCollectionItems(cfg).map(x=>shoppingRow(x,{collection:cfg.collection})).join('')||'<div class="empty">Checklist vide.</div>'}</div>`
       : '';
-    const docsMode = ((block==='documents' || ['tout','tous'].includes(block)) && supportsSupabaseDocs(module)) ? (module==='familles' ? 'global' : module) : '';
+    const docsMode = (block==='documents' && supportsSupabaseDocs(module)) ? (module==='familles' ? 'global' : module) : '';
     const supabaseDocsHtml = docsMode ? supabaseDocsPanelHtml(docsMode) : '';
     if(supabaseDocsHtml) setTimeout(()=>window.sbHydrateDocsPanel?.(docsMode), 120);
     // V5.28 — Les vues spéciales Courses/Repas/Stock gardent leurs vrais écrans, même ouvertes depuis les chips.
     view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openModule('${module}')">← Retour ${m.short}</button></div>
       <div class="sublist-title-bar"><div class="sublist-emoji">${cfg.emoji || m.icon}</div><div><h2>${cfg.title}</h2><small>${cfg.help || ''}</small></div></div>
       ${chips}
-      <div class="list-toolbar-card"><button class="btn ghost" onclick="SuperApp.openModule('${module}')">← Retour ${m.short}</button><button class="btn primary" onclick="SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')">${cfg.emoji} + Ajouter</button></div>
+      <div class="list-toolbar-card"><button class="btn ghost" onclick="SuperApp.openModule('${module}')">← Retour ${m.short}</button><button class="btn primary" onclick="${module==='education' ? 'SuperApp.openEducationAdd()' : `SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')`}">${cfg.emoji} + Ajouter</button></div>
       ${block==='documents' ? supabaseDocsHtml : `${specialHtml || managementListSection(module, block, items, cfg)}${supabaseDocsHtml && block!=='documents' ? supabaseDocsHtml : ''}`}`;
   }
   function emergencyNumbers(){
@@ -1414,16 +1445,7 @@
   }
 
   function maisonTaskRow(x,cfg={}){
-    const done = statusIsDone(x);
-    const icon = commonTypeIcon(x,{...cfg,module:'maison'});
-    const moduleId = 'maison';
-    return `<article class="health-info-row common-info-row maison-task-row ${done?'done':''}">
-      <button type="button" class="shopping-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')" aria-label="Marquer fait">${done?'✓':''}</button>
-      <div class="health-type-icon">${icon}</div>
-      <div class="health-info-main"><b>${escapeHtml(x.title || 'Tâche')}</b><small>${escapeHtml(commonLine2(x,{...cfg,module:'maison'}))}</small><em>${escapeHtml(commonLine3(x))}</em></div>
-      ${memberBadgeHtml(getItemMemberId(x) || x.member || 'family')}
-      ${rowActionsB(x.id)}
-    </article>`;
+    return maisonTaskUnifiedCard(x, {list:true});
   }
   function schoolUrgencyClass(x){
     if(statusIsDone(x)||!x.date) return '';
@@ -1442,26 +1464,60 @@
     if(t.includes('note')||t.includes('bulletin')) return '⭐';
     return '📚';
   }
+  function schoolFilterKey(x={}){
+    const blob = normalizeText(`${x.type||''} ${x.category||''} ${x.subcategory||''} ${x.title||''}`);
+    if(blob.includes('checklist')) return 'devoirs';
+    if(blob.includes('note') || blob.includes('bulletin') || blob.includes('appreciation')) return 'notes';
+    if(blob.includes('document') || blob.includes('autorisation') || blob.includes('certificat') || blob.includes('justificatif')) return 'documents';
+    if(blob.includes('fourniture') || blob.includes('cartable') || blob.includes('materiel')) return 'fournitures';
+    if(blob.includes('rendez') || blob.includes('rdv') || blob.includes('reunion') || blob.includes('convocation') || blob.includes('parent')) return 'rdv';
+    if(blob.includes('sortie') || blob.includes('voyage') || blob.includes('activite scolaire') || blob.includes('activites scolaires') || blob.includes('spectacle')) return 'sorties';
+    if(blob.includes('cantine') || blob.includes('admin') || blob.includes('paiement') || blob.includes('inscription') || blob.includes('transport scolaire')) return 'admin';
+    if(blob.includes('controle') || blob.includes('contrôle') || blob.includes('interro') || blob.includes('examen') || blob.includes('revision')) return 'controles';
+    return 'devoirs';
+  }
+  function schoolFilterMatch(x={}, filterName='tout'){
+    const f = String(filterName || 'tout');
+    if(['tout','ecole','all'].includes(f)) return true;
+    if(['terminees','done'].includes(f)) return statusIsDone(x);
+    const k = schoolFilterKey(x);
+    return k === f || (f === 'controles' && k === 'controles') || (f === 'ecole_notes' && k === 'notes');
+  }
+  function schoolDueOnDate(x={}, dmy=today){
+    const dd = parseDMY(dmy);
+    return !!(x.date === dmy || isRecurringOnDate(x, dd));
+  }
+  function schoolItemMeta(x){
+    const bits=[];
+    const subject = x.subject || '';
+    const category = x.category || 'École';
+    if(category) bits.push(category);
+    if(subject && normalizeText(subject)!==normalizeText(category)) bits.push(subject);
+    if(x.score!==undefined && x.score!=='') bits.push(`⭐ ${x.score}/${x.scoreMax||20}`);
+    const d = x.date || x.startDate;
+    if(d) bits.push(shortDate(d));
+    if(x.time || x.startTime) bits.push(x.time || x.startTime);
+    if(statusIsDone(x)) bits.push('Terminé');
+    return bits.join(' · ') || 'À planifier';
+  }
   function schoolItemCard(x,cfg={}){
     const done=statusIsDone(x);
     const urg=schoolUrgencyClass(x);
-    const icon=schoolTypeIcon(x);
-    const members=x.students&&x.students!=='family'?String(x.students).split(',').map(id=>{const m=(data.family||[]).find(m=>m.id===id.trim());return m?firstMemberName(m.name):id;}).filter(Boolean).join(', '):(x.member&&x.member!=='family'?memberName(x.member):'Famille');
-    const subject=x.subject||x.category||'';
-    const scoreLabel=(x.score!==undefined&&x.score!=='')?`${x.score}/${x.scoreMax||20}`:'';
-    const dl=x.date?shortDate(x.date):'';
-    return `<article class="school-card common-info-row ${done?'done':''} ${urg}">
-      <div class="school-card-left">
-        <span class="school-type-icon">${icon}</span>
-        <button type="button" class="shopping-check ${done?'checked':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')">${done?'✓':''}</button>
+    const title=x.title||'Élément scolaire';
+    return `<div class="mh-sig-item maison-list-card education-list-card ${done?'done':''} ${urg}">
+      <div class="mh-sig-task">
+        <button class="mh-ck ${done?'done':''}" onclick="event.stopPropagation();SuperApp.markDone('${x.id}')" aria-label="${done?'Remettre à faire':'Marquer comme fait'}"></button>
+        <div class="mh-sig-body" onclick="SuperApp.openItemSummary('${x.id}')"><b>${escapeHtml(title)}</b><small>${escapeHtml(schoolItemMeta(x))}</small>${done?'<em class="school-done-label">✓ Terminé</em>':''}</div>
+        ${taskAvatarHtml(x)}
       </div>
-      <div class="health-info-main">
-        <b>${escapeHtml(x.title||'Devoir')}</b>
-        <small>${escapeHtml(subject?subject+' · ':'')}${escapeHtml(members)}${scoreLabel?' · ⭐ '+scoreLabel:''}</small>
-        ${dl?`<em class="${urg}">${escapeHtml(dl)}</em>`:''}
+      <div class="mh-report">${done
+        ? `<button onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">🗑️ Retirer</button>`
+        : `<button onclick="event.stopPropagation();SuperApp.rescheduleTask('${x.id}','demain')">↪ Demain</button>
+        <button onclick="event.stopPropagation();SuperApp.rescheduleTask('${x.id}','weekend')">Week-end</button>
+        <button onclick="event.stopPropagation();SuperApp.rescheduleTask('${x.id}','autre')">Autre…</button>`}
       </div>
       ${rowActionsB(x.id)}
-    </article>`;
+    </div>`;
   }
   function shoppingRow(x,cfg={}){
     const done = statusIsDone(x);
@@ -1856,17 +1912,404 @@
     ]);
   }
   function openEducationAdd(){
-    openAddSheet([
-      ['📘','Devoir',"SuperApp.openAdd('education','devoir')"],
-      ['📊','Note',"SuperApp.openAdd('education','note')"],
-      ['📄','Document',"SuperApp.openAdd('education','document_ecole')"]
-    ]);
+    openEducationTypeChoice();
+  }
+  function educationTypeChoices(){
+    return [
+      ['devoir','📘','Devoir','Matière, consigne, enfant, échéance, checklist'],
+      ['note','⭐','Note','Matière / thème, note, barème, enfant'],
+      ['controle','🧪','Contrôle','Matière, révisions, date, checklist'],
+      ['document','📄','Document','Autorisation, bulletin, certificat, justificatif'],
+      ['fournitures','🎒','Fournitures','Liste d’articles, enfant, date de besoin'],
+      ['rdv','🤝','RDV école','Professeur, motif, date et heure'],
+      ['sortie','🚌','Sortie','Lieu, autorisation, sac, documents'],
+      ['admin','🍽️','Cantine / admin','Paiement, inscription, justificatif']
+    ];
+  }
+  function openEducationTypeChoice(){
+    const dlg = $('#actionDialog');
+    dlg.setAttribute('data-app','education');
+    const h2 = dlg.querySelector('.dialog-head h2');
+    if(h2) h2.textContent = 'Ajouter pour l’école';
+    $('#quickActions').innerHTML = `<div class="edu-type-choice"><p class="edu-type-intro">Choisis directement ce que tu veux créer. Chaque choix ouvre une fiche adaptée, sans champ générique inutile.</p>${educationTypeChoices().map(([key,ico,label,help])=>`<button type="button" class="edu-type-card" onclick="SuperApp.chooseEducationType('${key}')"><span class="etc-ico">${ico}</span><span class="etc-txt"><b>${label}</b><small>${help}</small></span><span class="etc-chev">›</span></button>`).join('')}</div>`;
+    dlg.showModal();
+  }
+  function chooseEducationType(key){
+    const cfg = educationTypeConfig(key);
+    try { $('#actionDialog').close(); } catch {}
+    openAdd('education', cfg.type, cfg.category, cfg.defaultTitle || '', '');
   }
   function openFamilleAdd(){
     openAddSheet([
       ['👤','Membre',"this.closest('dialog')?.close();SuperApp.openSettingsMember('')"],
       ['📁','Document',"SuperApp.openAdd('familles','document_famille')"]
     ]);
+  }
+  // V5.65 — Catégories Maison qui acceptent un document (et leurs libellés)
+  function maisonDocInfo(cat){
+    const c = String(cat||'');
+    if(/facture|paiement/i.test(c)) return {ico:'🧾', btn:'Enregistrer et joindre la facture', zone:'🧾 Facture'};
+    if(/véhicule|vehicule/i.test(c)) return {ico:'🚗', btn:'Enregistrer et joindre le document', zone:'🚗 Document du véhicule'};
+    if(/démarche|demarche|administrat/i.test(c)) return {ico:'📋', btn:'Enregistrer et joindre le justificatif', zone:'📋 Justificatif'};
+    return null;
+  }
+  // V5.63 — Assistant d'ajout/édition de tâche Maison (étape par étape, zéro scroll)
+  function maisonTaskWizardHtml(item={}){
+    const isEditing = !!item.id;
+    const cat = item.category || 'Ménage';
+    const member = item.member || 'family';
+    const fam = (data.family||[]).filter(m=>!statusIsHidden(m));
+    const todayIso = dmyToISO(today) || new Date().toISOString().slice(0,10);
+    const _rawD = item.date ? normalizeDateInput(item.date) : '';
+    const dateIso = (item.date ? (dmyToISO(_rawD) || (parseDMY(_rawD) ? dmyToISO(formatDMY(parseDMY(_rawD))) : '')) : '') || todayIso;
+    const _rawE = item.endDate ? normalizeDateInput(item.endDate) : '';
+    const endIso0 = item.endDate ? (dmyToISO(_rawE) || (parseDMY(_rawE) ? dmyToISO(formatDMY(parseDMY(_rawE))) : '')) : '';
+    const freqMode = item.frequenceMode || 'ponctuelle';
+    const recurringInit = freqMode !== 'ponctuelle';
+    const defEnd = `${(dateIso.split('-')[0]||new Date().getFullYear())}-12-31`;
+    const endIso = endIso0 || (recurringInit ? defEnd : '');
+    const wkDays = String(item.frequenceWeekDays||'').split(',').map(x=>x.trim()).filter(Boolean);
+    const docInfo = maisonDocInfo(cat);
+    const cats = [['Ménage','🧹 Ménage'],['Entretien','🔧 Entretien'],['Suivi Paiement Factures','🧾 Suivi Factures'],['Jardin / Extérieur','🌿 Jardin'],['Animaux','🐾 Animaux'],['Véhicule','🚗 Véhicule'],['Démarches administratives','📋 Démarches']];
+    const catBtns = cats.map(([v,l])=>`<button type="button" class="wiz-chip${cat===v?' sel':''}" onclick="SuperApp.wizPickCat(this,'${escapeAttr(v)}')">${l}</button>`).join('');
+    const avTous = `<button type="button" class="wiz-av${member==='family'?' sel':''}" onclick="SuperApp.wizPickMember(this,'family')"><span class="wiz-bub emoji">👨‍👩‍👧</span><span class="wiz-avn">Tous</span></button>`;
+    const avMembers = fam.map(m=>`<button type="button" class="wiz-av${member===m.id?' sel':''}" onclick="SuperApp.wizPickMember(this,'${escapeAttr(m.id)}')"><img class="wiz-bub" src="${memberAvatarSrc(m)}" alt=""><span class="wiz-avn">${escapeHtml(String(m.name||'').split(' ')[0])}</span></button>`).join('');
+    const fq = (mode,label,showDays)=>`<button type="button" class="wiz-chip sm${freqMode===mode?' sel':''}" onclick="SuperApp.wizPickFreq(this,'${mode}',${showDays})">${label}</button>`;
+    const dayCk = (v,l)=>`<label class="wiz-day"><input type="checkbox" name="frequenceWeekDays_cb" value="${v}" ${wkDays.includes(v)?'checked':''}><span>${l}</span></label>`;
+    const daysOpen = (freqMode==='personnalisee');
+    const docInner = isEditing
+      ? healthDocsFieldHtml(item, 'maison', (docInfo?docInfo.zone:'📎 Document'))
+      : `<button type="submit" class="wiz-choice" data-attach-after-save="1"><span class="ico" id="wizDocBtnIco">${docInfo?docInfo.ico:'📎'}</span><span class="tx"><b id="wizDocBtnLabel">${docInfo?docInfo.btn:'Enregistrer et joindre un document'}</b><small>Enregistre la tâche en 1 clic</small></span><span class="chev">›</span></button>`;
+    const docWrap = `<div id="wizDocWrap" style="display:${docInfo?'block':'none'};margin-top:11px">${docInner}</div>`;
+    const checklistBtn = isEditing
+      ? `<button type="button" class="wiz-choice" onclick="SuperApp.openGenericChecklist('${escapeAttr(item.id)}','maison')"><span class="ico">✅</span><span class="tx"><b>Checklist</b><small>Ouvrir les étapes</small></span><span class="chev">›</span></button>`
+      : `<button type="submit" class="wiz-choice" data-open-generic-checklist="1" data-checklist-kind="maison"><span class="ico">✅</span><span class="tx"><b>Checklist</b><small>Créer la tâche et ajouter des étapes</small></span><span class="chev">›</span></button>`;
+    const danger = isEditing
+      ? `<div class="wiz-danger"><button type="button" class="btn ghost" onclick="SuperApp.archiveItem('${escapeAttr(item.id)}')">Archiver</button><button type="button" class="btn ghost danger" onclick="SuperApp.deleteItem('${escapeAttr(item.id)}')">🗑️ Supprimer</button></div>`
+      : '';
+    return `
+      ${hiddenRoutingHtml('maison','maison',item)}
+      <input type="hidden" name="member" id="wizMember" value="${escapeAttr(member)}">
+      <input type="hidden" name="category" id="wizCat" value="${escapeAttr(cat)}">
+      <input type="hidden" name="frequenceMode" id="wizFreq" value="${escapeAttr(freqMode)}">
+      <input type="hidden" name="status" value="${escapeAttr(item.status||'a_faire')}">
+      <div class="wiz-step on" data-wiz-step="1">
+        <div class="wiz-q">Quoi as-tu à faire ?</div>
+        <input class="wiz-title" id="wizTitle" name="title" placeholder="Ex : Passer l'aspirateur" value="${escapeAttr(item.title||'')}">
+        <div class="wiz-lbl">🗂️ Catégorie</div>
+        <div class="wiz-chips" id="wizCatChips">${catBtns}</div>
+        <div class="wiz-lbl mt">👤 Pour qui ?</div>
+        <div class="wiz-avrow">${avTous}${avMembers}</div>
+        <div class="wiz-nav">
+          <button type="button" class="btn ghost" onclick="SuperApp.exitWizardFiche()">Annuler</button>
+          <button type="button" class="btn primary" onclick="SuperApp.wizNext()">Suivant →</button>
+        </div>
+      </div>
+      <div class="wiz-step" data-wiz-step="2">
+        <div class="wiz-lbl">🔁 Fréquence</div>
+        <div class="wiz-chips">${fq('ponctuelle','Ponctuelle',0)}${fq('quotidienne','Quotidienne',0)}${fq('hebdomadaire','Hebdo',0)}${fq('personnalisee','Jours précis…',1)}</div>
+        <div class="wiz-days${daysOpen?' on':''}" id="wizDays">${dayCk('1','L')}${dayCk('2','M')}${dayCk('3','M')}${dayCk('4','J')}${dayCk('5','V')}${dayCk('6','S')}${dayCk('0','D')}</div>
+        <div class="wiz-lbl mt">📅 <span id="wizDateLabel">${recurringInit?'Début':'Date'}</span></div>
+        <div class="wiz-chips">
+          <button type="button" class="wiz-chip sm" onclick="SuperApp.wizPickDate(this,0)">Aujourd'hui</button>
+          <button type="button" class="wiz-chip sm" onclick="SuperApp.wizPickDate(this,1)">Demain</button>
+          <button type="button" class="wiz-chip sm" onclick="SuperApp.wizPickDate(this,'we')">Week-end</button>
+          <button type="button" class="wiz-chip sm" onclick="SuperApp.wizPickDate(this,'pick')">Date…</button>
+        </div>
+        <div class="wiz-when">
+          <input class="wiz-date" type="date" name="date" id="wizDate" value="${dateIso}" data-today="${todayIso}" required>
+          <input class="wiz-time" type="time" name="time" value="${escapeAttr(item.time||'')}">
+        </div>
+        <div class="wiz-endwrap" id="wizEndWrap" style="${recurringInit?'':'display:none'}">
+          <div class="wiz-lbl mt">🏁 Fin</div>
+          <input class="wiz-date" type="date" name="endDate" id="wizEnd" value="${recurringInit?endIso:''}">
+          <div class="wiz-recnote">🔁 La tâche se répétera entre ces deux dates.</div>
+        </div>
+        ${checklistBtn}
+        ${docWrap}
+        ${danger}
+        <div class="wiz-nav">
+          <button type="button" class="btn ghost" onclick="SuperApp.wizBack()">← Retour</button>
+          <button type="submit" class="btn primary">Enregistrer ✓</button>
+        </div>
+      </div>`;
+  }
+
+  // V5.71 — Éducation : ajout direct par type concret, fiches spécialisées, sans champ générique.
+  function educationCategoryType(cat){
+    const c = normalizeText(cat || '');
+    if(c.includes('note')) return 'note';
+    if(c.includes('document')) return 'document_ecole';
+    if(c.includes('rendez') || c.includes('convocation')) return 'rendez_vous_ecole';
+    if(c.includes('fourniture')) return 'fournitures_ecole';
+    if(c.includes('cantine') || c.includes('administratif')) return 'administratif_ecole';
+    if(c.includes('controle') || c.includes('contrôle')) return 'controle';
+    if(c.includes('activite') || c.includes('activité') || c.includes('sortie') || c.includes('voyage')) return 'activite_scolaire';
+    return 'devoir';
+  }
+  function educationTypeConfig(keyOrItem){
+    let key = String(keyOrItem || 'devoir');
+    if(typeof keyOrItem === 'object'){
+      const t = normalizeText(keyOrItem.type || '');
+      const c = normalizeText(keyOrItem.category || '');
+      if(t.includes('note') || c.includes('note')) key = 'note';
+      else if(t.includes('document') || c.includes('document')) key = 'document';
+      else if(t.includes('rendez') || c.includes('rendez')) key = 'rdv';
+      else if(t.includes('fourniture') || c.includes('fourniture')) key = 'fournitures';
+      else if(t.includes('admin') || c.includes('cantine') || c.includes('admin')) key = 'admin';
+      else if(t.includes('controle') || c.includes('controle') || c.includes('contrôle')) key = 'controle';
+      else if(t.includes('activite') || t.includes('sortie') || c.includes('sortie') || c.includes('activite') || c.includes('activité')) key = 'sortie';
+      else key = 'devoir';
+    }
+    const map = {
+      devoir:{key:'devoir', type:'devoir', category:'Devoirs', icon:'📘', title:'Nouveau devoir', sub:'Matière, consigne, enfant, échéance et checklist.', defaultTitle:''},
+      note:{key:'note', type:'note', category:'Notes', icon:'⭐', title:'Nouvelle note', sub:'Matière / thème en haut, note et barème.', defaultTitle:'Note'},
+      controle:{key:'controle', type:'controle', category:'Contrôles', icon:'🧪', title:'Nouveau contrôle', sub:'Matière, thème à réviser, date et checklist.', defaultTitle:''},
+      document:{key:'document', type:'document_ecole', category:'Documents école', icon:'📄', title:'Nouveau document', sub:'Document scolaire, statut, échéance et pièce jointe.', defaultTitle:''},
+      fournitures:{key:'fournitures', type:'fournitures_ecole', category:'Fournitures', icon:'🎒', title:'Fournitures scolaires', sub:'Liste d’articles, enfant et date de besoin.', defaultTitle:''},
+      rdv:{key:'rdv', type:'rendez_vous_ecole', category:'Rendez-vous école', icon:'🤝', title:'Rendez-vous école', sub:'Avec qui, motif, enfant, date et heure.', defaultTitle:''},
+      sortie:{key:'sortie', type:'activite_scolaire', category:'Activités scolaires', icon:'🚌', title:'Sortie / activité scolaire', sub:'Lieu, enfant, autorisation et checklist.', defaultTitle:''},
+      admin:{key:'admin', type:'administratif_ecole', category:'Cantine / administratif', icon:'🍽️', title:'Cantine / administratif', sub:'Paiement, inscription, justificatif et échéance.', defaultTitle:''}
+    };
+    return map[key] || map.devoir;
+  }
+  function educationInitialCategory(item={}){
+    return item.category || educationTypeConfig(item).category;
+  }
+  function educationDocInfo(cat){
+    const c = normalizeText(cat || '');
+    if(c.includes('document')) return {ico:'📄', btn:'Enregistrer et joindre le document scolaire', zone:'📄 Document scolaire'};
+    if(c.includes('note')) return {ico:'⭐', btn:'Enregistrer et joindre la copie / note', zone:'⭐ Copie ou note'};
+    if(c.includes('controle') || c.includes('devoir')) return {ico:'📝', btn:'Enregistrer et joindre le sujet / devoir', zone:'📝 Sujet ou devoir'};
+    if(c.includes('activite') || c.includes('sortie') || c.includes('voyage')) return {ico:'🚌', btn:'Enregistrer et joindre l’autorisation', zone:'🚌 Autorisation / convocation'};
+    if(c.includes('rendez') || c.includes('administratif') || c.includes('cantine')) return {ico:'📋', btn:'Enregistrer et joindre le justificatif', zone:'📋 Justificatif scolaire'};
+    if(c.includes('fourniture')) return {ico:'🎒', btn:'Enregistrer et joindre la liste', zone:'🎒 Liste de fournitures'};
+    return null;
+  }
+  function eduWizSyncTitle(prefix=''){
+    const subject = (document.getElementById('eduSubject')?.value || '').trim();
+    const title = document.getElementById('wizTitle');
+    if(title && title.type === 'hidden') title.value = subject ? `${prefix}${subject}` : (prefix.replace(/ — $/,'') || 'Élément scolaire');
+  }
+  function educationTaskWizardHtml(item={}){
+    const isEditing = !!item.id;
+    const cfg = educationTypeConfig(item);
+    const cat = item.category || cfg.category;
+    const member = item.member || (item.students && item.students !== 'family' ? String(item.students).split(',')[0] : 'family');
+    const famAll = (data.family||[]).filter(m=>!statusIsHidden(m));
+    const children = famAll.filter(m=>normalizeText(m.role||'').includes('enfant'));
+    const fam = children.length ? children : famAll;
+    const todayIso = dmyToISO(today) || new Date().toISOString().slice(0,10);
+    const _rawD = item.date ? normalizeDateInput(item.date) : '';
+    const dateIso = (item.date ? (dmyToISO(_rawD) || (parseDMY(_rawD) ? dmyToISO(formatDMY(parseDMY(_rawD))) : '')) : '') || todayIso;
+    const _rawE = item.endDate ? normalizeDateInput(item.endDate) : '';
+    const endIso0 = item.endDate ? (dmyToISO(_rawE) || (parseDMY(_rawE) ? dmyToISO(formatDMY(parseDMY(_rawE))) : '')) : '';
+    const freqMode = item.frequenceMode || 'ponctuelle';
+    const recurringInit = freqMode !== 'ponctuelle';
+    const defEnd = `${(dateIso.split('-')[0]||new Date().getFullYear())}-12-31`;
+    const endIso = endIso0 || (recurringInit ? defEnd : '');
+    const wkDays = String(item.frequenceWeekDays||'').split(',').map(x=>x.trim()).filter(Boolean);
+    const docInfo = educationDocInfo(cat);
+    const typeVal = item.type || cfg.type;
+    const avTous = `<button type="button" class="wiz-av${member==='family'?' sel':''}" onclick="SuperApp.wizPickMember(this,'family')"><span class="wiz-bub emoji">👨‍👩‍👧</span><span class="wiz-avn">Tous</span></button>`;
+    const avMembers = fam.map(m=>`<button type="button" class="wiz-av${member===m.id?' sel':''}" onclick="SuperApp.wizPickMember(this,'${escapeAttr(m.id)}')"><img class="wiz-bub" src="${memberAvatarSrc(m)}" alt=""><span class="wiz-avn">${escapeHtml(String(m.name||'').split(' ')[0])}</span></button>`).join('');
+    const childBlock = `<div class="wiz-lbl mt">👧 Pour quel enfant ?</div><div class="wiz-avrow">${avTous}${avMembers}</div>`;
+    const fq = (mode,label,showDays)=>`<button type="button" class="wiz-chip sm${freqMode===mode?' sel':''}" onclick="SuperApp.wizPickFreq(this,'${mode}',${showDays})">${label}</button>`;
+    const dayCk = (v,l)=>`<label class="wiz-day"><input type="checkbox" name="frequenceWeekDays_cb" value="${v}" ${wkDays.includes(v)?'checked':''}><span>${l}</span></label>`;
+    const daysOpen = (freqMode==='personnalisee');
+    const frequencyBlock = cfg.key === 'note' ? '' : `<div class="wiz-lbl">🔁 Fréquence</div><div class="wiz-chips">${fq('ponctuelle','Ponctuel',0)}${fq('quotidienne','Tous les jours',0)}${fq('hebdomadaire','Chaque semaine',0)}${fq('personnalisee','Jours précis…',1)}</div><div class="wiz-days${daysOpen?' on':''}" id="wizDays">${dayCk('1','L')}${dayCk('2','M')}${dayCk('3','M')}${dayCk('4','J')}${dayCk('5','V')}${dayCk('6','S')}${dayCk('0','D')}</div>`;
+    const dateLabel = (cfg.key==='note') ? 'Date de la note' : (cfg.key==='rdv' ? 'Date du rendez-vous' : (cfg.key==='sortie' ? 'Date de la sortie' : (recurringInit?'Début':'Échéance')));
+    const dateBlock = `<div class="wiz-lbl mt">📅 <span id="wizDateLabel">${dateLabel}</span></div><div class="wiz-chips"><button type="button" class="wiz-chip sm" onclick="SuperApp.wizPickDate(this,0)">Aujourd'hui</button><button type="button" class="wiz-chip sm" onclick="SuperApp.wizPickDate(this,1)">Demain</button><button type="button" class="wiz-chip sm" onclick="SuperApp.wizPickDate(this,'we')">Week-end</button><button type="button" class="wiz-chip sm" onclick="SuperApp.wizPickDate(this,'pick')">Date…</button></div><div class="wiz-when"><input class="wiz-date" type="date" name="date" id="wizDate" value="${dateIso}" data-today="${todayIso}" required><input class="wiz-time" type="time" name="time" value="${escapeAttr(item.time||item.eduWindowStart||item.startTime||'')}"></div>`;
+    const endBlock = cfg.key === 'note' ? '' : `<div class="wiz-endwrap" id="wizEndWrap" style="${recurringInit?'':'display:none'}"><div class="wiz-lbl mt">🏁 Fin</div><input class="wiz-date" type="date" name="endDate" id="wizEnd" value="${recurringInit?endIso:''}"><div class="wiz-recnote">🔁 L'élément scolaire se répétera entre ces deux dates.</div></div>`;
+    const docInner = isEditing
+      ? healthDocsFieldHtml(item, 'education', (docInfo?docInfo.zone:'📎 Document'))
+      : `<button type="submit" class="wiz-choice" data-attach-after-save="1"><span class="ico" id="eduDocBtnIco">${docInfo?docInfo.ico:'📎'}</span><span class="tx"><b id="eduDocBtnLabel">${docInfo?docInfo.btn:'Enregistrer et joindre un document'}</b><small>Enregistre la fiche en 1 clic</small></span><span class="chev">›</span></button>`;
+    const docWrap = `<div id="eduDocWrap" style="display:${docInfo?'block':'none'};margin-top:11px">${docInner}</div>`;
+    const checklistBtn = (cfg.key === 'note' || cfg.key === 'document' || cfg.key === 'admin') ? '' : (isEditing
+      ? `<button type="button" class="wiz-choice" onclick="SuperApp.openGenericChecklist('${escapeAttr(item.id)}','education')"><span class="ico">✅</span><span class="tx"><b>Checklist</b><small>Ouvrir les étapes scolaires</small></span><span class="chev">›</span></button>`
+      : `<button type="submit" class="wiz-choice" data-open-generic-checklist="1" data-checklist-kind="education"><span class="ico">✅</span><span class="tx"><b>Checklist</b><small>Créer la fiche et ajouter des étapes</small></span><span class="chev">›</span></button>`);
+    const danger = isEditing ? `<div class="wiz-danger"><button type="button" class="btn ghost" onclick="SuperApp.archiveItem('${escapeAttr(item.id)}')">Archiver</button><button type="button" class="btn ghost danger" onclick="SuperApp.deleteItem('${escapeAttr(item.id)}')">🗑️ Supprimer</button></div>` : '';
+    const noteText = escapeHtml(item.notes||item.desc||'');
+    const hiddenTitle = (prefix)=>`<input type="hidden" id="wizTitle" name="title" value="${escapeAttr(item.title || cfg.defaultTitle || prefix.replace(/ — $/,'') || 'Élément scolaire')}">`;
+    let step1 = '', step2Extra = '';
+    if(cfg.key === 'devoir'){
+      step1 = `<div class="wiz-lbl">📚 Matière</div><input class="wiz-title wiz-subject" id="eduSubject" name="subject" placeholder="Ex : Maths, Français…" value="${escapeAttr(item.subject||'')}"><div class="wiz-lbl mt">📝 Consigne du devoir</div><textarea class="wiz-title edu-wiz-textarea" id="wizTitle" name="title" placeholder="Ex : exercices page 42, apprendre la poésie…" required>${escapeHtml(item.title||'')}</textarea>${childBlock}`;
+      step2Extra = `<details class="form-collapse edu-note-collapse"><summary>📝 Ajouter un commentaire</summary><div class="form-field"><textarea name="notes" rows="3" placeholder="Notes">${noteText}</textarea></div></details>`;
+    } else if(cfg.key === 'note'){
+      step1 = `${hiddenTitle('Note — ')}<div class="wiz-lbl">📚 Matière / thème</div><input class="wiz-title wiz-subject" id="eduSubject" name="subject" oninput="SuperApp.eduWizSyncTitle('Note — ')" placeholder="Ex : Maths — fractions" value="${escapeAttr(item.subject||'')}"><div id="eduScoreWrap" class="edu-score-wrap"><div class="form-field"><label>Note obtenue</label><input name="score" type="number" min="0" max="100" step="0.5" value="${escapeAttr(item.score||'') }" placeholder="Ex : 14"></div><div class="form-field"><label>Sur combien</label><input name="scoreMax" type="number" min="1" max="100" step="1" value="${escapeAttr(item.scoreMax||'20')}" placeholder="20"></div></div>${childBlock}`;
+      step2Extra = `<div class="wiz-lbl mt">💬 Commentaire</div><textarea class="wiz-title edu-wiz-textarea" name="notes" placeholder="Ex : bon progrès, revoir les problèmes…">${noteText}</textarea>`;
+    } else if(cfg.key === 'controle'){
+      step1 = `${hiddenTitle('Contrôle — ')}<div class="wiz-lbl">📚 Matière</div><input class="wiz-title wiz-subject" id="eduSubject" name="subject" oninput="SuperApp.eduWizSyncTitle('Contrôle — ')" placeholder="Ex : Histoire, SVT…" value="${escapeAttr(item.subject||'')}"><div class="wiz-lbl mt">📖 Leçon / thème à réviser</div><textarea class="wiz-title edu-wiz-textarea" name="notes" placeholder="Ex : chapitre 3, cartes de géographie…">${noteText}</textarea>${childBlock}`;
+    } else if(cfg.key === 'document'){
+      step1 = `<div class="wiz-lbl">📄 Document scolaire</div><input class="wiz-title" id="wizTitle" name="title" placeholder="Ex : autorisation sortie musée" value="${escapeAttr(item.title||'') }" required><div class="wiz-lbl mt">🏷️ Type de document</div><select class="wiz-title wiz-select" name="subcategory"><option ${item.subcategory==='Autorisation'?'selected':''}>Autorisation</option><option ${item.subcategory==='Bulletin'?'selected':''}>Bulletin</option><option ${item.subcategory==='Certificat'?'selected':''}>Certificat</option><option ${item.subcategory==='Convocation'?'selected':''}>Convocation</option><option ${item.subcategory==='Justificatif'?'selected':''}>Justificatif</option></select>${childBlock}`;
+      step2Extra = `<div class="wiz-lbl mt">📌 Statut</div><select class="wiz-title wiz-select" name="docStatus"><option ${item.docStatus==='À rendre'?'selected':''}>À rendre</option><option ${item.docStatus==='À signer'?'selected':''}>À signer</option><option ${item.docStatus==='Classé'?'selected':''}>Classé</option></select><details class="form-collapse edu-note-collapse"><summary>📝 Ajouter une note</summary><div class="form-field"><textarea name="notes" rows="3" placeholder="Notes">${noteText}</textarea></div></details>`;
+    } else if(cfg.key === 'fournitures'){
+      step1 = `<div class="wiz-lbl">🎒 Liste de fournitures</div><textarea class="wiz-title edu-wiz-textarea" id="wizTitle" name="title" placeholder="Ex : cahier 96 pages, colle, protège-cahier…" required>${escapeHtml(item.title||'')}</textarea>${childBlock}`;
+      step2Extra = `<details class="form-collapse edu-note-collapse"><summary>📝 Ajouter une précision</summary><div class="form-field"><textarea name="notes" rows="3" placeholder="Ex : demandé pour lundi">${noteText}</textarea></div></details>`;
+    } else if(cfg.key === 'rdv'){
+      step1 = `<div class="wiz-lbl">🤝 Motif du rendez-vous</div><input class="wiz-title" id="wizTitle" name="title" placeholder="Ex : point trimestre, orientation…" value="${escapeAttr(item.title||'') }" required><div class="wiz-lbl mt">🏫 Avec qui ?</div><input class="wiz-title wiz-subject" name="teacher" placeholder="Ex : maîtresse, professeur principal…" value="${escapeAttr(item.teacher||'')}">${childBlock}`;
+      step2Extra = `<div class="wiz-lbl mt">📍 Lieu</div><input class="wiz-title wiz-subject" name="place" placeholder="Ex : école, salle 204…" value="${escapeAttr(item.place||'')}"><details class="form-collapse edu-note-collapse"><summary>📝 Ajouter une note</summary><div class="form-field"><textarea name="notes" rows="3" placeholder="Notes">${noteText}</textarea></div></details>`;
+    } else if(cfg.key === 'sortie'){
+      step1 = `${hiddenTitle('Sortie — ')}<div class="wiz-lbl">🚌 Lieu / activité</div><input class="wiz-title wiz-subject" id="eduSubject" name="subject" oninput="SuperApp.eduWizSyncTitle('Sortie — ')" placeholder="Ex : musée, piscine, théâtre…" value="${escapeAttr(item.subject||'')}">${childBlock}`;
+      step2Extra = `<div class="wiz-lbl mt">🎒 À prévoir</div><textarea class="wiz-title edu-wiz-textarea" name="notes" placeholder="Ex : pique-nique, gourde, tenue de sport…">${noteText}</textarea>`;
+    } else {
+      step1 = `<div class="wiz-lbl">🍽️ Démarche</div><select class="wiz-title wiz-select" id="wizTitle" name="title"><option ${item.title==='Paiement cantine'?'selected':''}>Paiement cantine</option><option ${item.title==='Inscription activité'?'selected':''}>Inscription activité</option><option ${item.title==='Assurance scolaire'?'selected':''}>Assurance scolaire</option><option ${item.title==='Transport scolaire'?'selected':''}>Transport scolaire</option></select>${childBlock}`;
+      step2Extra = `<div class="wiz-lbl mt">💬 Commentaire</div><textarea class="wiz-title edu-wiz-textarea" name="notes" placeholder="Ex : règlement fait, reçu à classer…">${noteText}</textarea>`;
+    }
+    return `
+      <input type="hidden" name="targetModule" value="education">
+      <input type="hidden" name="type" id="eduWizType" value="${escapeAttr(typeVal)}">
+      <input type="hidden" name="member" id="wizMember" value="${escapeAttr(member)}">
+      <input type="hidden" name="students" id="studentsHidden" value="${escapeAttr(member)}">
+      <input type="hidden" name="category" id="wizCat" value="${escapeAttr(cat)}">
+      <input type="hidden" name="frequenceMode" id="wizFreq" value="${escapeAttr(freqMode)}">
+      <input type="hidden" name="status" value="${escapeAttr(item.status||'a_faire')}">
+      <div class="edu-wiz-head"><span>${cfg.icon}</span><div><b>${escapeHtml(isEditing ? 'Modifier' : cfg.title)}</b><small>${escapeHtml(cfg.sub)}</small></div></div>
+      <div class="wiz-step edu-wizard on" data-wiz-step="1">
+        ${step1}
+        <div class="wiz-nav">
+          <button type="button" class="btn ghost" onclick="SuperApp.exitWizardFiche()">Annuler</button>
+          <button type="button" class="btn primary" onclick="SuperApp.wizNext()">Suivant →</button>
+        </div>
+      </div>
+      <div class="wiz-step edu-wizard" data-wiz-step="2">
+        ${frequencyBlock}
+        ${dateBlock}
+        ${endBlock}
+        ${step2Extra}
+        ${checklistBtn}
+        ${docWrap}
+        ${danger}
+        <div class="wiz-nav">
+          <button type="button" class="btn ghost" onclick="SuperApp.wizBack()">← Retour</button>
+          <button type="submit" class="btn primary">Enregistrer ✓</button>
+        </div>
+      </div>`;
+  }
+
+
+  // V5.74 — Assistant Santé (étape par étape) : Traitement (moments + durée) / Rendez-vous (lieu + accompagnants).
+  function santeTaskWizardHtml(item={}){
+    const isEditing = !!item.id;
+    const isAppt = (typeof isAppointment==='function' && isAppointment(item)) || item.type==='rendez_vous_medical' || item.type==='appointment';
+    const typeVal = item.type || (isAppt?'rendez_vous_medical':'medicament');
+    const cat = item.category || (isAppt?'Rendez-vous':'Traitements');
+    const member = item.member || (item.members && item.members!=='family' ? String(item.members).split(',')[0] : 'family');
+    const fam = (data.family||[]).filter(m=>!statusIsHidden(m));
+    const todayIso = dmyToISO(today) || new Date().toISOString().slice(0,10);
+    const _rawS = (item.startDate||item.date) ? normalizeDateInput(item.startDate||item.date) : '';
+    const startIso = ((item.startDate||item.date) ? (dmyToISO(_rawS) || (parseDMY(_rawS)?dmyToISO(formatDMY(parseDMY(_rawS))):'')) : '') || todayIso;
+    const _rawE = item.endDate ? normalizeDateInput(item.endDate) : '';
+    const endIso0 = item.endDate ? (dmyToISO(_rawE) || (parseDMY(_rawE)?dmyToISO(formatDMY(parseDMY(_rawE))):'')) : '';
+    const defEnd = `${(startIso.split('-')[0]||new Date().getFullYear())}-12-31`;
+    const endIso = endIso0 || (isAppt ? '' : defEnd);
+    // Pour qui (patient, mono-sélection)
+    const avTous = `<button type="button" class="wiz-av${member==='family'?' sel':''}" onclick="SuperApp.wizPickMember(this,'family')"><span class="wiz-bub emoji">👨‍👩‍👧</span><span class="wiz-avn">Tous</span></button>`;
+    const avMembers = fam.map(m=>`<button type="button" class="wiz-av${member===m.id?' sel':''}" onclick="SuperApp.wizPickMember(this,'${escapeAttr(m.id)}')"><img class="wiz-bub" src="${memberAvatarSrc(m)}" alt=""><span class="wiz-avn">${escapeHtml(String(m.name||'').split(' ')[0])}</span></button>`).join('');
+    const patientBlock = `<div class="wiz-lbl mt">👤 Pour qui ?</div><div class="wiz-avrow">${avTous}${avMembers}</div>`;
+    // Moments de prise (traitement)
+    const dm = String(item.doseMoments||'matin,soir').split(',').map(x=>x.trim()).filter(Boolean);
+    const moment=(id,ico,label)=>`<label class="wiz-moment${dm.includes(id)?' sel':''}"><input type="checkbox" name="doseMoments_cb" value="${id}" ${dm.includes(id)?'checked':''} onchange="this.closest('.wiz-moment').classList.toggle('sel',this.checked)"><span class="wm-ico">${ico}</span><b>${label}</b><span class="wm-tick">✓</span></label>`;
+    // Jours (traitement)
+    const daysMode = item.treatmentDaysMode || 'every_day';
+    const wk = String(item.treatmentWeekDays||'').split(',').map(x=>x.trim()).filter(Boolean);
+    const dayCk=(v,l)=>`<label class="wiz-day"><input type="checkbox" name="treatmentWeekDays_cb" value="${v}" ${wk.includes(v)?'checked':''}><span>${l}</span></label>`;
+    const daysOpen = daysMode==='week_days';
+    // Accompagnants (RDV, multi)
+    const selM = String(item.members||'').split(',').map(x=>x.trim()).filter(Boolean);
+    const accAv = fam.map(m=>`<button type="button" class="wiz-av${(selM.includes(m.id)&&m.id!==member)?' sel':''}" onclick="SuperApp.santeToggleAcc(this,'${escapeAttr(m.id)}')"><img class="wiz-bub" src="${memberAvatarSrc(m)}" alt=""><span class="wiz-avn">${escapeHtml(String(m.name||'').split(' ')[0])}</span></button>`).join('');
+    const accInit = selM.filter(id=>id!==member).join(',');
+    // Document contextuel + checklist + danger
+    const docInfo = isAppt ? {ico:'📎',btn:'Enregistrer et joindre un compte-rendu',zone:'📎 Compte-rendu'} : {ico:'📎',btn:"Enregistrer et joindre l'ordonnance",zone:'📎 Ordonnance'};
+    const docInner = isEditing
+      ? healthDocsFieldHtml(item, 'sante', docInfo.zone)
+      : `<button type="submit" class="wiz-choice" data-attach-after-save="1"><span class="ico">${docInfo.ico}</span><span class="tx"><b>${docInfo.btn}</b><small>Enregistre la fiche en 1 clic</small></span><span class="chev">›</span></button>`;
+    const docWrap = `<div style="margin-top:11px">${docInner}</div>`;
+    const checklistBtn = isEditing
+      ? `<button type="button" class="wiz-choice" onclick="SuperApp.openGenericChecklist('${escapeAttr(item.id)}','sante')"><span class="ico">✅</span><span class="tx"><b>${isAppt?'Préparer le rendez-vous':'Suivi du traitement'}</b><small>Ouvrir les étapes</small></span><span class="chev">›</span></button>`
+      : `<button type="submit" class="wiz-choice" data-open-generic-checklist="1" data-checklist-kind="sante"><span class="ico">✅</span><span class="tx"><b>${isAppt?'Préparer le rendez-vous':'Suivi du traitement'}</b><small>Créer la fiche et ajouter des étapes</small></span><span class="chev">›</span></button>`;
+    const danger = isEditing ? `<div class="wiz-danger"><button type="button" class="btn ghost" onclick="SuperApp.archiveItem('${escapeAttr(item.id)}')">Archiver</button><button type="button" class="btn ghost danger" onclick="SuperApp.deleteItem('${escapeAttr(item.id)}')">🗑️ Supprimer</button></div>` : '';
+    const dateChips = `<div class="wiz-chips"><button type="button" class="wiz-chip sm" onclick="SuperApp.wizPickDate(this,0)">Aujourd'hui</button><button type="button" class="wiz-chip sm" onclick="SuperApp.wizPickDate(this,1)">Demain</button><button type="button" class="wiz-chip sm" onclick="SuperApp.wizPickDate(this,'we')">Week-end</button><button type="button" class="wiz-chip sm" onclick="SuperApp.wizPickDate(this,'pick')">Date…</button></div>`;
+
+    let step1, step2;
+    if(isAppt){
+      step1 = `<div class="wiz-q">Quel rendez-vous ?</div>
+        <input class="wiz-title" id="wizTitle" name="title" placeholder="Ex : Pédiatre - vaccin" value="${escapeAttr(item.title||'')}" required>
+        <div class="wiz-lbl mt">🩺 Médecin / spécialiste (facultatif)</div>
+        <input class="wiz-title wiz-subject" name="doctor" placeholder="Ex : Dr Martin" value="${escapeAttr(item.doctor||'')}">
+        ${patientBlock}`;
+      step2 = `<div class="wiz-lbl">📅 Date du rendez-vous</div>${dateChips}
+        <div class="wiz-when"><input class="wiz-date" type="date" name="date" id="wizDate" value="${startIso}" data-today="${todayIso}" required><input class="wiz-time" type="time" name="time" value="${escapeAttr(item.time||'')}"></div>
+        <div class="wiz-lbl mt">📍 Lieu</div>
+        <input class="wiz-title wiz-subject" name="place" placeholder="Ex : Cabinet médical, Metz" value="${escapeAttr(item.place||'')}">
+        <div class="wiz-lbl mt">🧑‍🤝‍🧑 Accompagnant(s)</div>
+        <p class="wiz-hint">Le rendez-vous sera ajouté à leur calendrier aussi.</p>
+        <div class="wiz-avrow">${accAv}</div>
+        <input type="hidden" name="accompagnants" id="wizAccomp" value="${escapeAttr(accInit)}">
+        ${docWrap}${checklistBtn}${danger}`;
+    } else {
+      step1 = `<div class="wiz-q">Quel traitement ?</div>
+        <input class="wiz-title" id="wizTitle" name="title" placeholder="Ex : Doliprane 500mg" value="${escapeAttr(item.title||'')}" required>
+        <div class="wiz-lbl mt">💬 Posologie (facultatif)</div>
+        <input class="wiz-title wiz-subject" name="dosage" placeholder="Ex : 1 comprimé" value="${escapeAttr(item.dosage||'')}">
+        ${patientBlock}`;
+      step2 = `<div class="wiz-lbl">💊 Moments de prise</div>
+        <p class="wiz-hint">Plusieurs choix possibles.</p>
+        <div class="wiz-moments">${moment('matin','🌅','Matin')}${moment('midi','🌞','Midi')}${moment('soir','🌙','Soir')}${moment('coucher','🛏️','Coucher')}</div>
+        <input type="hidden" name="doseMode" value="moments">
+        <div class="wiz-lbl mt">📆 Jours</div>
+        <input type="hidden" name="treatmentDaysMode" id="wizDaysMode" value="${daysOpen?'week_days':'every_day'}">
+        <div class="wiz-chips"><button type="button" class="wiz-chip sm${!daysOpen?' sel':''}" onclick="SuperApp.santePickDays(this,0)">Tous les jours</button><button type="button" class="wiz-chip sm${daysOpen?' sel':''}" onclick="SuperApp.santePickDays(this,1)">Jours précis…</button></div>
+        <div class="wiz-days${daysOpen?' on':''}" id="wizDays">${dayCk('1','L')}${dayCk('2','M')}${dayCk('3','M')}${dayCk('4','J')}${dayCk('5','V')}${dayCk('6','S')}${dayCk('0','D')}</div>
+        <div class="wiz-lbl mt">⏳ Durée du traitement</div>
+        <div class="wiz-when"><input class="wiz-date" type="date" name="startDate" id="wizDate" value="${startIso}" data-today="${todayIso}" required><input class="wiz-date" type="date" name="endDate" id="wizEnd" value="${endIso}" required></div>
+        <div class="wiz-recnote">🔁 Le traitement s'affichera chaque jour entre le début et la fin.</div>
+        ${docWrap}${checklistBtn}${danger}`;
+    }
+    return `
+      <input type="hidden" name="targetModule" value="sante">
+      <input type="hidden" name="type" value="${escapeAttr(typeVal)}">
+      <input type="hidden" name="member" id="wizMember" value="${escapeAttr(member)}">
+      <input type="hidden" name="category" value="${escapeAttr(cat)}">
+      <input type="hidden" name="status" value="${escapeAttr(item.status||'a_faire')}">
+      <div class="wiz-step on" data-wiz-step="1">
+        ${step1}
+        <div class="wiz-nav"><button type="button" class="btn ghost" onclick="SuperApp.exitWizardFiche()">Annuler</button><button type="button" class="btn primary" onclick="SuperApp.wizNext()">Suivant →</button></div>
+      </div>
+      <div class="wiz-step" data-wiz-step="2">
+        ${step2}
+        <div class="wiz-nav"><button type="button" class="btn ghost" onclick="SuperApp.wizBack()">← Retour</button><button type="submit" class="btn primary">Enregistrer ✓</button></div>
+      </div>`;
+  }
+  function santeToggleAcc(el,id){ el.classList.toggle('sel'); const h=document.getElementById('wizAccomp'); if(!h) return; const arr=String(h.value||'').split(',').map(s=>s.trim()).filter(Boolean); const i=arr.indexOf(id); if(el.classList.contains('sel')){ if(i<0) arr.push(id); } else if(i>=0){ arr.splice(i,1); } h.value=arr.join(','); }
+  function santePickDays(el,precise){ el.parentElement.querySelectorAll('.wiz-chip').forEach(c=>c.classList.remove('sel')); el.classList.add('sel'); const days=document.getElementById('wizDays'); if(days) days.classList.toggle('on',!!precise); const m=document.getElementById('wizDaysMode'); if(m) m.value=precise?'week_days':'every_day'; }
+
+
+  function wizGo(n){ document.querySelectorAll('#editForm .wiz-step').forEach(el=>el.classList.toggle('on', el.dataset.wizStep===String(n))); }
+  function wizNext(){ const t=document.getElementById('wizTitle'); if(t && t.type !== 'hidden' && !t.value.trim()){ t.focus(); t.classList.add('wiz-err'); return; } wizGo(2); }
+  function wizBack(){ wizGo(1); }
+  function wizPickCat(el,v){ el.parentElement.querySelectorAll('.wiz-chip').forEach(c=>c.classList.remove('sel')); el.classList.add('sel'); const h=document.getElementById('wizCat'); if(h) h.value=v; const w=document.getElementById('wizDocWrap'); if(!w) return; const info=maisonDocInfo(v); w.style.display = info ? 'block' : 'none'; if(info){ const lbl=document.getElementById('wizDocBtnLabel'); if(lbl) lbl.textContent=info.btn; const ico=document.getElementById('wizDocBtnIco'); if(ico) ico.textContent=info.ico; } }
+  function eduWizPickCat(el,v){ el.parentElement.querySelectorAll('.wiz-chip').forEach(c=>c.classList.remove('sel')); el.classList.add('sel'); const h=document.getElementById('wizCat'); if(h) h.value=v; const type=document.getElementById('eduWizType'); if(type) type.value=educationCategoryType(v); const score=document.getElementById('eduScoreWrap'); if(score) score.style.display=normalizeText(v).includes('note')?'grid':'none'; const w=document.getElementById('eduDocWrap'); if(!w) return; const info=educationDocInfo(v); w.style.display = info ? 'block' : 'none'; if(info){ const lbl=document.getElementById('eduDocBtnLabel'); if(lbl) lbl.textContent=info.btn; const ico=document.getElementById('eduDocBtnIco'); if(ico) ico.textContent=info.ico; } }
+  function wizPickMember(el,id){ el.parentElement.querySelectorAll('.wiz-av').forEach(a=>a.classList.remove('sel')); el.classList.add('sel'); const h=document.getElementById('wizMember'); if(h) h.value=id; const sh=document.getElementById('studentsHidden'); if(sh) sh.value=id; }
+  function wizPickDate(el,kind){ el.parentElement.querySelectorAll('.wiz-chip').forEach(c=>c.classList.remove('sel')); el.classList.add('sel'); const d=document.getElementById('wizDate'); if(!d) return; if(kind==='pick'){ try{ d.showPicker?.(); }catch{} d.focus(); return; } const t=(d.dataset.today||'').split('-').map(Number); const base=(t.length===3)?new Date(t[0],t[1]-1,t[2]):new Date(); if(kind===1) base.setDate(base.getDate()+1); else if(kind==='we'){ const dow=base.getDay(); base.setDate(base.getDate()+((6-dow+7)%7)); } const y=base.getFullYear(),m=String(base.getMonth()+1).padStart(2,'0'),da=String(base.getDate()).padStart(2,'0'); d.value=`${y}-${m}-${da}`; }
+  function wizPickFreq(el,mode,showDays){ el.parentElement.querySelectorAll('.wiz-chip').forEach(c=>c.classList.remove('sel')); el.classList.add('sel'); const h=document.getElementById('wizFreq'); if(h) h.value=mode; const days=document.getElementById('wizDays'); if(days) days.classList.toggle('on', !!showDays); const recurring=mode!=='ponctuelle'; const wrap=document.getElementById('wizEndWrap'); const lbl=document.getElementById('wizDateLabel'); const end=document.getElementById('wizEnd'); const start=document.getElementById('wizDate'); if(wrap) wrap.style.display=recurring?'block':'none'; if(lbl) lbl.textContent=recurring?'Début':(document.getElementById('editDialog')?.dataset.app==='education'?'Échéance':'Date'); if(end){ if(recurring){ if(!end.value){ const sv=(start&&start.value)||''; const y=(sv.split('-')[0])||String(new Date().getFullYear()); end.value=`${y}-12-31`; } } else { end.value=''; } } }
+
+  // V5.63 — Aiguillage du rendu : Maison => wizard (création+édition), autres apps => formulaire classique
+  function renderEditFields(type, item){
+    const actions = $('#editForm .dialog-actions');
+    if(canonicalModuleId(type)==='maison'){
+      $('#editFields').innerHTML = maisonTaskWizardHtml(item);
+      actions?.setAttribute('hidden','');
+    } else if(canonicalModuleId(type)==='education'){
+      $('#editFields').innerHTML = educationTaskWizardHtml(item);
+      actions?.setAttribute('hidden','');
+    } else if(canonicalModuleId(type)==='sante'){
+      $('#editFields').innerHTML = santeTaskWizardHtml(item);
+      actions?.setAttribute('hidden','');
+    } else {
+      $('#editFields').innerHTML = fieldsFor(type,item);
+      actions?.removeAttribute('hidden');
+    }
   }
   function openEdit(type, id=''){
     type = canonicalModuleId(type);
@@ -1876,7 +2319,7 @@
     // Restaurer les boutons Annuler/Enregistrer (peuvent avoir été cachés par openResetConfirmDialog)
     resetDialogActions({submit:true, submitLabel:'Enregistrer', cancelLabel:'Annuler'});
     state.editing = id ? findRecord(id) : null;
-    const titleMap={maison:'Ajouter une tâche',courses_repas:'Ajouter une course / repas',calendrier:'Ajouter un élément daté',education:'Ajouter un devoir',sante:'Ajouter une information santé',sport_loisirs:(()=>{ const _t=state.slvTab||'tout'; if(_t==='sport') return 'Ajouter un sport'; if(_t==='loisir') return 'Ajouter un loisir'; if(_t==='voyage') return 'Ajouter un voyage'; return 'Ajouter — Sport / Loisir / Voyage'; })(),familles:'Ajouter un document famille'};
+    const titleMap={maison:'Ajouter une tâche',courses_repas:'Ajouter une course / repas',calendrier:'Ajouter un élément daté',education:'Ajouter un élément scolaire',sante:'Ajouter une information santé',sport_loisirs:(()=>{ const _t=state.slvTab||'tout'; if(_t==='sport') return 'Ajouter un sport'; if(_t==='loisir') return 'Ajouter un loisir'; if(_t==='voyage') return 'Ajouter un voyage'; return 'Ajouter — Sport / Loisir / Voyage'; })(),familles:'Ajouter un document famille'};
     $('#editTitle').textContent = id ? 'Modifier l’élément' : (titleMap[type] || 'Ajouter');
     $('#editForm').dataset.type = type;
     $('#editForm').dataset.id = id || '';
@@ -1885,12 +2328,26 @@
     if(state.editing?.collection==='emergency' && !item.type) item.type='urgence_sante';
     if(state.editing?.collection==='sportGear' && !item.type) item.type = item.category==='Documents sport' ? 'document_sport' : 'materiel_sport';
     if(state.editing?.collection==='weeklyMeals' && (!item.type || item.type==='repas')) item.type='repas_semaine';
-    $('#editFields').innerHTML = fieldsFor(type,item);
+    renderEditFields(type, item);
     if($('#editDialog').open) $('#editDialog').close();
     $('#editDialog').showModal();
-    if(supportsSupabaseDocs(type) && item.id){
+    const _docModuleForHydrate = canonicalModuleId(type);
+    const _shouldAutoHydrateDocs = (_docModuleForHydrate === 'maison') || (supportsSupabaseDocs(type) && _docModuleForHydrate !== 'education');
+    if(_shouldAutoHydrateDocs && item.id){
       setTimeout(()=>window.sbHydrateHealthItemDocs?.(item.id, type), 120);
     }
+  }
+  function openMaisonTaskWizardStep(id, step=2){
+    openEdit('maison', id);
+    setTimeout(()=>wizGo(step || 2), 0);
+  }
+  function openEducationTaskWizardStep(id, step=2){
+    openEdit('education', id);
+    setTimeout(()=>wizGo(step || 2), 0);
+  }
+  function openSanteTaskWizardStep(id, step=2){
+    openEdit('sante', id);
+    setTimeout(()=>wizGo(step || 2), 0);
   }
   function openAdd(module,type='',category='',title='',member=''){
     // V5.11 — Fusionner avec un preset existant (ex. day/slot posés par openAddWeeklyMeal)
@@ -2018,7 +2475,7 @@
   function checklistActionFor(id){
     const f = findRecord(id);
     if(f && ['sports','loisirs','voyages'].includes(f.collection)) return `SuperApp.openSlvActivityDetail('${id}')`;
-    const kind = (f && canonicalModuleId(f.item.module) === 'education' && String(f.item.type||'') !== 'note') ? 'education' : 'maison';
+    const kind = (f && canonicalModuleId(f.item.module) === 'education') ? 'education' : 'maison';
     return `SuperApp.openGenericChecklist('${id}','${kind}')`;
   }
   function rowActionsB(id){
@@ -2556,7 +3013,7 @@
       <div class="reset-confirm-hero"><span>⚠️</span><div><b>${title}</b><small>${isCloud ? 'Suppression locale et Supabase.' : 'Suppression locale uniquement.'}</small></div></div>
       <p>${isCloud ? 'Cette opération supprime aussi les données Supabase du compte connecté. Elles ne reviendront pas après synchronisation.' : 'Cette opération vide seulement cet appareil. Les données peuvent revenir avec le bouton Récupérer Supabase si elles existent encore dans le cloud.'}</p>
       <div class="reset-import-help"><b>Avant de supprimer</b><ol><li>Cliquer sur <b>Exporter mes données JSON</b>.</li><li>Conserver le fichier sur votre téléphone ou ordinateur.</li><li>Après réinitialisation : <b>Paramètres &gt; Sauvegarde et données &gt; Importer JSON</b>.</li><li>Sélectionner le fichier exporté puis valider l’import pour restaurer les données.</li></ol></div>
-      <div class="reset-confirm-actions"><button class="btn ghost" type="button" onclick="SuperApp.exportData()">📤 Exporter mes données JSON</button><button class="btn ghost" type="button" onclick="SuperApp.closeEditDialog()">Annuler</button><button class="btn primary danger" type="button" onclick="SuperApp.confirmFullReset('${mode}')">${isCloud ? 'Supprimer définitivement' : 'Supprimer sur cet appareil'}</button></div>
+      <div class="reset-confirm-actions"><button class="btn ghost" type="button" onclick="SuperApp.exportData()">📤 Exporter mes données JSON</button><button class="btn ghost" type="button" onclick="SuperApp.exitWizardFiche()">Annuler</button><button class="btn primary danger" type="button" onclick="SuperApp.confirmFullReset('${mode}')">${isCloud ? 'Supprimer définitivement' : 'Supprimer sur cet appareil'}</button></div>
     </div>`;
   }
   function openResetConfirmDialog(mode='reset'){
@@ -2845,7 +3302,7 @@
   function getMaisonTasks(filter='open'){
     let arr = visibleItems('tasks');
     if(filter === 'open') arr = arr.filter(x=>!statusIsDone(x));
-    if(filter === 'today' || filter === 'taches_aujourdhui') arr = arr.filter(x=>!statusIsDone(x) && (x.date === today || (/quotidien|daily/i.test(x.recurrence||''))));
+    if(filter === 'today' || filter === 'taches_aujourdhui') arr = arr.filter(x=>!statusIsDone(x) && (x.date === today || isRecurringDueToday(x)));
     if(filter === 'late' || filter === 'taches_retard') arr = arr.filter(x=>!statusIsDone(x) && x.date && daysDiff(today,x.date) < 0);
     if(filter === 'recurrent' || filter === 'taches_recurrentes') arr = arr.filter(x=>matchesWords(x,['routine','récurrent','recurrent','quotidien','hebdo']));
     if(filter === 'done') arr = arr.filter(statusIsDone);
@@ -2876,7 +3333,10 @@
   function getSchoolItems(filter='open'){
     let arr = [...visibleItems('homework'), ...visibleItems('schoolDocs')].map(x=>({...x,module:'education'}));
     if(filter === 'open') arr = arr.filter(x=>!statusIsDone(x));
-    if(filter === 'today') arr = arr.filter(x=>!statusIsDone(x) && (x.date === today || isRecurringDueToday(x)));
+    if(filter === 'today') arr = arr.filter(x=>!statusIsDone(x) && schoolDueOnDate(x, today));
+    if(filter === 'today_all') arr = arr.filter(x=>schoolDueOnDate(x, today));
+    if(filter === 'late') arr = arr.filter(x=>!statusIsDone(x) && x.date && daysDiff(today,x.date) < 0);
+    if(filter === 'done') arr = arr.filter(statusIsDone);
     return arr;
   }
   function isAppointment(x){ return ['appointment','rendez_vous_medical','rendez vous medical','rdv'].includes(itemType(x)); }
@@ -2913,16 +3373,44 @@
     return arr;
   }
   function getSportGear(filter='all'){ return visibleItems('sportGear'); }
-  function isRecurringDueToday(x){
-    if(!x.recurrence||x.recurrence==='ponctuelle') return false;
-    if(x.startDate&&x.startDate>today) return false;
-    if(x.endDate&&x.endDate<today) return false;
-    if(x.recurrence==='quotidienne') return true;
-    const dow=new Date().getDay();
-    if(x.recurrence==='hebdomadaire') return x.recurDay!==undefined?Number(x.recurDay)===dow:(x.date?new Date(x.date).getDay()===dow:false);
-    if(x.recurrence==='mensuelle') return x.date?new Date(x.date).getDate()===new Date().getDate():false;
+  // V5.67 — Récurrence unifiée : on comprend frequenceMode/frequenceWeekDays (assistant) EN PLUS du champ 'recurrence'.
+  function recurrenceOf(x){
+    if(x.recurrence && x.recurrence!=='ponctuelle') return x.recurrence;
+    const fm = x.frequenceMode;
+    if(fm==='quotidienne') return 'quotidienne';
+    if(fm==='hebdomadaire' || fm==='personnalisee') return 'hebdomadaire';
+    if(fm==='mensuelle') return 'mensuelle';
+    if(fm==='annuelle') return 'annuelle';
+    return x.recurrence || 'ponctuelle';
+  }
+  function recurDaysOf(x){
+    const fwd = String(x.frequenceWeekDays||'').split(',').map(t=>t.trim()).filter(t=>t!=='');
+    if(fwd.length) return fwd.map(Number);
+    if(x.recurDay!==undefined && x.recurDay!=='') return [Number(x.recurDay)];
+    return [];
+  }
+  function isRecurringOnDate(x, d){
+    if(!d) return false;
+    const rec = recurrenceOf(x);
+    if(!rec || rec==='ponctuelle') return false;
+    const dd = new Date(d); dd.setHours(0,0,0,0);
+    const startStr = x.startDate || x.date;
+    const start = startStr ? parseDMY(startStr) : null;
+    if(start){ start.setHours(0,0,0,0); if(dd < start) return false; }
+    if(x.endDate){ const end=parseDMY(x.endDate); if(end){ end.setHours(0,0,0,0); if(dd > end) return false; } }
+    const dow = dd.getDay();
+    if(rec==='quotidienne') return true;
+    if(rec==='hebdomadaire'){
+      const days = recurDaysOf(x);
+      if(days.length) return days.includes(dow);
+      const base = start || (x.date?parseDMY(x.date):null);
+      return base ? base.getDay()===dow : false;
+    }
+    if(rec==='mensuelle'){ const base=start||(x.date?parseDMY(x.date):null); return base ? base.getDate()===dd.getDate() : false; }
+    if(rec==='annuelle'){ const base=start||(x.date?parseDMY(x.date):null); return base ? (base.getDate()===dd.getDate() && base.getMonth()===dd.getMonth()) : false; }
     return false;
   }
+  function isRecurringDueToday(x){ return isRecurringOnDate(x, parseDMY(today) || new Date()); }
   function getLoisirActivities(filter='open'){
     let arr=visibleItems('loisirs');
     if(filter==='open') arr=arr.filter(x=>!statusIsDone(x));
@@ -3047,11 +3535,11 @@
 
     // Le calendrier est une vue calculée, pas une base parallèle.
     // Chaque app utilise la même source que ses listes, compteurs et alertes.
-    pushMany(getMaisonTasks('open'), '🏠', 'Maison', 'maison', 'tasks');
+    pushMany(visibleItems('tasks'), '🏠', 'Maison', 'maison', 'tasks');
     pushMany(getMenus('all'), '🍽️', 'Courses & repas', 'courses_repas', 'menus');
     pushMany(getShoppingItems('open'), '🛒', 'Courses', 'courses_repas', 'shopping');
     pushMany(getStockItems('all'), '🧺', 'Stock', 'courses_repas', 'stock');
-    pushMany(getSchoolItems('open'), '📚', 'École', 'education', 'school');
+    pushMany(getSchoolItems('all'), '📚', 'École', 'education', 'school');
     pushMany(getHealthTreatments('open'), '💊', 'Traitement', 'sante', 'health');
     pushMany(getHealthTreatmentDoseEvents(), '💊', 'Prise traitement', 'sante', 'healthDoses');
     pushMany(getHealthAppointments('open'), '🩺', 'Rendez-vous', 'sante', 'health');
@@ -3281,6 +3769,7 @@
   }
   function openSlvActivityDetail(id){ state.appsView={kind:'slvDetail', id}; setView('apps'); }
   function genericChecklistConfig(kind='maison'){
+    if(kind === 'sante') return {kind:'sante', module:'sante', title:'Préparer le rendez-vous', emoji:'🩺', itemPlaceholder:'À prévoir', type:'checklist_sante', category:'Santé', suggestions:['Carte vitale','Ordonnance','Carnet de santé','Questions à poser']};
     return kind === 'education'
       ? {kind:'education', module:'education', title:'Checklist devoirs', emoji:'📚', itemPlaceholder:'Étape du devoir', type:'checklist_devoir', category:'Devoirs', suggestions:['Lire la consigne','Faire les exercices','Relire','Mettre dans le cartable']}
       : {kind:'maison', module:'maison', title:'Checklist ménage', emoji:'🧹', itemPlaceholder:'Étape ou objet', type:'checklist_maison', category:'Ménage', suggestions:['Préparer','Nettoyer','Ranger','Vérifier']};
@@ -3292,6 +3781,17 @@
     const found = findRecord(parentId);
     return found?.item || null;
   }
+  // V5.67 — Sélection multiple + suppression par lot (hub & checklist)
+  function batchOn(){ return !!(state.batch && state.batch.on); }
+  function batchHas(id){ return !!(state.batch && state.batch.ids && state.batch.ids.includes(String(id))); }
+  function batchEnter(){ state.batch = {on:true, ids:[]}; render(); }
+  function batchExit(){ state.batch = {on:false, ids:[]}; render(); }
+  function batchToggle(id){ id=String(id); if(!state.batch||!state.batch.on) state.batch={on:true, ids:[]}; const a=state.batch.ids; const i=a.indexOf(id); if(i>=0) a.splice(i,1); else a.push(id); render(); }
+  function batchSelectAll(idsCsv){ const ids=String(idsCsv||'').split(',').filter(Boolean); if(!state.batch||!state.batch.on) state.batch={on:true, ids:[]}; state.batch.ids = (ids.length && state.batch.ids.length===ids.length) ? [] : [...ids]; render(); }
+  function batchDelete(){ const b=state.batch; if(!b||!b.ids.length) return; const n=b.ids.length; confirmDialog(`Supprimer ${n} élément(s) ? Ils disparaîtront de l'interface.`, ()=>{ b.ids.forEach(id=>{ const f=findRecord(id); if(f){ f.item.status='supprime'; f.item.statut='supprime'; f.item.syncStatus='pending_delete'; touchSync(f.item); hideCalendarCopiesOf(f.item); } }); state.batch={on:false, ids:[]}; save(); render(); toast(`🗑️ ${n} élément(s) supprimé(s)`); }); }
+  function batchRescheduleToday(){ const b=state.batch; if(!b||!b.ids.length) return; const n=b.ids.length; b.ids.forEach(id=>{ const f=findRecord(id); if(f){ f.item.date=today; f.item.status='a_faire'; f.item.statut='a_faire'; touchSync(f.item); } }); state.batch={on:false,ids:[]}; save(); render(); toast(`↪ ${n} tâche(s) pour aujourd'hui`); }
+  function batchMarkDoneAll(){ const b=state.batch; if(!b||!b.ids.length) return; const n=b.ids.length; b.ids.forEach(id=>{ const f=findRecord(id); if(f){ f.item.status='fait'; f.item.statut='fait'; touchSync(f.item); } }); state.batch={on:false,ids:[]}; save(); render(); toast(`✅ ${n} tâche(s) faite(s)`); }
+  function batchBarHtml(idsCsv, opts={}){ const ids=String(idsCsv||'').split(',').filter(Boolean); const n=(state.batch&&state.batch.ids)?state.batch.ids.length:0; const all = n>0 && n===ids.length; const taskBtns = opts.taskActions ? `<button type="button" class="bb-act" onclick="SuperApp.batchRescheduleToday()" ${n?'':'disabled'}>↪ Aujourd'hui</button><button type="button" class="bb-act" onclick="SuperApp.batchMarkDoneAll()" ${n?'':'disabled'}>✅ Fait</button>` : ''; return `<div class="batch-bar"><button type="button" class="bb-all" onclick="SuperApp.batchSelectAll('${idsCsv}')">${all?'Tout désélectionner':'Tout sélectionner'}</button>${taskBtns}<button type="button" class="bb-del" onclick="SuperApp.batchDelete()" ${n?'':'disabled'}>🗑️ Supprimer (${n})</button></div>`; }
   function openGenericChecklist(parentId, kind='maison'){
     const parent = genericChecklistActivity(parentId);
     if(!parent){ toast('Élément introuvable.'); return; }
@@ -3331,9 +3831,12 @@
     paintGenericChecklistPage(found.item.parentId, kind);
   }
   function genericChecklistLineHtml(x){
-    const done=statusIsDone(x); const qty=parseInt(x.quantity||x.qty||1,10)||1;
-    const label = x.subcategory || x.category || 'Checklist';
-    return `<article class="slv-check-row ${done?'done':''}"><label><input type="checkbox" ${done?'checked':''} onchange="SuperApp.toggleGenericChecklistItem('${x.id}')"><span><b>${escapeHtml(x.title)}</b><small>${escapeHtml(label)}</small></span></label><div class="slv-stepper" aria-label="Quantité"><button type="button" onclick="event.stopPropagation();SuperApp.changeGenericChecklistQty('${x.id}',-1)">−</button><strong>${qty}</strong><button type="button" onclick="event.stopPropagation();SuperApp.changeGenericChecklistQty('${x.id}',1)">+</button></div><button type="button" class="row-action del btn-sm ghost danger" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">Supprimer</button></article>`;
+    const done=statusIsDone(x);
+    if(batchOn()){
+      const picked=batchHas(x.id);
+      return `<div class="gc-row ${done?'done':''} ${picked?'picked':''}" onclick="SuperApp.batchToggle('${x.id}')"><span class="gc-selbox">${picked?'✓':''}</span><span class="gc-tx">${escapeHtml(x.title)}</span></div>`;
+    }
+    return `<div class="gc-row ${done?'done':''}"><button type="button" class="gc-ck" onclick="event.stopPropagation();SuperApp.toggleGenericChecklistItem('${x.id}')">${done?'✓':''}</button><span class="gc-tx">${escapeHtml(x.title)}</span><button type="button" class="gc-x" aria-label="Supprimer" onclick="event.stopPropagation();SuperApp.deleteItem('${x.id}')">✕</button></div>`;
   }
   // V5.38 — Filtre/regroupement par sous-catégorie pour les checklists Maison/Éducation.
   function genericChecklistItemSub(x){ return String((x && (x.subcategory || x.itemCategory)) || '').trim(); }
@@ -3378,24 +3881,31 @@
     const parent = genericChecklistActivity(parentId); if(!parent){ paintModule(kind==='education'?'education':'maison'); return; }
     const cfg = genericChecklistConfig(kind);
     const rows = genericChecklistRows(parentId);
-    const done = rows.filter(statusIsDone).length;
-    const suggestions = cfg.suggestions;
-    const parentCat = parent.category || cfg.category;
-    const subOpts = subcategoriesFor(cfg.module, parentCat);
-    const catSelect = subOpts.length
-      ? `<select id="genericChecklistCatInput" aria-label="Sous-catégorie">${subOpts.map(s=>`<option>${escapeHtml(s)}</option>`).join('')}</select>`
-      : `<select id="genericChecklistCatInput"><option>${escapeHtml(cfg.category)}</option><option>Préparation</option><option>À faire</option><option>Autre</option></select>`;
-    const filterChips = genericChecklistFilterChips(parentId, cfg.kind, rows);
-    $('#view-apps').innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openEdit('${cfg.module}','${parentId}')">← Retour fiche</button></div>
-      <section class="slv-checklist-page ${escapeAttr(cfg.module)}">
-        <article class="slv-detail-hero"><div class="slv-detail-icon">${cfg.emoji}</div><div class="slv-detail-main"><span>${escapeHtml(cfg.title)}</span><h2>${escapeHtml(parent.title||'Élément')}</h2><p>${done}/${rows.length} fait(s)</p></div></article>
-        <section class="slv-checklist-board">
-          <div class="slv-add-object-card"><input id="genericChecklistTitleInput" type="text" placeholder="${escapeAttr(cfg.itemPlaceholder)}"><input id="genericChecklistQtyInput" type="number" min="1" step="1" value="1" aria-label="Quantité">${catSelect}<button type="button" class="btn primary" onclick="SuperApp.addGenericChecklistLine('${parentId}','${cfg.kind}')">+ Ajouter</button></div>
-          <div class="slv-suggestions"><b>Suggestions rapides</b><div>${suggestions.map(v=>`<button type="button" onclick="SuperApp.addGenericChecklistSuggestion('${parentId}','${cfg.kind}','${escapeAttr(v)}')">＋ ${escapeHtml(v)}</button>`).join('')}</div></div>
-          ${filterChips}
-          ${genericChecklistGroupedRows(parentId, cfg.kind, rows)}
-          <footer class="dialog-actions slv-checklist-actions"><button type="button" class="btn ghost" onclick="SuperApp.openEdit('${cfg.module}','${parentId}')">Retour fiche</button><button type="button" class="btn primary" onclick="SuperApp.openModule('${cfg.module}')">Valider</button></footer>
-        </section>
+    const open = rows.filter(x=>!statusIsDone(x));
+    const doneRows = rows.filter(statusIsDone);
+    const ordered = [...open, ...doneRows];
+    const doneCount = doneRows.length;
+    const on = batchOn();
+    const idsCsv = ordered.map(x=>x.id).join(',');
+    const selBtn = rows.length ? (on
+      ? `<button type="button" class="gc-selbtn" onclick="SuperApp.batchExit()">Annuler</button>`
+      : `<button type="button" class="gc-selbtn" onclick="SuperApp.batchEnter()">Sélectionner</button>`) : '';
+    const addRow = on ? '' : `<div class="gc-add"><input id="genericChecklistTitleInput" type="text" placeholder="${escapeAttr(cfg.itemPlaceholder)}" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();SuperApp.addGenericChecklistLine('${parentId}','${cfg.kind}');}"><button type="button" class="gc-addbtn" aria-label="Ajouter" onclick="SuperApp.addGenericChecklistLine('${parentId}','${cfg.kind}')">＋</button></div>`;
+    const returnAction = cfg.module==='maison'
+      ? `SuperApp.openMaisonTaskWizardStep('${parentId}',2)`
+      : (cfg.module==='education' ? `SuperApp.openEducationTaskWizardStep('${parentId}',2)`
+      : (cfg.module==='sante' ? `SuperApp.openSanteTaskWizardStep('${parentId}',2)`
+      : `SuperApp.openEdit('${cfg.module}','${parentId}')`));
+    const foot = on
+      ? batchBarHtml(idsCsv)
+      : `<footer class="gc-foot"><button type="button" class="btn primary gc-finish" onclick="${returnAction}">✓ Terminer la checklist</button></footer>`;
+    const listHtml = ordered.length ? ordered.map(genericChecklistLineHtml).join('') : `<div class="gc-empty">Aucune étape pour l'instant.</div>`;
+    $('#view-apps').innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="${returnAction}">← Retour fiche</button></div>
+      <section class="gc-page ${escapeAttr(cfg.module)}">
+        <div class="gc-head"><div class="gc-emoji">${cfg.emoji}</div><div class="gc-headmain"><span>${escapeHtml(cfg.title)}</span><h2>${escapeHtml(parent.title||'Élément')}</h2><p>${doneCount}/${rows.length} fait(s)</p></div>${selBtn}</div>
+        ${addRow}
+        <div class="gc-list">${listHtml}</div>
+        ${foot}
       </section>`;
   }
 
@@ -3643,7 +4153,7 @@
     return ({maison:'Maison', education:'Éducation', sante:'Santé', sport_loisirs:'Sport / Loisir / Voyage', familles:'Familles'}[canonicalModuleId(module)] || moduleLabel(module));
   }
   function supportsSupabaseDocs(module){
-    return ['sante','sport_loisirs','familles','courses_repas'].includes(canonicalModuleId(module));
+    return ['sante','sport_loisirs','familles','courses_repas','education'].includes(canonicalModuleId(module));
   }
   function healthDocsFieldHtml(item={}, module='sante', ctxLabel=''){
     module = canonicalModuleId(module);
@@ -3654,7 +4164,9 @@
     }
     const safeId = escapeAttr(id);
     const safeModule = escapeAttr(module);
-    return `<section class="sb-health-doc-zone" data-sb-health-docs="${safeId}" data-sb-doc-module="${safeModule}"><div class="sb-doc-test-intro"><b>${title}</b></div><input id="sb-health-doc-input-${safeId}" type="file" hidden onchange="window.sbUploadHealthItemDocument?.(this,'${safeId}','${safeModule}')"><button type="button" class="btn primary sb-doc-test-upload" onclick="document.getElementById('sb-health-doc-input-${safeId}')?.click()">📤 Charger le document</button><div class="sb-health-doc-status info">Chargement des documents…</div><div class="sb-health-doc-list"><div class="empty">Chargement…</div></div></section>`;
+    const initialDocStatus = module === 'education' ? 'Pièce jointe optionnelle. La checklist reste locale.' : 'Chargement des documents…';
+    const initialDocList = module === 'education' ? 'Aucun document chargé automatiquement.' : 'Chargement…';
+    return `<section class="sb-health-doc-zone" data-sb-health-docs="${safeId}" data-sb-doc-module="${safeModule}"><div class="sb-doc-test-intro"><b>${title}</b></div><input id="sb-health-doc-input-${safeId}" type="file" hidden onchange="window.sbUploadHealthItemDocument?.(this,'${safeId}','${safeModule}')"><button type="button" class="btn primary sb-doc-test-upload" onclick="document.getElementById('sb-health-doc-input-${safeId}')?.click()">📤 Charger le document</button><div class="sb-health-doc-status info">${initialDocStatus}</div><div class="sb-health-doc-list"><div class="empty">${initialDocList}</div></div></section>`;
   }
 
   function genericChecklistFieldHtml(type, item={}){
@@ -3678,7 +4190,12 @@
     const sub = String(item.subcategory || item.subcategorie || item.subCategory || '').toLowerCase();
     const it = String(item.type || '').toLowerCase();
     const hay = cat + ' ' + sub;
-    if(m === 'maison') return /facture|paiement/.test(hay) ? '🧾 Joindre la facture' : '';
+    if(m === 'maison'){
+      if(/facture|paiement/.test(hay)) return '🧾 Joindre la facture';
+      if(/véhicule|vehicule/.test(hay)) return '🚗 Joindre le document du véhicule';
+      if(/démarche|demarche|administrat/.test(hay)) return '📋 Joindre le justificatif';
+      return '';
+    }
     if(m === 'courses_repas') return (/course/.test(it) || /course|alimentation|épicerie|epicerie/.test(cat)) && !/repas|stock/.test(it) ? '🧾 Joindre le ticket de caisse' : '';
     if(m === 'sante'){
       if(isAppointment(item)) return '📄 Joindre l’ordonnance ou le compte-rendu';
@@ -3701,7 +4218,14 @@
       if(/administr/.test(cat)) return '📑 Joindre le justificatif';
       return '📎 Joindre le document';
     }
-    return ''; // Éducation : aucun document (centralisé dans Familles › Scolarité)
+    if(m === 'education'){
+      if(/document|autorisation|assurance|certificat|bulletin/.test(hay) || /document/.test(it)) return '📄 Joindre le document scolaire';
+      if(/controle|contrôle|devoir|expose|exposé/.test(hay)) return '📝 Joindre le sujet / devoir';
+      if(/sortie|voyage|activite|activité/.test(hay)) return '🚌 Joindre l’autorisation ou la convocation';
+      if(/cantine|administratif|paiement|justificatif/.test(hay)) return '📋 Joindre le justificatif';
+      return '';
+    }
+    return '';
   }
 
   // V5.8 — Formulaire standardisé : MÊME séquence partout, peu importe le module.
@@ -3906,57 +4430,7 @@
         ? `<section class="slv-checklist-form-panel always-visible-checklist"><div class="slv-mini-help"><b>✅ Checklist</b></div><button type="button" class="btn primary" onclick="SuperApp.openSlvChecklistLight('${escapeAttr(item.id)}')">✅ Ouvrir la checklist ${escapeHtml(label)}</button></section>`
         : `<section class="slv-checklist-form-panel always-visible-checklist"><div class="slv-mini-help"><b>✅ Checklist</b></div><button type="submit" class="btn primary" name="openChecklistAfterSave" value="1" data-open-checklist="1">✅ Créer et ouvrir la checklist ${escapeHtml(label)}</button></section>`;
     }
-    if(type === 'maison'){
-      const freqMode = item.frequenceMode || 'ponctuelle';
-      const wkDays = String(item.frequenceWeekDays||'').split(',').map(x=>x.trim()).filter(Boolean);
-      const dayBtn = (id,label) => `<label class="member-check-item compact"><input type="checkbox" name="frequenceWeekDays_cb" value="${id}" ${wkDays.includes(id)?'checked':''}> <span>${label}</span></label>`;
-      inside = `
-        <div class="form-field"><label>Lieu (facultatif)</label><select name="place">
-          <option value="" ${!item.place?'selected':''}>—</option>
-          <option value="Cuisine" ${item.place==='Cuisine'?'selected':''}>🍳 Cuisine</option>
-          <option value="Salon" ${item.place==='Salon'?'selected':''}>🛋️ Salon</option>
-          <option value="Chambres" ${item.place==='Chambres'?'selected':''}>🛏️ Chambres</option>
-          <option value="Salle de bain" ${item.place==='Salle de bain'?'selected':''}>🚿 Salle de bain</option>
-          <option value="Extérieur" ${item.place==='Extérieur'?'selected':''}>🌿 Extérieur</option>
-          <option value="Garage" ${item.place==='Garage'?'selected':''}>🚗 Garage</option>
-        </select></div>
-        <div class="form-field"><label>Priorité</label><select name="priorite">
-          <option value="" ${!item.priorite?'selected':''}>—</option>
-          <option value="Urgent" ${item.priorite==='Urgent'?'selected':''}>🔴 Urgent</option>
-          <option value="Normal" ${item.priorite==='Normal'?'selected':''}>🟡 Normal</option>
-          <option value="À prévoir" ${item.priorite==='À prévoir'?'selected':''}>🟢 À prévoir</option>
-        </select></div>
-        <section class="task-frequency-planner">
-          <div class="form-field"><label>Fréquence</label><select name="frequenceMode" onchange="SuperApp.updateTaskFrequencyDisplay(this)">
-            <option value="ponctuelle" ${freqMode==='ponctuelle'?'selected':''}>Ponctuelle (une seule fois)</option>
-            <option value="quotidienne" ${freqMode==='quotidienne'?'selected':''}>Quotidienne</option>
-            <option value="hebdomadaire" ${freqMode==='hebdomadaire'?'selected':''}>Hebdomadaire</option>
-            <option value="mensuelle" ${freqMode==='mensuelle'?'selected':''}>Mensuelle</option>
-            <option value="annuelle" ${freqMode==='annuelle'?'selected':''}>Annuelle</option>
-            <option value="personnalisee" ${freqMode==='personnalisee'?'selected':''}>Personnaliser…</option>
-          </select></div>
-          <div class="task-freq-section task-freq-hebdo" style="${freqMode==='hebdomadaire'?'':'display:none'}">
-            <div class="form-field"><label>Jours de la semaine</label>
-              <div class="member-checkbox-list week-days-grid">
-                ${dayBtn('1','Lun')}${dayBtn('2','Mar')}${dayBtn('3','Mer')}${dayBtn('4','Jeu')}${dayBtn('5','Ven')}${dayBtn('6','Sam')}${dayBtn('0','Dim')}
-              </div>
-              <small>Cochez un ou plusieurs jours.</small>
-            </div>
-          </div>
-          <div class="task-freq-section task-freq-custom" style="${freqMode==='personnalisee'?'':'display:none'}">
-            <div class="form-field"><label>Jours précis</label>
-              <div class="member-checkbox-list week-days-grid">
-                ${dayBtn('1','Lun')}${dayBtn('2','Mar')}${dayBtn('3','Mer')}${dayBtn('4','Jeu')}${dayBtn('5','Ven')}${dayBtn('6','Sam')}${dayBtn('0','Dim')}
-              </div>
-              <small>Coche les jours où la tâche revient (ex : Lun + Jeu).</small>
-            </div>
-            <div class="form-field"><label>Ou : tous les X jours</label>
-              <input name="frequenceInterval" type="number" min="1" step="1" value="${item.frequenceInterval||2}" placeholder="Ex : 3">
-              <small>Exemple : 3 = tous les 3 jours, 14 = toutes les 2 semaines.</small>
-            </div>
-          </div>
-        </section>`;
-    }
+    // V5.63 — L'ancien formulaire Maison a été retiré : la Maison passe par l'assistant (maisonTaskWizardHtml).
     if(!inside) return extraAfterDetails;
     // V5.62 — Plus de volet « ＋ Plus de détails » : tous les champs sont visibles directement.
     return `<div class="form-section-inline">${inside}</div>${extraAfterDetails}`;
@@ -3968,7 +4442,7 @@
   const DEFAULT_CATEGORIES = {
     maison:{'Ménage':[],'Rangement':[],'Entretien':[],'Réparation':[],'Urgence':[],'Routine':[],'Suivi Paiement Factures':[]},
     courses_repas:{'Alimentation':[],'Épicerie':[],'Stock':[]},
-    education:{'Devoirs':[],'Contrôles':[],'Documents école':[],'Notes':[],'Activités scolaires':[]},
+    education:{'Devoirs':[],'Contrôles':[],'Notes':[],'Rendez-vous école':[],'Documents école':[],'Fournitures':[],'Activités scolaires':[],'Cantine / administratif':[]},
     sante:{'Traitements':[],'Médicaments':[],'Rendez-vous':[],'Vaccins':[],'Documents santé':[],'Urgences':[]},
     sport_loisirs:{'Sport':[],'Sortie familiale':[],'Loisir':[],'Matériel':[],'Documents sport':[]},
     familles:{'Identité':[],'Passeport':[],'Diplômes':[],'Santé':[],'Scolarité':[],'Assurances':[],'Administratif':[]},
@@ -4321,9 +4795,23 @@
   }
   function addItem(type,item){
     item.date = normalizeDateInput(item.date || '');
+    // V5.67 — Pont : le calendrier lit 'recurrence' ; on le dérive de la fréquence de l'assistant.
+    if(item.frequenceMode){
+      const _fm = item.frequenceMode;
+      item.recurrence = (_fm==='quotidienne')?'quotidienne':((_fm==='hebdomadaire'||_fm==='personnalisee')?'hebdomadaire':((_fm==='mensuelle')?'mensuelle':((_fm==='annuelle')?'annuelle':'ponctuelle')));
+    }
     const id = $('#editForm')?.dataset.id;
     const targetModule = canonicalModuleId(item.targetModule || item.module || type);
     if(!isAppActive(targetModule)){ toast('Cette application n’est pas activée. Active-la d’abord.'); return null; }
+    if(targetModule === 'education'){
+      const subj = String(item.subject || '').trim();
+      const typ = normalizeText(item.type || 'devoir');
+      if((!item.title || ['note','controle','sortie'].includes(normalizeText(item.title))) && subj){
+        if(typ.includes('note')) item.title = `Note — ${subj}`;
+        else if(typ.includes('controle')) item.title = `Contrôle — ${subj}`;
+        else if(typ.includes('activite')) item.title = `Sortie — ${subj}`;
+      }
+    }
     delete item.targetModule;
     if(item.quantity !== undefined || item.unit){
       item.unit = item.unit || 'unité';
@@ -4433,13 +4921,13 @@
   // V5.41 — Report d'une tâche en 1 tap (Demain / Ce week-end / Un autre jour)
   function rescheduleTask(id, when){
     const found = findRecord(id); if(!found){ return; }
-    if(when === 'autre'){ openEdit('maison', id); return; }
+    if(when === 'autre'){ const mod = canonicalModuleId(found.item.module || 'maison'); openEdit(mod === 'calendrier' ? 'calendrier' : mod, id); return; }
     let d = new Date();
     if(when === 'demain'){ d = addDays(new Date(), 1); }
     else if(when === 'weekend'){ const day = new Date().getDay(); let add = (6 - day + 7) % 7; if(add === 0) add = 7; d = addDays(new Date(), add); }
     found.item.date = `${pad2(d.getDate())}-${pad2(d.getMonth()+1)}-${d.getFullYear()}`;
     touchSync(found.item); save(); render();
-    toast('↪ Tâche reportée');
+    toast('↪ Élément reporté');
   }
   function activeModuleBlock(module){ ensureV53State(); return state.moduleBlocks[canonicalModuleId(module)] || defaultBlockForModule(module); }
   function activeMemberFilter(module){ ensureV53State(); return state.memberFilters[canonicalModuleId(module)] || 'all'; }
@@ -4489,6 +4977,10 @@
       if(item.members === 'family') return true;
       if(String(item.members).split(',').map(s=>s.trim()).includes(memberId)) return true;
     }
+    if(item.students){
+      if(item.students === 'family') return true;
+      if(String(item.students).split(',').map(s=>s.trim()).includes(memberId)) return true;
+    }
     if(canonicalModuleId(item.module)==='sante' && item.companion === memberId) return true;
     return getItemMemberId(item) === memberId;
   }
@@ -4529,8 +5021,8 @@
         extra:[['stock','Stock','🧺']]
       },
       education:{
-        main:[['tout','Tout','▦'],['ecole','École','📘'],['ecole_notes','Notes','⭐']],
-        extra:[['documents','Documents','📄']]
+        main:[['tout','Tout','▦'],['today','Aujourd’hui','📅'],['retard','En retard','⏰']],
+        extra:[['devoirs','Devoirs','📘'],['controles','Contrôles','🧪'],['ecole_notes','Notes','⭐'],['documents','Documents','📄'],['fournitures','Fournitures','🎒'],['rdv','RDV école','🤝'],['sorties','Sorties','🚌'],['admin','Cantine / admin','🍽️'],['terminees','Terminées','✅']]
       },
       sante:{
         main:[['tous','Tous','▦'],['rendez_vous','Rendez-vous','📅'],['traitements','Traitements','💊']],
@@ -4568,7 +5060,7 @@
     const scoped = arr => applyMemberFilter(arr, module);
     if(module==='maison') return [summaryMetric(scoped([...getMaisonTasks('open'), ...getGenericChecklistItems('maison')]).length,'éléments actifs','🏠',"SuperApp.setMaisonPeriodFilter('all')"), summaryMetric(scoped(getMaisonTasks('today')).length,'aujourd’hui','📅',"SuperApp.setMaisonPeriodFilter('today')"), summaryMetric(scoped(getMaisonTasks('late')).length,'en retard','⏰',"SuperApp.setMaisonPeriodFilter('late')")].join('');
     if(module==='courses_repas') return [summaryMetric(scoped(getMenus()).length,'menus','🍽️',"SuperApp.setModuleBlock('courses_repas','repas')"), summaryMetric(scoped(getShoppingItems('open')).length,'courses','🛒',"SuperApp.setModuleBlock('courses_repas','courses')"), summaryMetric(scoped(getStockItems('low')).length,'stock faible','⚠️',"SuperApp.setModuleBlock('courses_repas','stock')")].join('');
-    if(module==='education') return [summaryMetric(scoped(getSchoolItems('open')).length,'école','📚',"SuperApp.setModuleBlock('education','ecole')"), summaryMetric(scoped(getSchoolItems('open').filter(x=>x.type==='note' || x.category==='Notes')).length,'notes','⭐',"SuperApp.setModuleBlock('education','ecole_notes')"), summaryMetric(scoped(getSchoolItems('today')).length,'aujourd’hui','📅',"SuperApp.setModuleBlock('education','ecole')")].join('');
+    if(module==='education') return [summaryMetric(scoped(getSchoolItems('open')).length,'école','📚',"SuperApp.setModuleBlock('education','tout')"), summaryMetric(scoped(getSchoolItems('open').filter(x=>schoolFilterMatch(x,'notes'))).length,'notes','⭐',"SuperApp.setModuleBlock('education','ecole_notes')"), summaryMetric(scoped(getSchoolItems('today_all')).length,'aujourd’hui','📅',"SuperApp.setModuleBlock('education','today')")].join('');
     if(module==='sante') return [summaryMetric(scoped(getHealthTreatments('open')).length,'traitements','💊',"SuperApp.setModuleBlock('sante','traitements')"), summaryMetric(scoped(getHealthAppointments('open')).length,'rendez-vous','🩺',"SuperApp.setModuleBlock('sante','rendez_vous')"), summaryMetric(scoped(getHealthBookItems()).length,'carnet','📘',"SuperApp.setModuleBlock('sante','documents')")].join('');
     if(module==='sport_loisirs'){ const _a=[...scoped(getSportActivities('open')),...scoped(getLoisirActivities('open')),...scoped(getVoyageActivities('open'))]; return [summaryMetric(_a.length,'activités','⚽',"SuperApp.setModuleBlock('sport_loisirs','tout')"), summaryMetric(scoped(getSportGear()).length+scoped(getLoisirGear()).length+scoped(getVoyageGear()).length,'matériel','🎒',"SuperApp.setModuleBlock('sport_loisirs','documents')"), summaryMetric(scoped(getSportActivities('today')).length,'aujourd’hui','📅')].join(''); }
     if(module==='familles') return [summaryMetric(getFamilyMembers().length,'membres','👨‍👩‍👧‍👦',"SuperApp.openFamilyMembersManager('all')"), summaryMetric(scoped(getFamilyDocuments()).length,'documents','📁',"SuperApp.setModuleBlock('familles','documents')")].join('');
@@ -4588,7 +5080,7 @@
     let arr = [];
     if(cfg.special === 'members') arr = getFamilyMembers();
     else if(module==='maison' || cfg.collection==='tasks'){
-      if(['taches_aujourdhui','taches_du_jour'].includes(key)) arr = visibleItems('tasks').filter(x=> x.date === today || (/quotidien|daily/i.test(x.recurrence||'')));
+      if(['taches_aujourdhui','taches_du_jour'].includes(key)) arr = visibleItems('tasks').filter(x=> x.date === today || isRecurringDueToday(x));
       else if(key==='taches_retard' || cfg.filterName==='late') arr = visibleItems('tasks').filter(x=> x.date && daysDiff(today,x.date) < 0);
       else if(['taches_recurrentes','routines'].includes(key)) arr = getMaisonTasks('recurrent');
       else if(['taches_terminees'].includes(key)) arr = getMaisonTasks('done');
@@ -4601,7 +5093,7 @@
         else if(key === 'maison_tache') arr = tasks.filter(x=>!isEntretien(x) && !isRoutine(x));
         else arr = [...tasks, ...getGenericChecklistItems('maison')];
         const period = activeMaisonPeriodFilter();
-        if(period === 'today') arr = arr.filter(x=> x.date === today || (/quotidien|daily/i.test(x.recurrence||'')));
+        if(period === 'today') arr = arr.filter(x=> x.date === today || isRecurringDueToday(x));
         else if(period === 'late') arr = arr.filter(x=> x.date && daysDiff(today,x.date) < 0);
         else if(period === 'recurrent') arr = arr.filter(x=>matchesWords(x,['routine','récurrent','recurrent','quotidien','hebdo']));
       }
@@ -4613,8 +5105,14 @@
       else if(cfg.collection==='shopping') arr = getShoppingItems('all');
       else arr = getShoppingItems('all');
     } else if(module==='education'){
-      arr = [...getSchoolItems('all'), ...getGenericChecklistItems('education')];
-      if(cfg.filter) arr = arr.filter(cfg.filter);          // V5.6 : honorer le filtre (Notes…)
+      const schoolBase = [...getSchoolItems('all'), ...getGenericChecklistItems('education')];
+      const filterName = cfg.filterName || cfg.key || 'tout';
+      if(filterName === 'today') arr = schoolBase.filter(x=>schoolDueOnDate(x, today));
+      else if(filterName === 'late') arr = schoolBase.filter(x=>!statusIsDone(x) && x.date && daysDiff(today,x.date) < 0);
+      else if(filterName === 'done') arr = schoolBase.filter(statusIsDone);
+      else if(['tout','ecole','all'].includes(filterName)) arr = schoolBase;
+      else arr = schoolBase.filter(x=>schoolFilterMatch(x, filterName));
+      if(cfg.filter) arr = arr.filter(cfg.filter);
     } else if(module==='sante'){
       if(key==='tous') arr = [...getHealthAppointments('all'), ...getHealthTreatments('all'), ...getHealthBookItems()];
       else if(key==='rendez_vous') arr = getHealthAppointments('all');
@@ -4711,12 +5209,14 @@
       </section>`;
     }
     const items = visibleCollectionItems(cfg);
-    const docsModeInline = ((block==='tout' || block==='tous') && supportsSupabaseDocs(module)) ? (module==='familles' ? 'global' : module) : '';
+    const docsModeInline = ((block==='tout' || block==='tous') && supportsSupabaseDocs(module) && module !== 'education') ? (module==='familles' ? 'global' : module) : '';
     const docsPanelInline = docsModeInline ? supabaseDocsPanelHtml(docsModeInline) : '';
     if(docsModeInline) setTimeout(()=>window.sbHydrateDocsPanel?.(docsModeInline), 120);
     const addAction = cfg.special === 'members'
       ? `SuperApp.openSettingsMember('')`
-      : `SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')`;
+      : (module === 'education'
+        ? `SuperApp.openEducationAdd()`
+        : `SuperApp.openAdd('${module}','${cfg.type||eventTypeForModule(module)}','${escapeAttr(cfg.category||'Général')}')`);
     const rows = cfg.special === 'members'
       ? (items.length ? items.map(manageMemberRow).join('') : `<article class="empty cute-empty"><b>👤 Aucun membre</b><small>Ajoute un premier membre du foyer.</small><button class="btn primary" onclick="SuperApp.openSettingsMember('')">+ Ajouter</button></article>`)
       : (items.length ? items.map(x=>{
@@ -4725,48 +5225,87 @@
           if(module==='sport_loisirs'&&!cfg.special&&cfg.collection!=='sportGear'&&cfg.collection!=='loisirGear'&&cfg.collection!=='voyageGear') return slvActivityCard(x);
           return managementRow(x,cfg);
         }).join('') : `<article class="empty cute-empty"><b>${cfg.emoji} Rien pour le moment</b><small>Ajoute un premier élément. Tout élément affiché peut ensuite être modifié ou supprimé.</small><button class="btn primary" onclick="${addAction}">+ Ajouter</button></article>`);
-    const titleBar = module === 'sante' ? '' : `<div class="section-title compact-title v53-list-title"><h2>${cfg.emoji} ${escapeHtml(moduleListTitle(module, block, cfg))}</h2><button class="link-btn" onclick="${addAction}">+ Ajouter</button></div>`;
+    const onB = batchOn();
+    const selBtn = (module==='maison') ? (onB
+      ? `<button type="button" class="link-btn sel-link" onclick="SuperApp.batchExit()">Annuler</button>`
+      : `<button type="button" class="link-btn sel-link" onclick="SuperApp.batchEnter()">Sélectionner</button>`) : '';
+    const titleBar = module === 'sante' ? '' : `<div class="section-title compact-title v53-list-title"><h2>${cfg.emoji} ${escapeHtml(moduleListTitle(module, block, cfg))}</h2>${selBtn}<button class="link-btn" onclick="${addAction}">+ Ajouter</button></div>`;
+    const listIdsCsv = items.map(x=>x.id).join(',');
+    const batchFoot = (module==='maison' && onB) ? batchBarHtml(listIdsCsv, {taskActions:true}) : '';
     return `<section class="v53-direct-list ${module==='sante'?'health-direct-list':''}" data-block="${escapeAttr(block)}">
       <section class="filter-zone"><h3>${module==='sante'?'Filtrer la liste':'Filtrer'}</h3>${listTabsForModule(module)}</section>
       ${memberFilterRow(module)}
       ${titleBar}
       <div class="management-list">${rows}</div>
+      ${batchFoot}
       ${docsPanelInline}
     </section>`;
   }
-  // V5.41 — Hub Maison « personnalité » : vert, héros, bloc signature « Tâche du jour », report.
-  function maisonSignatureBlock(t){
-    if(!t){
-      return `<div class="mh-sig empty"><div class="mh-sig-tag">🌟 Ta tâche du jour</div><p class="mh-sig-empty">Rien d'urgent aujourd'hui. Profite ! 🌿</p></div>`;
+  // V5.68 — Avatar du membre concerné par une tâche (affiché à droite).
+  function taskAvatarHtml(t){
+    const mid = getItemMemberId(t) || t.member || 'family';
+    if(!mid || mid==='family' || mid==='all' || mid==='tous'){
+      return `<span class="mh-who mh-who-all" title="Toute la famille">👨‍👩‍👧</span>`;
     }
-    const title = t.title || t.titre || t.nom || 'Tâche';
+    const m = (data.family||[]).find(x=>String(x.id)===String(mid));
+    if(!m) return `<span class="mh-who mh-who-all" title="Famille">👤</span>`;
+    return `<img class="mh-who" src="${memberAvatarSrc(m)}" alt="" title="${escapeHtml(m.name||'')}">`;
+  }
+  // V5.69 — Carte tâche Maison unique : hub + liste utilisent exactement le même squelette.
+  function maisonTaskMeta(t){
     const cat = t.category || t.categorie || 'Maison';
+    const date = t.date ? shortDate(t.date) : (t.startDate ? shortDate(t.startDate) : 'À planifier');
+    const time = t.time ? ` · ${t.time}` : '';
+    return `${cat} · ${date}${time}`;
+  }
+  function maisonTaskUnifiedCard(t, opts={}){
     const done = statusIsDone(t);
-    return `<div class="mh-sig ${done?'done':''}">
-      <div class="mh-sig-tag">${done?'✓ Fait, bravo !':'🌟 Ta tâche du jour'}</div>
+    const title = t.title || t.titre || t.nom || 'Tâche';
+    const listClass = opts.list ? ' maison-task-row maison-list-card' : '';
+    const on = batchOn();
+    if(on){
+      const picked = batchHas(t.id);
+      return `<div class="mh-sig-item${listClass} ${done?'done':''} ${picked?'picked':''}" onclick="SuperApp.batchToggle('${t.id}')"><div class="mh-sig-task"><span class="mh-selbox">${picked?'✓':''}</span><div class="mh-sig-body"><b>${escapeHtml(title)}</b><small>${escapeHtml(maisonTaskMeta(t))}</small></div>${taskAvatarHtml(t)}</div></div>`;
+    }
+    return `<div class="mh-sig-item${listClass} ${done?'done':''}">
       <div class="mh-sig-task">
         <button class="mh-ck ${done?'done':''}" onclick="event.stopPropagation();SuperApp.markDone('${t.id}')" aria-label="${done?'Remettre à faire':'Terminer la tâche'}"></button>
-        <div class="mh-sig-body" onclick="SuperApp.openItemSummary('${t.id}')"><b>${escapeHtml(title)}</b><small>${escapeHtml(cat)}</small></div>
+        <div class="mh-sig-body" onclick="SuperApp.openItemSummary('${t.id}')"><b>${escapeHtml(title)}</b><small>${escapeHtml(maisonTaskMeta(t))}</small></div>
+        ${taskAvatarHtml(t)}
       </div>
       <div class="mh-report">${done
         ? `<button onclick="event.stopPropagation();SuperApp.deleteItem('${t.id}')">🗑️ Retirer</button>`
         : `<button onclick="SuperApp.rescheduleTask('${t.id}','demain')">↪ Demain</button>
-        <button onclick="SuperApp.rescheduleTask('${t.id}','weekend')">Ce week-end</button>
-        <button onclick="SuperApp.rescheduleTask('${t.id}','autre')">Un autre jour…</button>`}
+        <button onclick="SuperApp.rescheduleTask('${t.id}','weekend')">Week-end</button>
+        <button onclick="SuperApp.rescheduleTask('${t.id}','autre')">Autre…</button>`}
       </div>
       ${rowActionsB(t.id)}
     </div>`;
+  }
+  // V5.41 — Hub Maison « personnalité » : vert, héros, bloc signature « Tâche du jour », report.
+  function maisonSignatureBlock(tasks){
+    tasks = Array.isArray(tasks) ? tasks : (tasks ? [tasks] : []);
+    if(!tasks.length){
+      return `<div class="mh-sig empty"><div class="mh-sig-tag">🌟 Tes tâches du jour</div><p class="mh-sig-empty">Rien d'urgent aujourd'hui. Profite ! 🌿</p></div>`;
+    }
+    const on = batchOn();
+    const tag = tasks.length > 1 ? '🌟 Tes tâches du jour' : '🌟 Ta tâche du jour';
+    const selBtn = on
+      ? `<button type="button" class="mh-selbtn" onclick="SuperApp.batchExit()">Annuler</button>`
+      : `<button type="button" class="mh-selbtn" onclick="SuperApp.batchEnter()">Sélectionner</button>`;
+    const rows = tasks.map(t=>maisonTaskUnifiedCard(t)).join('');
+    const idsCsv = tasks.map(t=>t.id).join(',');
+    const bar = on ? batchBarHtml(idsCsv, {taskActions:true}) : '';
+    return `<div class="mh-sig"><div class="mh-sig-tag">${tag}${selBtn}</div>${rows}${bar}</div>`;
   }
   function maisonHubScreen(){
     const open = getMaisonTasks('open');
     const activeN = open.length;
     const todayN = getMaisonTasks('today').length;
     const lateN = getMaisonTasks('late').length;
-    // V5.56 — Signature « collante » : on reste sur la tâche affichée (même cochée → barrée)
-    // jusqu'à ce qu'elle soit supprimée. Elle ne saute plus à la suivante dès qu'on coche.
-    let sig = state.maisonSigId ? (data.tasks||[]).find(t=>t.id===state.maisonSigId && !statusIsHidden(t)) : null;
-    if(!sig) sig = getMaisonTasks('today')[0] || open[0] || null;
-    state.maisonSigId = sig ? sig.id : null;
+    // V5.64 — On affiche TOUTES les tâches du jour (ouvertes d'abord, faites barrées en bas).
+    const todayDone = visibleItems('tasks').filter(x => statusIsDone(x) && (x.date === today || isRecurringDueToday(x)));
+    const todayTasks = [...getMaisonTasks('today'), ...todayDone];
     const heroSrc = appHeroSrc('maison');
     return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.setView('home')">← Accueil</button></div>
       <section class="maison-hub">
@@ -4783,8 +5322,8 @@
             <button class="mh-pill" onclick="SuperApp.openMaisonList('late')"><span class="em">⏰</span><b>${lateN}</b><small>En retard</small></button>
           </div>
         </div>
-        ${maisonSignatureBlock(sig)}
-        <div class="mh-add"><button onclick="SuperApp.openAdd('maison')">＋ Ajouter une tâche</button></div>
+        <div class="mh-add mh-add-top"><button onclick="SuperApp.openAdd('maison')">＋ Ajouter une tâche</button></div>
+        ${maisonSignatureBlock(todayTasks)}
       </section>`;
   }
   // V5.42 — Hub Courses & repas « personnalité » : mandarine, héros, bloc « Repas du jour », tickets de caisse.
@@ -4892,9 +5431,16 @@
     }).join('');
     return `<div class="eh-sig"><div class="eh-sig-tag">👧 Vue par enfant</div><div class="eh-child-list">${rows}</div></div>`;
   }
+  function educationTodayBlock(){
+    const todays = getSchoolItems('today_all');
+    if(!todays.length){
+      return `<div class="eh-sig eh-today empty"><div class="eh-sig-tag">📌 Tâches scolaires du jour</div><p class="eh-sig-empty">Rien d’urgent pour aujourd’hui.</p></div>`;
+    }
+    return `<div class="eh-sig eh-today"><div class="eh-sig-tag">📌 Tâches scolaires du jour</div><div class="eh-today-list">${sortDoneLast(todays).slice(0,3).map(x=>schoolItemCard(x,{module:'education'})).join('')}</div>${todays.length>3?`<button type="button" class="eh-more" onclick="SuperApp.openAppList('education','today')">Voir les ${todays.length} éléments</button>`:''}</div>`;
+  }
   function educationHubScreen(){
     const ecoleN = getSchoolItems('open').length;
-    const notesN = visibleItems('homework').filter(x=>!statusIsDone(x) && (x.type==='note' || x.category==='Notes')).length;
+    const notesN = visibleItems('homework').filter(x=>!statusIsDone(x) && schoolFilterMatch(x,'notes')).length;
     const docN = visibleItems('schoolDocs').length;
     const heroSrc = appHeroSrc('education');
     return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.setView('home')">← Accueil</button></div>
@@ -4907,13 +5453,14 @@
           <h3>Récapitulatif</h3>
           <p class="eh-sub">Touche un chiffre pour voir la liste.</p>
           <div class="eh-grid">
-            <button class="eh-pill" onclick="SuperApp.openAppList('education','ecole')"><span class="em">📚</span><b>${ecoleN}</b><small>École</small></button>
+            <button class="eh-pill" onclick="SuperApp.openAppList('education','tout')"><span class="em">📚</span><b>${ecoleN}</b><small>École</small></button>
             <button class="eh-pill" onclick="SuperApp.openAppList('education','ecole_notes')"><span class="em">⭐</span><b>${notesN}</b><small>Notes</small></button>
             <button class="eh-pill" onclick="SuperApp.openAppList('education','documents')"><span class="em">📄</span><b>${docN}</b><small>Documents</small></button>
           </div>
         </div>
-        ${educationSignatureBlock()}
         <div class="eh-add"><button onclick="SuperApp.openEducationAdd()">＋ Ajouter</button></div>
+        ${educationTodayBlock()}
+        ${educationSignatureBlock()}
       </section>`;
   }
   // V5.45 — Hub Sport/Loisir/Voyage « personnalité » : turquoise, héros, bloc « Prochaine activité ».
@@ -5600,11 +6147,11 @@
     _findRecord: findRecord, toast,
     setView, openModule, openItem, openItemEdit, openItemSummary, setCalendarFilter, setNotificationFilter,
     render:()=>render(),
-    setActiveProfile, openProfilePicker, closeProfileSheet, requestNotify, openQuickActions, openSanteAdd, openSlvAdd, openCoursesAdd, openEducationAdd, openFamilleAdd,
+    setActiveProfile, openProfilePicker, closeProfileSheet, requestNotify, openQuickActions, openSanteAdd, openSlvAdd, openCoursesAdd, openEducationAdd, openEducationTypeChoice, chooseEducationType, openFamilleAdd,
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
     selectDate:(d)=>{state.selectedDate=d;state.calendarMode='day';renderCalendar();},
-    openEdit, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, setSlvSubFilter, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, openSettings, openActivationPanel, activateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, deleteReferenceList, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
+    openEdit, openMaisonTaskWizardStep, openEducationTaskWizardStep, openSanteTaskWizardStep, openAdd, openGenericChecklist, addGenericChecklistLine, addGenericChecklistSuggestion, toggleGenericChecklistItem, changeGenericChecklistQty, openSlvActivityDetail, openSlvChecklistLight, addSlvChecklistLine, addSlvChecklistSuggestion, changeSlvChecklistQty, finishSlvChecklist, refreshSlvChecklistDialog, setSlvSubFilter, openMember, markDone, toggleTreatmentDose, archiveItem, deleteItem, setSlvTab, toggleApp, exportData, importData, clearDemoData, resetCloudData, openResetConfirmDialog, confirmFullReset, closeEditDialog, exitWizardFiche, batchEnter, batchExit, batchToggle, batchSelectAll, batchDelete, batchRescheduleToday, batchMarkDoneAll, openSettings, openActivationPanel, activateApp, openSettingsMember, archiveMember, openCategoryEditor, archiveCategory, deleteReferenceList, openReferenceEditor, openModuleList, setModuleBlock, setMaisonPeriodFilter, toggleMaisonFilters, toggleModuleFilters, updateTaskFrequencyDisplay, wizNext, wizBack, wizPickCat, wizPickMember, wizPickDate, wizPickFreq, santeToggleAcc, santePickDays, eduWizPickCat, eduWizSyncTitle, setMemberFilter, openBudgetEditor, openMemberDocList, openFamilyMembersManager, selectWeatherCity, updateWeatherCityPicker, useCurrentPosition, refreshWeather, applyAppearance, startOnboarding, setFamilyPack,
     refreshSubcategories,
     setListCatFilter, setListSubFilter, setGenericChecklistFilter, scrollToMember,
     openMaisonList, openMaisonHub, rescheduleTask, openAppList, openAppHub, openEducationChild, openSlvUniverse,
