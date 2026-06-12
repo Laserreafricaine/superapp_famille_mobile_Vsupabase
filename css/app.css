@@ -3013,3 +3013,47 @@ html,body{max-width:100%;overflow-x:hidden;}
   .treatment-moment-row input[type=time]{width:100%;}
   .week-days-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
 }
+
+/* V5.78.0 — Correctif ciblé : la ligne “Pour qui ?” ne doit plus élargir les fiches d'ajout */
+#editDialog .wiz-avrow{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  display:flex;
+  flex-wrap:nowrap;
+  gap:9px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding:0 2px 8px;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-x:contain;
+}
+#editDialog .wiz-avrow::-webkit-scrollbar{height:0;display:none;}
+#editDialog .wiz-av{
+  flex:0 0 64px;
+  min-width:64px;
+  max-width:64px;
+}
+#editDialog .wiz-bub{
+  width:52px;
+  height:52px;
+  flex:0 0 52px;
+}
+#editDialog .wiz-avn{
+  max-width:64px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  text-align:center;
+}
+#editDialog .wiz-nav,
+#editDialog .wiz-danger{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+}
+#editDialog .wiz-nav .btn,
+#editDialog .wiz-danger .btn{
+  min-width:0;
+  max-width:100%;
+}
