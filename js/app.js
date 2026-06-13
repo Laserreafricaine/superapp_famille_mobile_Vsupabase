@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.80.0';
+  const APP_VERSION = '5.81.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -732,7 +732,7 @@
       if(String(type).startsWith('settings_')){ saveSettingsForm(type,item,e.currentTarget.dataset.id || ''); return; }
       if(type === 'settings' || type === 'reset_confirm'){ closeEditDialog(); return; }
       const docModule = canonicalModuleId(type);
-      const wasNewDocModule = ((supportsSupabaseDocs(docModule) && (docModule !== 'education' || wantsAttachAfterSave)) || wantsAttachAfterSave) && !e.currentTarget.dataset.id;
+      const wasNewDocModule = wantsAttachAfterSave && !e.currentTarget.dataset.id;
       const savedRecord = addItem(type,item);
       const backToList = state.returnList ? {...state.returnList} : null;
       state.preset=null;
@@ -5526,7 +5526,12 @@
     if(!todays.length){
       return `<div class="eh-sig eh-today empty"><div class="eh-sig-tag">📌 Tâches scolaires du jour</div><p class="eh-sig-empty">Rien d’urgent pour aujourd’hui.</p></div>`;
     }
-    return `<div class="eh-sig eh-today"><div class="eh-sig-tag">📌 Tâches scolaires du jour</div><div class="eh-today-list">${sortDoneLast(todays).slice(0,3).map(x=>schoolItemCard(x,{module:'education'})).join('')}</div>${todays.length>3?`<button type="button" class="eh-more" onclick="SuperApp.openAppList('education','today')">Voir les ${todays.length} éléments</button>`:''}</div>`;
+    const shown = sortDoneLast(todays).slice(0,3);
+    const on = batchOn();
+    const selBtn = on ? `<button type="button" class="mh-selbtn" onclick="SuperApp.batchExit()">Annuler</button>` : `<button type="button" class="mh-selbtn" onclick="SuperApp.batchEnter()">Sélectionner</button>`;
+    const bar = on ? batchBarHtml(shown.map(x=>x.id).join(',')) : '';
+    const more = (!on && todays.length>3) ? `<button type="button" class="eh-more" onclick="SuperApp.openAppList('education','today')">Voir les ${todays.length} éléments</button>` : '';
+    return `<div class="eh-sig eh-today"><div class="sh-sig-head"><div class="eh-sig-tag">📌 Tâches scolaires du jour</div>${selBtn}</div><div class="eh-today-list">${shown.map(x=>schoolItemCard(x,{module:'education'})).join('')}</div>${more}${bar}</div>`;
   }
   function educationHubScreen(){
     const ecoleN = getSchoolItems('open').length;
