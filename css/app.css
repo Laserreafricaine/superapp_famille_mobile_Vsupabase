@@ -3093,4 +3093,14 @@ dialog.create-cat-dialog.kbd-open[open] form{
 .cr-stadd{font-size:11px;font-weight:800;color:var(--cr-deep);background:var(--cr-soft);padding:2px 9px;border-radius:999px}
 .cr-addfab{margin:16px 0 0}
 .cr-addfab button{width:100%;border:0;background:var(--cr);color:#fff;border-radius:16px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 8px 20px rgba(240,138,60,.32)}
+/* V5.83 — formulaire stock chips + mini-choix case vide */
+.cr-lvlchips{display:flex;gap:9px;flex-wrap:wrap}
+.cr-lvlchip{border:1.8px solid #EFE7DC;background:#fff;color:#5e564d;border-radius:14px;padding:10px 16px;font-weight:700;font-size:14px;cursor:pointer}
+.cr-lvlchip[data-v="Bon"].on{background:#E4F3EA;border-color:#3FA46A;color:#3FA46A}
+.cr-lvlchip[data-v="Moyen"].on{background:#FBF0D6;border-color:#B98512;color:#B98512}
+.cr-lvlchip[data-v="Faible"].on{background:#FCE6DE;border-color:#E0633E;color:#E0633E}
+.cr-form-hint{font-size:12.5px;color:#C2691F;background:#FDEFE3;border-radius:12px;padding:9px 12px;margin:12px 0 0;line-height:1.4}
+.cr-pickhabs{display:flex;flex-wrap:wrap;gap:9px}
+.cr-pickhab{border:1.8px solid #F08A3C;background:#FDEFE3;color:#C2691F;border-radius:14px;padding:10px 14px;font-weight:700;font-size:14px;cursor:pointer}
+.cr-pickhab.write{background:#fff;border-style:dashed;color:#9a7a55}
 

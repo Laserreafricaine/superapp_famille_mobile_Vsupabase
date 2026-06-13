@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.82.0';
+  const APP_VERSION = '5.83.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -1858,8 +1858,8 @@
     state.returnList = null;
     const items=[
       ['🏠','Tâche',"SuperApp.openAdd('maison')"],
-      ['🍽️','Repas',"SuperApp.openAdd('courses_repas','repas_semaine','Repas')"],
-      ['🛒','Course',"SuperApp.openAdd('courses_repas','course')"],
+      ['🍽️','Repas',"SuperApp.crGoRepas()"],
+      ['🛒','Course',"SuperApp.crGoCourses()"],
       ['🩺','Rendez-vous médical',"SuperApp.openAdd('sante','rendez_vous_medical','Rendez-vous')"],
       ['⚽','Sport',"SuperApp.setSlvTab('sport');SuperApp.openAdd('sport_loisirs','activite','Sport')"],
       ['🎨','Loisir',"SuperApp.setSlvTab('loisir');SuperApp.openAdd('sport_loisirs','loisir','Loisir')"],
@@ -1897,9 +1897,9 @@
   }
   function openCoursesAdd(){
     openAddSheet([
-      ['🛒','Course',"SuperApp.openAdd('courses_repas','course')"],
-      ['🍽️','Repas',"SuperApp.openAdd('courses_repas','repas_semaine','Repas')"],
-      ['📦','Stock',"SuperApp.openAdd('courses_repas','stock')"]
+      ['🍽️','Repas',"SuperApp.crGoRepas()"],
+      ['🛒','Course',"SuperApp.crGoCourses()"],
+      ['🧺','Stock',"SuperApp.openAdd('courses_repas','stock','Stock')"]
     ]);
   }
   function openEducationAdd(){
@@ -4407,11 +4407,23 @@
     }
     if(type === 'courses_repas'){
       const unit = unitFromItem(item);
-      inside = `
-        <div class="form-grid-2"><div class="form-field"><label>Quantité</label><input name="quantity" type="number" step="${unitStep(unit)}" min="0" inputmode="${unit==='unité'?'numeric':'decimal'}" placeholder="Ex : 2" value="${escapeAttr(numberQty(item))}"></div><div class="form-field"><label>Unité</label><select name="unit" onchange="SuperApp.updateQuantityStep(this)">${unitOptions(unit)}</select></div></div>
-        <input type="hidden" name="qty" value="${escapeAttr(qtyLabel(item))}">
-        <div class="form-field"><label>Lieu / rayon</label><input name="place" placeholder="Frigo, placard, rayon…" value="${escapeAttr(item.place||'')}"></div>
-        <div class="form-field"><label>Niveau de stock</label><select name="level"><option value="" ${!item.level?'selected':''}>—</option><option ${item.level==='Bon'?'selected':''}>Bon</option><option ${item.level==='Moyen'?'selected':''}>Moyen</option><option ${item.level==='Faible'?'selected':''}>Faible</option></select></div>`;
+      const isStock = (item.type==='stock') || normalizeText(item.category||'')==='stock';
+      if(isStock){
+        const lv = item.level || 'Bon';
+        const chip=(v)=>`<button type="button" class="cr-lvlchip${lv===v?' on':''}" data-v="${v}" onclick="SuperApp.crFormLevel(this)">${v}</button>`;
+        inside = `
+          <input type="hidden" name="level" id="crLevelField" value="${escapeAttr(lv)}">
+          <div class="form-field"><label>Combien il en reste ?</label><div class="cr-lvlchips">${chip('Bon')}${chip('Moyen')}${chip('Faible')}</div></div>
+          <details class="form-collapse"><summary>＋ Préciser la quantité (optionnel)</summary>
+            <div class="form-grid-2"><div class="form-field"><label>Quantité</label><input name="quantity" type="number" step="${unitStep(unit)}" min="0" inputmode="${unit==='unité'?'numeric':'decimal'}" placeholder="Ex : 2" value="${escapeAttr(numberQty(item))}"></div><div class="form-field"><label>Unité</label><select name="unit" onchange="SuperApp.updateQuantityStep(this)">${unitOptions(unit)}</select></div></div>
+            <input type="hidden" name="qty" value="${escapeAttr(qtyLabel(item))}"></details>
+          <p class="cr-form-hint">🗂️ Rangé automatiquement dans le bon rayon — modifiable depuis la liste.</p>`;
+      } else {
+        inside = `
+          <div class="form-grid-2"><div class="form-field"><label>Quantité</label><input name="quantity" type="number" step="${unitStep(unit)}" min="0" inputmode="${unit==='unité'?'numeric':'decimal'}" placeholder="Ex : 2" value="${escapeAttr(numberQty(item))}"></div><div class="form-field"><label>Unité</label><select name="unit" onchange="SuperApp.updateQuantityStep(this)">${unitOptions(unit)}</select></div></div>
+          <input type="hidden" name="qty" value="${escapeAttr(qtyLabel(item))}">
+          <div class="form-field"><label>Lieu / rayon</label><input name="place" placeholder="Frigo, placard, rayon…" value="${escapeAttr(item.place||'')}"></div>`;
+      }
     }
     if(type === 'education'){
       inside = `
@@ -6307,7 +6319,7 @@
     const mealFor=(d,sl)=>meals.find(x=>Number(x.day)===d&&(x.slot||'soir')===sl);
     const cell=(d,sl)=>{ const m=mealFor(d,sl); const lbl=sl==='midi'?'🌞 Midi':'🌙 Soir';
       if(m) return `<button class="cr-cell filled" onclick="SuperApp.crMealSheet('${m.id}')"><span class="cr-cslot">${lbl}</span><span class="cr-cttl">${escapeHtml(m.title||'')}</span></button>`;
-      return `<button class="cr-cell empty" onclick="SuperApp.crPlaceMeal(${d},'${sl}')"><span class="cr-cplus">＋</span><span class="cr-chint">${sl==='midi'?'Midi':'Soir'}</span></button>`; };
+      return `<button class="cr-cell empty" onclick="SuperApp.crEmptyCell(${d},'${sl}')"><span class="cr-cplus">＋</span><span class="cr-chint">${sl==='midi'?'Midi':'Soir'}</span></button>`; };
     let rows=''; for(let n=0;n<7;n++){ const i=(todayIdx+n)%7; const isT=i===todayIdx, isTom=n===1;
       rows+=`<div class="cr-row ${isT?'today':''}"><div class="cr-day"><b>${DAYS[i]}</b>${isT?'<small>aujourd’hui</small>':(isTom?'<small class="tom">demain</small>':'')}</div>${cell(i,'midi')}${cell(i,'soir')}</div>`; }
     return `<div class="cr-table"><div class="cr-thead"><span></span><b>🌞 Midi</b><b>🌙 Soir</b></div>${rows}</div>`; }
@@ -6346,17 +6358,32 @@
     const selBtn=on?`<button class="lnk" onclick="SuperApp.batchExit()">Annuler</button>`:`<button class="lnk" onclick="SuperApp.batchEnter()">Sélectionner</button>`;
     if(!filtered.length) return `<article class="empty cute-empty"><b>🧺 Aucun produit</b><small>Ajoute ce que tu as dans tes placards, frigo, congélateur.</small><button class="btn primary" onclick="SuperApp.openAdd('courses_repas','stock','Stock')">+ Ajouter</button></article>`;
     const LVL={faible:['low','Faible'],moyen:['mid','Moyen'],bon:['good','Bon']};
-    const rows=filtered.map(x=>{ const lv=normalizeText(x.level||''); const li=LVL[lv]||['mid',x.level||'—'];
-      if(on){ const p=batchHas(x.id); return `<button class="cr-srow sel ${p?'picked':''}" onclick="SuperApp.batchToggle('${x.id}')"><span class="cr-ck">${p?'✓':''}</span><div class="cr-sbody"><b>${escapeHtml(x.title)}</b><small>${escapeHtml(x.place||'')}${qtyLabel(x)?' · '+escapeHtml(qtyLabel(x)):''}</small></div><span class="cr-lvl ${li[0]}">${li[1]}</span></button>`; }
-      const low=li[0]==='low'; return `<div class="cr-srow" onclick="SuperApp.openEdit('courses_repas','${x.id}')"><div class="cr-sic">🧺</div><div class="cr-sbody"><b>${escapeHtml(x.title)}</b><small>${escapeHtml(x.place||'')}${qtyLabel(x)?' · '+escapeHtml(qtyLabel(x)):''}</small><div class="cr-slvls"><span class="cr-lvl ${li[0]}">${li[1]}</span>${low?'<span class="cr-stadd">＋ aux courses</span>':''}</div></div><button class="cr-more" onclick="event.stopPropagation();SuperApp.crStockSheet('${x.id}')">⋯</button></div>`; }).join('');
+    const srow=(x)=>{ const lv=normalizeText(x.level||''); const li=LVL[lv]||['mid',x.level||'—']; const meta=[x.place,qtyLabel(x)].filter(Boolean).map(escapeHtml).join(' · ');
+      if(on){ const p=batchHas(x.id); return `<button class="cr-srow sel ${p?'picked':''}" onclick="SuperApp.batchToggle('${x.id}')"><span class="cr-ck">${p?'✓':''}</span><div class="cr-sbody"><b>${escapeHtml(x.title)}</b><small>${meta}</small></div><span class="cr-lvl ${li[0]}">${li[1]}</span></button>`; }
+      const low=li[0]==='low'; return `<div class="cr-srow" onclick="SuperApp.openEdit('courses_repas','${x.id}')"><div class="cr-sic">🧺</div><div class="cr-sbody"><b>${escapeHtml(x.title)}</b><small>${meta}</small><div class="cr-slvls"><span class="cr-lvl ${li[0]}">${li[1]}</span>${low?'<span class="cr-stadd">＋ aux courses</span>':''}</div></div><button class="cr-more" onclick="event.stopPropagation();SuperApp.crStockSheet('${x.id}')">⋯</button></div>`; };
+    let groups=''; CR_RAYONS.forEach(r=>{ const its=filtered.filter(x=>crRayonOf(x)===r.key); if(!its.length) return; groups+=`<div class="cr-rayon"><div class="cr-rayon-h">${r.ico} ${r.name}</div><div class="cr-stock-list">${its.map(srow).join('')}</div></div>`; });
     const bar=on?batchBarHtml(filtered.map(x=>x.id).join(',')):'';
-    return `<div class="cr-toolbar"><div class="cr-tb-l">Mon stock <small>frigo · placards · congél.</small></div>${selBtn}</div><div class="cr-stock-list">${rows}</div>${bar}<div class="cr-addfab"><button onclick="SuperApp.openAdd('courses_repas','stock','Stock')">＋ Ajouter un produit</button></div>`; }
-  function crStockSheet(id){ const x=(data.stock||[]).find(s=>s.id===id); if(!x) return; const low=normalizeText(x.level||'').includes('faible');
-    crOpenSheet(x.title,(x.place||'')+(qtyLabel(x)?' · '+qtyLabel(x):''),`${low?`<button class="cr-act" onclick="SuperApp.crStockToCourses('${id}')"><span class="i">🛒</span> Ajouter aux courses</button>`:''}<button class="cr-act" onclick="SuperApp.crStockConsume('${id}')"><span class="i">➖</span> Consommer</button><button class="cr-act" onclick="SuperApp.crStockEdit('${id}')"><span class="i">✏️</span> Modifier</button><button class="cr-act danger" onclick="SuperApp.crStockDelete('${id}')"><span class="i">🗑️</span> Supprimer</button>`); }
+    return `<div class="cr-toolbar"><div class="cr-tb-l">Mon stock <small>frigo · placards · congél.</small></div>${selBtn}</div>${groups}${bar}<div class="cr-addfab"><button onclick="SuperApp.openAdd('courses_repas','stock','Stock')">＋ Ajouter un produit</button></div>`; }
+  function crStockSheet(id){ const x=(data.stock||[]).find(s=>s.id===id); if(!x) return; const low=normalizeText(x.level||'').includes('faible'); const cur=crRayonOf(x);
+    const chips=CR_RAYONS.map(r=>`<button class="cr-rchip${r.key===cur?' on':''}" onclick="SuperApp.crSetStockRayon('${id}','${r.key}')">${r.ico} ${r.name}</button>`).join('');
+    const meta=[x.place,qtyLabel(x)].filter(Boolean).join(' · ');
+    crOpenSheet(x.title, meta, `<div class="cr-rchips">${chips}</div>${low?`<button class="cr-act" onclick="SuperApp.crStockToCourses('${id}')"><span class="i">🛒</span> Ajouter aux courses</button>`:''}<button class="cr-act" onclick="SuperApp.crStockConsume('${id}')"><span class="i">➖</span> Consommer</button><button class="cr-act" onclick="SuperApp.crStockEdit('${id}')"><span class="i">✏️</span> Modifier</button><button class="cr-act danger" onclick="SuperApp.crStockDelete('${id}')"><span class="i">🗑️</span> Supprimer</button>`); }
   function crStockToCourses(id){ crCloseSheet(); addStockToCourses(id); render(); }
   function crStockConsume(id){ crCloseSheet(); consumeStock(id); }
   function crStockEdit(id){ crCloseSheet(); openEdit('courses_repas',id); }
   function crStockDelete(id){ crCloseSheet(); deleteItem(id); }
+  function crFormLevel(btn){ const g=btn.parentElement; g.querySelectorAll('.cr-lvlchip').forEach(c=>c.classList.remove('on')); btn.classList.add('on'); const f=document.getElementById('crLevelField'); if(f) f.value=btn.dataset.v; }
+  function crSetStockRayon(id,key){ const x=(data.stock||[]).find(s=>s.id===id); if(!x) return; x.rayon=key; (data.rayonLearned=data.rayonLearned||{})[normalizeText(x.title)]=key; save(); crCloseSheet(); render(); toast('Rangé dans '+crRayonByKey(key).ico+' '+crRayonByKey(key).name); }
+  function crGoRepas(){ openModuleList('courses_repas','repas'); }
+  function crGoCourses(){ openModuleList('courses_repas','courses'); setTimeout(()=>{ const i=document.getElementById('crQadd'); if(i){ try{i.focus();}catch(e){} } },140); }
+  function crPlaceMealAt(title,day,slot){ if(!title) return; const ex=(data.weeklyMeals||[]).find(m=>Number(m.day)===day&&(m.slot||'soir')===slot&&!statusIsHidden(m)); if(ex){ ex.title=title; } else { data.weeklyMeals=data.weeklyMeals||[]; data.weeklyMeals.push(decorateSync({id:uid(),module:'courses_repas',type:'repas_semaine',category:'Repas',title,day,slot,status:'a_faire'})); } crBumpMeal(title); save(); crCloseSheet(); render(); toast('🍽️ '+title+' ajouté'); }
+  function crPlaceHabAt(i,day,slot){ const h=crHabituels(8); if(h[i]) crPlaceMealAt(h[i],day,slot); }
+  function crPromptCell(day,slot){ crCloseSheet(); const v=prompt('Nom du repas ?'); if(v&&v.trim()) crPlaceMealAt(v.trim(),day,slot); }
+  function crEmptyCell(day,slot){ if(state.mealArmed){ crPlaceMeal(day,slot); return; }
+    const habs=crHabituels(8);
+    const chips=habs.map((t,i)=>`<button class="cr-pickhab" onclick="SuperApp.crPlaceHabAt(${i},${day},'${slot}')">${crIsFav(t)?'⭐ ':''}${escapeHtml(t)}</button>`).join('');
+    const dayN=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'][day]||''; const sl=slot==='midi'?'Midi 🌞':'Soir 🌙';
+    crOpenSheet('Ajouter un repas', dayN+' · '+sl, `<div class="cr-pickhabs">${chips}<button class="cr-pickhab write" onclick="SuperApp.crPromptCell(${day},'${slot}')">✏️ Autre…</button></div>`); }
 
   window.SuperApp = {
     _getData: ()=>data,
@@ -6364,7 +6391,7 @@
     _findRecord: findRecord, toast,
     setView, openModule, openItem, openItemEdit, openItemSummary, setCalendarFilter, setNotificationFilter,
     render:()=>render(),
-    crArmMeal, crArmHab, crDisarm, crPromptMeal, crPlaceMeal, crMealSheet, crMealRename, crMealDup, crMealFav, crMealMove, crDoMove, crMealDelete, crToggleFav, crSetRayon, crQuickAdd, crCourseSheet, crCourseRename, crCourseDelete, crClearDone, crStockSheet, crStockToCourses, crStockConsume, crStockEdit, crStockDelete,
+    crArmMeal, crArmHab, crDisarm, crPromptMeal, crPlaceMeal, crMealSheet, crMealRename, crMealDup, crMealFav, crMealMove, crDoMove, crMealDelete, crToggleFav, crSetRayon, crQuickAdd, crCourseSheet, crCourseRename, crCourseDelete, crClearDone, crStockSheet, crStockToCourses, crStockConsume, crStockEdit, crStockDelete, crFormLevel, crSetStockRayon, crGoRepas, crGoCourses, crEmptyCell, crPlaceHabAt, crPromptCell, crPlaceMealAt,
     setActiveProfile, openProfilePicker, closeProfileSheet, requestNotify, openQuickActions, openSanteAdd, openSlvAdd, openCoursesAdd, openEducationAdd, openEducationTypeChoice, chooseEducationType, openFamilleAdd,
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
