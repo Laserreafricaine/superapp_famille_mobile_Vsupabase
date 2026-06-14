@@ -3007,6 +3007,37 @@ dialog.create-cat-dialog.kbd-open[open] form{
 .cr-grab{width:42px;height:5px;border-radius:3px;background:#e6ddd2;margin:2px auto 12px}
 .cr-sheet-t{margin:2px 0 2px;font-weight:800;font-size:17px}
 .cr-sheet-s{color:#8A8178;font-size:12.5px;margin-bottom:12px}
+.cr-sheet-lab{font-weight:800;font-size:12.5px;color:#6a6258;margin:2px 2px 8px}
+/* V5.86 — fenêtre repas : plat actuel (modification) */
+.cr-cur{display:flex;align-items:center;gap:8px;background:var(--cr-soft);border-radius:13px;padding:10px 12px;margin-bottom:13px;font-weight:700;color:var(--cr-deep);font-size:14px}
+.cr-cur-x{margin-left:auto;border:0;background:#fff;border-radius:9px;width:28px;height:28px;font-size:16px;font-weight:800;color:#C53A3A;cursor:pointer;line-height:1}
+/* V5.85 — 3 univers (Repas/Courses/Stock) : teintes + onglets */
+.cr-univers[data-cr="repas"]{--cr:#F3B26B;--cr-deep:#C77C1E;--cr-soft:#FCEFDC;--cr-tint:#F8DEC0}
+.cr-univers[data-cr="courses"]{--cr:#ED8A39;--cr-deep:#C2691F;--cr-soft:#FBE2CB;--cr-tint:#F8D2B0}
+.cr-univers[data-cr="stock"]{--cr:#BC6212;--cr-deep:#8A470B;--cr-soft:#F1D7BD;--cr-tint:#E9C39C}
+.cr-tabs{display:flex;gap:7px;margin:2px 0 11px}
+.cr-tab{flex:1;border:1.6px solid var(--line);background:#fff;border-radius:14px;padding:9px 6px;font-family:'Baloo 2',sans-serif;font-weight:700;font-size:13px;color:#7a7268;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px}
+.cr-tab-e{font-size:17px;line-height:1}
+.cr-tab.on{color:#fff;border-color:transparent}
+.cr-tab.on[data-t="repas"]{background:#F3B26B}
+.cr-tab.on[data-t="courses"]{background:#ED8A39}
+.cr-tab.on[data-t="stock"]{background:#BC6212}
+/* zone texte fenêtre repas */
+.cr-typezone{display:flex;gap:8px}
+.cr-typezone input{flex:1;border:1.7px solid var(--line);border-radius:13px;padding:11px 13px;font-size:14px;font-family:inherit}
+.cr-typezone input:focus{outline:none;border-color:var(--cr)}
+.cr-typezone button{border:0;background:var(--cr);color:#fff;border-radius:13px;padding:0 17px;font-weight:800;font-size:18px;cursor:pointer}
+/* filtres stock */
+.cr-filters{background:#fff;border-radius:14px;padding:9px 10px;box-shadow:0 4px 14px rgba(0,0,0,.05);margin:2px 0 8px}
+.cr-search{width:100%;border:1.6px solid var(--line);border-radius:11px;padding:9px 12px;font-size:13.5px;font-family:inherit;margin-bottom:9px;background:#fff}
+.cr-search:focus{outline:none;border-color:var(--cr)}
+.cr-frow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}
+.cr-frow:last-child{margin-bottom:0}
+.cr-fchip{border:1.4px solid var(--line);background:#fff;color:#6a6258;border-radius:999px;padding:5px 11px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit}
+.cr-fchip.on{background:var(--cr);border-color:var(--cr);color:#fff}
+.cr-fchip.lvl-low.on{background:#E0633E;border-color:#E0633E;color:#fff}
+.cr-fchip.lvl-mid.on{background:#B98512;border-color:#B98512;color:#fff}
+.cr-fchip.lvl-good.on{background:#3FA46A;border-color:#3FA46A;color:#fff}
 .cr-act{display:flex;align-items:center;gap:12px;width:100%;border:0;background:var(--cr-soft);color:var(--cr-deep);border-radius:14px;padding:13px 14px;font-weight:800;font-size:14.5px;margin-bottom:8px;cursor:pointer}
 .cr-act.danger{background:#FCE7E7;color:#C53A3A}
 .cr-act .i{font-size:18px}
@@ -3052,6 +3083,8 @@ dialog.create-cat-dialog.kbd-open[open] form{
 .cr-quick input{flex:1;border:1.6px solid #EFE7DC;border-radius:13px;padding:11px 13px;font-size:14px;background:#fff;font-family:inherit}
 .cr-quick input:focus{outline:none;border-color:var(--cr)}
 .cr-quick button{border:0;background:var(--cr);color:#fff;border-radius:13px;padding:0 16px;font-weight:800;font-size:18px;cursor:pointer}
+.cr-qhint{font-size:12px;font-weight:700;color:var(--cr-deep);margin:0 2px 8px}
+.cr-qhint.empty{color:#c3b9ae;font-weight:600}
 .cr-toolbar{display:flex;align-items:center;justify-content:space-between;padding:10px 2px 2px}
 .cr-toolbar2{padding:0 2px 4px;text-align:right}
 .cr-tb-l{font-weight:800;font-size:15px}
@@ -3086,11 +3119,11 @@ dialog.create-cat-dialog.kbd-open[open] form{
 .cr-sbody b{font-size:14.5px}
 .cr-sbody small{display:block;color:#8A8178;font-size:12px}
 .cr-slvls{display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap}
-.cr-lvl{display:inline-block;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px}
+.cr-lvl{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;border:0;cursor:pointer;font-family:inherit;line-height:1.3}
 .cr-lvl.low{background:#FCE6DE;color:#E0633E}
 .cr-lvl.mid{background:#FBF0D6;color:#B98512}
 .cr-lvl.good{background:#E4F3EA;color:#3FA46A}
-.cr-stadd{font-size:11px;font-weight:800;color:var(--cr-deep);background:var(--cr-soft);padding:2px 9px;border-radius:999px}
+.cr-stadd{font-size:11px;font-weight:800;color:var(--cr-deep);background:var(--cr-soft);padding:3px 10px;border-radius:999px;border:0;cursor:pointer;font-family:inherit}
 .cr-addfab{margin:16px 0 0}
 .cr-addfab button{width:100%;border:0;background:var(--cr);color:#fff;border-radius:16px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 8px 20px rgba(240,138,60,.32)}
 /* V5.83 — formulaire stock chips + mini-choix case vide */

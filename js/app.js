@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'superapp_famille_mobile_v5_36';
   const LEGACY_STORAGE_KEYS = ['superapp_famille_mobile_v5_35','superapp_famille_mobile_v5_12_menage_visuel','superapp_famille_mobile_v5_1_logique_actions','superapp_famille_mobile_v5_simplifiee','superapp_famille_mobile_v4_3_6_icone_meteo_dynamique','superapp_famille_mobile_v4_3_5_meteo_auto_coherente','superapp_famille_mobile_v4_3_4_localisation_meteo','superapp_famille_mobile_v4_3_3_filtres_actions','superapp_famille_mobile_v4_3_2_kpi_cliquables','superapp_famille_mobile_v4_3_1_kpi_cliquables','superapp_famille_mobile_v4_3_cartes_exploitables','superapp_famille_mobile_v4_2_visuels_cockpit_mobile','superapp_famille_mobile_v4_1_parametres_autonomes','superapp_famille_mobile_v4_modulaire','superapp_famille_mobile_v3','superapp_famille_mobile_v2'];
-  const APP_VERSION = '5.83.0';
+  const APP_VERSION = '5.86.0';
   const pad2 = n => String(n).padStart(2, '0');
   const todayObj = new Date();
   const today = `${pad2(todayObj.getDate())}-${pad2(todayObj.getMonth()+1)}-${todayObj.getFullYear()}`;
@@ -24,7 +24,7 @@
   
   const modules = [
     { id:'maison', name:'Maison', short:'Maison', icon:'🏡', cls:'module-home', image:'assets/images/illustrations/home-task.png', badge:'assets/icons/icon_maison.png', desc:'Une seule liste de tâches avec catégories et filtres.' },
-    { id:'courses_repas', name:'Courses & repas', short:'Courses & repas', icon:'🛒', cls:'module-food', image:'assets/images/illustrations/grocery-fridge.png', badge:'assets/icons/icon_courses.png', desc:'Menus, courses et stock regroupés clairement.' },
+    { id:'courses_repas', name:'Courses, Repas & Stock', short:'Courses & Stock', icon:'🛒', cls:'module-food', image:'assets/images/illustrations/grocery-fridge.png', badge:'assets/icons/icon_courses.png', desc:'Menus, courses et stock regroupés clairement.' },
     { id:'education', name:'Éducation', short:'Éducation', icon:'📚', cls:'module-edu', image:'assets/images/illustrations/education-desk.png', badge:'assets/icons/icon_education.png', desc:'École, documents et notes sans tiroirs inutiles.' },
     { id:'sante', name:'Santé', short:'Santé', icon:'🩺', cls:'module-health', image:'assets/images/illustrations/health-kit.png', badge:'assets/icons/icon_sante.png', desc:'Traitements, rendez-vous et carnet de santé.' },
     { id:'sport_loisirs', name:'Sport, Loisir & Voyage', short:'Sport, Loisir & Voyage', icon:'⚽', cls:'module-sport', image:'assets/images/illustrations/sport-bag.png', badge:'assets/icons/icon_sport.png', desc:'Activités et matériel, sans dispersion.' },
@@ -368,7 +368,7 @@
   }
   function appHeroTitle(module){
     module = canonicalModuleId(module);
-    return {maison:'Maison', courses_repas:'Courses & repas', education:'Éducation', sante:'Santé', sport_loisirs:'Sport, Loisir & Voyage', familles:'Famille', calendrier:'Calendrier'}[module] || moduleLabel(module);
+    return {maison:'Maison', courses_repas:'Courses, Repas & Stock', education:'Éducation', sante:'Santé', sport_loisirs:'Sport, Loisir & Voyage', familles:'Famille', calendrier:'Calendrier'}[module] || moduleLabel(module);
   }
   function appHeroBlock(module){
     module = canonicalModuleId(module);
@@ -966,7 +966,7 @@
     };
     const appsGrid = `<div class="home-apps-grid">`
       + appTile('maison','Maison')
-      + appTile('courses_repas','Courses & repas')
+      + appTile('courses_repas','Courses, Repas & Stock')
       + appTile('education','Éducation')
       + appTile('sante','Santé')
       + appTile('sport_loisirs','Sport · Loisir · Voyage')
@@ -1076,7 +1076,7 @@
     },
     courses_repas: {
       // V5.27 — Refonte : 3 chips claires, indépendantes
-      tout:{title:'Tout', emoji:'🍽️', collections:['shopping','weeklyMeals','stock'], collection:'shopping', type:'course', category:'Courses', help:'Courses, repas et stock.', special:'coursesAllView'},
+      tout:{title:'Repas', emoji:'🍽️', collection:'weeklyMeals', type:'repas_semaine', category:'Repas', help:'Repas.', special:'mealsView', aliasOf:'repas'},
       repas:{title:'Repas', emoji:'🍽️', collection:'weeklyMeals', type:'repas_semaine', category:'Repas', help:'Repas du jour en vedette et menu de la semaine.', special:'mealsView'},
       courses:{title:'Courses', emoji:'🛒', collection:'shopping', type:'course', category:'Alimentation', help:'Liste de courses cochable, ajout manuel.'},
       stock:{title:'Stock', emoji:'🧺', collection:'stock', type:'stock', category:'Stock', help:'Frigo, congélateur, placards.', special:'stockView'},
@@ -1839,7 +1839,7 @@
       function calendarDayView(events){
     return `<div class="calendar-day-view"><article class="day-focus-card"><div><span>📅 Vue jour</span><h3>${displayDate(state.selectedDate)}</h3><p>${events.length ? events.length + ' élément(s) pour cette journée.' : 'Journée libre pour ce filtre.'}</p></div><button type="button" class="btn primary" onclick="SuperApp.openEdit('calendrier')">📅 Ajouter</button></article>${events.length ? `<div class="day-focus-list">${events.map(x=>agendaRow(x,x.icon,x.label)).join('')}</div>` : '<div class="empty cute-empty"><b>🌿 Rien de prévu</b><small>Change de filtre ou ajoute un événement.</small></div>'}</div>`;
   }
-  function calendarFilters(){ return [['all','Tous','▦'],['maison','Maison','🏠'],['courses_repas','Courses & repas','🍽️'],['education','Éducation','📘'],['sante','Santé','💗'],['sport_loisirs','Sport, Loisir & Voyage','⚽'],['familles','Familles','👨‍👩‍👧‍👦'],['calendrier','Autres','📌']]; }
+  function calendarFilters(){ return [['all','Tous','▦'],['maison','Maison','🏠'],['courses_repas','Courses, Repas & Stock','🍽️'],['education','Éducation','📘'],['sante','Santé','💗'],['sport_loisirs','Sport, Loisir & Voyage','⚽'],['familles','Familles','👨‍👩‍👧‍👦'],['calendrier','Autres','📌']]; }
   function weekDayPanel(d){
     const dmy = formatDMY(d); const ev = itemsForDate(dmy);
     return `<article class="week-day-panel ${dmy===state.selectedDate?'active':''}" onclick="SuperApp.selectDate('${dmy}')"><b>${d.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','')}</b><small>${shortDate(dmy)}</small>${ev.slice(0,3).map(x=>`<span>${x.icon} ${x.title}</span>`).join('') || '<em>Libre</em>'}</article>`;
@@ -1866,7 +1866,7 @@
       ['📅','Évènement simple',"SuperApp.openAdd('calendrier')"],
       ['📄','Documents famille',"SuperApp.openAdd('familles','document_famille','Documents')"]
     ];
-    $('#quickActions').innerHTML = items.map(([icon,label,act])=>`<button class="quick-action" type="button" onclick="${act}"><span>${icon}</span>${label}</button>`).join('');
+    $('#quickActions').innerHTML = items.map(([icon,label,act])=>`<button class="quick-action" type="button" onclick="SuperApp.crCloseActionDialog();${act}"><span>${icon}</span>${label}</button>`).join('');
     const _qd = $('#actionDialog'); _qd.removeAttribute('data-app');
     const _qh = _qd.querySelector('.dialog-head h2'); if(_qh) _qh.textContent = 'Ajouter rapidement';
     _qd.showModal();
@@ -1885,7 +1885,7 @@
   function openAddSheet(items){
     const dlg = $('#actionDialog'); dlg.removeAttribute('data-app');
     const h2 = dlg.querySelector('.dialog-head h2'); if(h2) h2.textContent = 'Ajouter rapidement';
-    $('#quickActions').innerHTML = items.map(([icon,label,act])=>`<button class="quick-action" type="button" onclick="${act}"><span>${icon}</span>${label}</button>`).join('');
+    $('#quickActions').innerHTML = items.map(([icon,label,act])=>`<button class="quick-action" type="button" onclick="SuperApp.crCloseActionDialog();${act}"><span>${icon}</span>${label}</button>`).join('');
     dlg.showModal();
   }
   function openSlvAdd(){
@@ -1899,7 +1899,7 @@
     openAddSheet([
       ['🍽️','Repas',"SuperApp.crGoRepas()"],
       ['🛒','Course',"SuperApp.crGoCourses()"],
-      ['🧺','Stock',"SuperApp.openAdd('courses_repas','stock','Stock')"]
+      ['🧺','Stock',"SuperApp.crGoStock()"]
     ]);
   }
   function openEducationAdd(){
@@ -3600,7 +3600,7 @@
     // Le calendrier est une vue calculée, pas une base parallèle.
     // Chaque app utilise la même source que ses listes, compteurs et alertes.
     pushMany(visibleItems('tasks'), '🏠', 'Maison', 'maison', 'tasks');
-    pushMany(getMenus('all'), '🍽️', 'Courses & repas', 'courses_repas', 'menus');
+    pushMany(getMenus('all'), '🍽️', 'Courses, Repas & Stock', 'courses_repas', 'menus');
     pushMany(getShoppingItems('open'), '🛒', 'Courses', 'courses_repas', 'shopping');
     pushMany(getStockItems('all'), '🧺', 'Stock', 'courses_repas', 'stock');
     pushMany(getSchoolItems('all'), '📚', 'École', 'education', 'school');
@@ -5264,20 +5264,17 @@
     // V5.27 — Vue Repas : repas du jour en vedette + tableau hebdo
     if(cfg.special === 'mealsView'){
       return `<section class="v53-direct-list" data-block="${escapeAttr(block)}">
-        <section class="filter-zone"><h3>Filtrer</h3>${listTabsForModule(module)}</section>
         ${mealsViewHtml()}
       </section>`;
     }
     // V5.27 — Vue Stock : liste + bouton "Ajouter aux courses" pour les Faibles
     if(cfg.special === 'stockView'){
       return `<section class="v53-direct-list" data-block="${escapeAttr(block)}">
-        <section class="filter-zone"><h3>Filtrer</h3>${listTabsForModule(module)}</section>
         ${stockViewHtml(cfg)}
       </section>`;
     }
     if(module === 'courses_repas' && block === 'courses'){
       return `<section class="v53-direct-list" data-block="${escapeAttr(block)}">
-        <section class="filter-zone"><h3>Filtrer</h3>${listTabsForModule(module)}</section>
         ${crCoursesScreen()}
       </section>`;
     }
@@ -5417,7 +5414,7 @@
         ${maisonSignatureBlock(todayTasks)}
       </section>`;
   }
-  // V5.42 — Hub Courses & repas « personnalité » : mandarine, héros, bloc « Repas du jour », tickets de caisse.
+  // V5.42 — Hub Courses, Repas & Stock « personnalité » : mandarine, héros, bloc « Repas du jour », tickets de caisse.
   function coursesSignatureBlock(){
     const todayIdx = (new Date().getDay()+6)%7;
     const meals = (data.weeklyMeals||[]).filter(x=>!statusIsHidden(x));
@@ -5441,8 +5438,8 @@
     return `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.setView('home')">← Accueil</button></div>
       <section class="courses-hub">
         <div class="ch-hero" style="background-image:url('${heroSrc}')">
-          <span class="ch-badge">Courses & repas</span>
-          <div class="ch-hero-c"><h2>Courses & repas</h2><small>Les repas et le panier, sans prise de tête 🍊</small></div>
+          <span class="ch-badge">Courses, Repas & Stock</span>
+          <div class="ch-hero-c"><h2>Courses, Repas & Stock</h2><small>Les repas et le panier, sans prise de tête 🍊</small></div>
         </div>
         <div class="ch-recap">
           <h3>Récapitulatif</h3>
@@ -5693,12 +5690,8 @@
         view.innerHTML = maisonHubScreen();
       }
     } else if(m.id === 'courses_repas'){
-      if(appViewMode('courses_repas') === 'list'){
-        view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openAppHub('courses_repas')">← Courses & repas</button></div>
+      view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.setView('home')">← Accueil</button></div>
         <section class="palette-medium ${tone}">${renderDirectList(m.id)}</section>`;
-      } else {
-        view.innerHTML = coursesHubScreen();
-      }
     } else if(m.id === 'education'){
       if(appViewMode('education') === 'list'){
         view.innerHTML = `<div class="screen-backbar"><button class="btn ghost back-btn" onclick="SuperApp.openAppHub('education')">← Éducation</button></div>
@@ -5744,9 +5737,9 @@
     const buttons = {
       maison: [['🧹 Tâche',`SuperApp.openAdd('maison','tache','Ménage')`,true],['🔧 Entretien',`SuperApp.openAdd('maison','entretien','Entretien')`,false]],
       courses_repas: [
-        ['🛒 Course',`SuperApp.openAdd('courses_repas','course','Alimentation')`,true],
-        ['🍽️ Repas',`SuperApp.openAdd('courses_repas','repas_semaine','Menu de la semaine')`,false],
-        ['🧺 Stock',`SuperApp.openAdd('courses_repas','stock','Stock')`,false]
+        ['🛒 Course',`SuperApp.crGoCourses()`,true],
+        ['🍽️ Repas',`SuperApp.crGoRepas()`,false],
+        ['🧺 Stock',`SuperApp.crGoStock()`,false]
       ],
       education: [
         ['📘 Devoir',`SuperApp.openAdd('education','devoir','Devoirs')`,true],
@@ -6318,31 +6311,35 @@
   function crWeekTable(){ const meals=(data.weeklyMeals||[]).filter(x=>!statusIsHidden(x)); const DAYS=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche']; const todayIdx=(new Date().getDay()+6)%7;
     const mealFor=(d,sl)=>meals.find(x=>Number(x.day)===d&&(x.slot||'soir')===sl);
     const cell=(d,sl)=>{ const m=mealFor(d,sl); const lbl=sl==='midi'?'🌞 Midi':'🌙 Soir';
-      if(m) return `<button class="cr-cell filled" onclick="SuperApp.crMealSheet('${m.id}')"><span class="cr-cslot">${lbl}</span><span class="cr-cttl">${escapeHtml(m.title||'')}</span></button>`;
+      if(m) return `<button class="cr-cell filled" onclick="SuperApp.crEmptyCell(${d},'${sl}')"><span class="cr-cslot">${lbl}</span><span class="cr-cttl">${escapeHtml(m.title||'')}</span></button>`;
       return `<button class="cr-cell empty" onclick="SuperApp.crEmptyCell(${d},'${sl}')"><span class="cr-cplus">＋</span><span class="cr-chint">${sl==='midi'?'Midi':'Soir'}</span></button>`; };
     let rows=''; for(let n=0;n<7;n++){ const i=(todayIdx+n)%7; const isT=i===todayIdx, isTom=n===1;
       rows+=`<div class="cr-row ${isT?'today':''}"><div class="cr-day"><b>${DAYS[i]}</b>${isT?'<small>aujourd’hui</small>':(isTom?'<small class="tom">demain</small>':'')}</div>${cell(i,'midi')}${cell(i,'soir')}</div>`; }
     return `<div class="cr-table"><div class="cr-thead"><span></span><b>🌞 Midi</b><b>🌙 Soir</b></div>${rows}</div>`; }
 
+  function crUnivers(active, inner){ const tabs=[['repas','🍽️','Repas'],['courses','🛒','Courses'],['stock','🧺','Stock']]; const bar=`<div class="cr-tabs">${tabs.map(([b,e,l])=>`<button type="button" class="cr-tab ${b===active?'on':''}" data-t="${b}" onclick="SuperApp.openModuleList('courses_repas','${b}')"><span class="cr-tab-e">${e}</span>${l}</button>`).join('')}</div>`; return `<div class="cr-univers" data-cr="${active}">${bar}${inner}</div>`; }
   function crRepasScreen(){ const habs=crHabituels(8); const armed=state.mealArmed;
     const habHtml=habs.map((t,i)=>`<button class="cr-hab${crIsFav(t)?' fav':''}" onclick="SuperApp.crArmHab(${i})">${crIsFav(t)?'⭐ ':''}${escapeHtml(t)}</button>`).join('')+`<button class="cr-hab write" onclick="SuperApp.crPromptMeal()">✏️ Autre…</button>`;
     const armedBar=armed?`<div class="cr-armed"><span class="cr-armed-l">🍽️ <em>${escapeHtml(armed)}</em> — touche une case</span><button onclick="SuperApp.crDisarm()">Annuler</button></div>`:'';
-    return `<div class="cr-sec-h"><b>Tes repas habituels</b><small>1 tap = à poser</small></div><div class="cr-habs">${habHtml}</div><div class="cr-hab-hint">Touche un repas, puis une case du tableau.</div>${armedBar}<div class="cr-week-title">Menu de la semaine</div>${crWeekTable()}`; }
+    return crUnivers('repas', `<div class="cr-sec-h"><b>Tes repas habituels</b><small>1 tap = à poser</small></div><div class="cr-habs">${habHtml}</div><div class="cr-hab-hint">Touche un repas, puis une case du tableau.</div>${armedBar}<div class="cr-week-title">Menu de la semaine</div>${crWeekTable()}`); }
 
-  function crCoursesScreen(){ const items=(data.shopping||[]).filter(x=>!statusIsHidden(x)); const on=batchOn();
+  function crCoursesScreen(){ const allItems=(data.shopping||[]).filter(x=>!statusIsHidden(x)); const on=batchOn();
+    const useFilters=!on; const cf=(state.coursesFilter=state.coursesFilter||{q:'',rayon:'tous'});
+    const cmatch=(x)=>{ if(!useFilters) return true; const q=normalizeText(cf.q||''); if(q&&!normalizeText(x.title||'').includes(q)) return false; if(cf.rayon!=='tous'&&crRayonOf(x)!==cf.rayon) return false; return true; }; const items=allItems.filter(cmatch);
     const open=items.filter(x=>!statusIsDone(x)).length, done=items.length-open;
     const selBtn=on?`<button class="lnk" onclick="SuperApp.batchExit()">Annuler</button>`:`<button class="lnk" onclick="SuperApp.batchEnter()">Sélectionner</button>`;
     let groups=''; CR_RAYONS.forEach(r=>{ const its=items.filter(x=>crRayonOf(x)===r.key); if(!its.length) return;
       const rows=its.map(x=>{ if(on){ const p=batchHas(x.id); return `<button class="cr-crow sel ${p?'picked':''}" onclick="SuperApp.batchToggle('${x.id}')"><span class="cr-ck">${p?'✓':''}</span><span class="cr-ci"><b>${escapeHtml(x.title||'Article')}</b>${qtyLabel(x)?`<small>${escapeHtml(qtyLabel(x))}</small>`:''}</span></button>`; }
         const dn=statusIsDone(x); return `<div class="cr-crow ${dn?'done':''}"><button class="cr-ck" onclick="SuperApp.markDone('${x.id}')">${dn?'✓':''}</button><div class="cr-ci" onclick="SuperApp.markDone('${x.id}')"><b>${escapeHtml(x.title||'Article')}</b>${qtyLabel(x)?`<small>${escapeHtml(qtyLabel(x))}</small>`:''}</div><button class="cr-more" onclick="SuperApp.crCourseSheet('${x.id}')">⋯</button></div>`; }).join('');
       groups+=`<div class="cr-rayon"><div class="cr-rayon-h">${r.ico} ${r.name}</div><div class="cr-rayon-list">${rows}</div></div>`; });
-    if(!groups) groups=`<article class="empty cute-empty"><b>🛒 Liste vide</b><small>Ajoute ta première course ci-dessus.</small></article>`;
+    if(!groups){ const fa=useFilters&&((cf.q||'')!==''||cf.rayon!=='tous'); groups=fa?`<article class="empty cute-empty"><b>🔍 Aucun résultat</b><small>Aucune course ne correspond aux filtres.</small><button class="btn primary" onclick="SuperApp.crCoursesResetFilters()">Réinitialiser les filtres</button></article>`:`<article class="empty cute-empty"><b>🛒 Liste vide</b><small>Ajoute ta première course ci-dessus.</small></article>`; }
     const bar=on?batchBarHtml(items.map(x=>x.id).join(',')):'';
-    return `<div class="cr-quick"><input id="crQadd" placeholder="＋ Ajouter une course… (ex. Tomates)" onkeydown="if(event.key==='Enter'){event.preventDefault();SuperApp.crQuickAdd();}"><button onclick="SuperApp.crQuickAdd()">＋</button></div>
+    return crUnivers('courses', `<div class="cr-quick"><input id="crQadd" placeholder="＋ Ajouter une course… (ex. Tomates)" onkeydown="if(event.key==='Enter'){event.preventDefault();SuperApp.crQuickAdd();}"><button onclick="SuperApp.crQuickAdd()">＋</button></div>
+      ${useFilters?crCoursesFilterBar(cf):''}
       <div class="cr-toolbar"><div class="cr-tb-l">Ma liste <small>${open} à acheter · ${done} fait</small></div>${selBtn}</div>
       ${!on?`<div class="cr-toolbar2"><button class="lnk" onclick="SuperApp.crClearDone()">🗑️ Supprimer les achetés</button></div>`:''}
       ${groups}${bar}
-      <div class="cr-loop">🔁 <b>La boucle :</b> ces courses peuvent venir de tes repas de la semaine et de ton stock faible.</div>`; }
+      <div class="cr-loop">🔁 <b>La boucle :</b> ces courses peuvent venir de tes repas de la semaine et de ton stock faible.</div>`); }
   function crQuickAdd(){ const inp=document.getElementById('crQadd'); if(!inp) return; const v=(inp.value||'').trim(); if(!v) return;
     const key=crClassify(v); data.shopping=data.shopping||[];
     data.shopping.push(decorateSync({id:uid(),module:'courses_repas',type:'course',title:v,category:'Alimentation',rayon:key,date:today,status:'a_faire',statut:'a_faire'}));
@@ -6353,29 +6350,49 @@
   function crCourseRename(id){ const x=(data.shopping||[]).find(s=>s.id===id); if(!x) return; const v=prompt('Modifier la course',x.title); if(v&&v.trim()){ x.title=v.trim(); save(); } crCloseSheet(); render(); }
   function crCourseDelete(id){ crCloseSheet(); deleteItem(id); }
   function crClearDone(){ const dn=(data.shopping||[]).filter(x=>!statusIsHidden(x)&&statusIsDone(x)); if(!dn.length){ toast('Rien d’acheté à retirer'); return; } confirmDialog('Retirer '+dn.length+' article(s) achetés ?',()=>{ dn.forEach(x=>{ x.status='supprime'; x.statut='supprime'; x.syncStatus='pending_delete'; }); save(); render(); toast('Liste nettoyée'); }); }
+  function crCoursesFilterBar(cf){ const rchip=(k,lab)=>`<button class="cr-fchip${cf.rayon===k?' on':''}" onclick="SuperApp.crCoursesSetRayon('${k}')">${lab}</button>`; return `<div class="cr-filters"><input class="cr-search" id="crCoursesSearch" placeholder="🔍 Rechercher une course…" value="${escapeAttr(cf.q||'')}" oninput="SuperApp.crCoursesSearch(this.value)"><div class="cr-frow">${rchip('tous','Tous')}${CR_RAYONS.map(r=>rchip(r.key,r.ico)).join('')}</div></div>`; }
+  function crCoursesSearch(v){ const cf=(state.coursesFilter=state.coursesFilter||{q:'',rayon:'tous'}); cf.q=v; render(); const i=document.getElementById('crCoursesSearch'); if(i){ try{ i.focus(); i.setSelectionRange(i.value.length,i.value.length); }catch(e){} } }
+  function crCoursesSetRayon(k){ const cf=(state.coursesFilter=state.coursesFilter||{q:'',rayon:'tous'}); cf.rayon=k; render(); }
+  function crCoursesResetFilters(){ state.coursesFilter={q:'',rayon:'tous'}; render(); }
 
-  function crStockScreen(cfg){ const items=(data.stock||[]).filter(x=>!statusIsHidden(x)); const filtered=cfg&&cfg.filter?items.filter(cfg.filter):items; const on=batchOn();
+  function crStockScreen(cfg){ const all=(data.stock||[]).filter(x=>!statusIsHidden(x)); const base=cfg&&cfg.filter?all.filter(cfg.filter):all; const on=batchOn();
+    const useFilters=!on&&!(cfg&&cfg.filter); const sf=(state.stockFilter=state.stockFilter||{q:'',level:'tout',rayon:'tous'});
+    const match=(x)=>{ if(!useFilters) return true; const q=normalizeText(sf.q||''); if(q&&!normalizeText(x.title||'').includes(q)) return false; if(sf.level!=='tout'&&normalizeText(x.level||'')!==sf.level) return false; if(sf.rayon!=='tous'&&crRayonOf(x)!==sf.rayon) return false; return true; }; const filtered=base.filter(match);
     const selBtn=on?`<button class="lnk" onclick="SuperApp.batchExit()">Annuler</button>`:`<button class="lnk" onclick="SuperApp.batchEnter()">Sélectionner</button>`;
-    if(!filtered.length) return `<article class="empty cute-empty"><b>🧺 Aucun produit</b><small>Ajoute ce que tu as dans tes placards, frigo, congélateur.</small><button class="btn primary" onclick="SuperApp.openAdd('courses_repas','stock','Stock')">+ Ajouter</button></article>`;
+    const showQuick=!on&&!(cfg&&cfg.filter); const quick=showQuick?`<div class="cr-quick"><input id="crSadd" placeholder="＋ Ajouter un produit… (ex. Lait)" oninput="SuperApp.crStockHint()" onkeydown="if(event.key==='Enter'){event.preventDefault();SuperApp.crStockQuickAdd();}"><button onclick="SuperApp.crStockQuickAdd()">＋</button></div><div class="cr-qhint empty" id="crShint">Le rayon sera deviné automatiquement…</div>`:'';
+    const filterBar=useFilters?crStockFilterBar(sf,base):'';
     const LVL={faible:['low','Faible'],moyen:['mid','Moyen'],bon:['good','Bon']};
     const srow=(x)=>{ const lv=normalizeText(x.level||''); const li=LVL[lv]||['mid',x.level||'—']; const meta=[x.place,qtyLabel(x)].filter(Boolean).map(escapeHtml).join(' · ');
       if(on){ const p=batchHas(x.id); return `<button class="cr-srow sel ${p?'picked':''}" onclick="SuperApp.batchToggle('${x.id}')"><span class="cr-ck">${p?'✓':''}</span><div class="cr-sbody"><b>${escapeHtml(x.title)}</b><small>${meta}</small></div><span class="cr-lvl ${li[0]}">${li[1]}</span></button>`; }
-      const low=li[0]==='low'; return `<div class="cr-srow" onclick="SuperApp.openEdit('courses_repas','${x.id}')"><div class="cr-sic">🧺</div><div class="cr-sbody"><b>${escapeHtml(x.title)}</b><small>${meta}</small><div class="cr-slvls"><span class="cr-lvl ${li[0]}">${li[1]}</span>${low?'<span class="cr-stadd">＋ aux courses</span>':''}</div></div><button class="cr-more" onclick="event.stopPropagation();SuperApp.crStockSheet('${x.id}')">⋯</button></div>`; };
+      const low=li[0]==='low'; return `<div class="cr-srow" onclick="SuperApp.crStockSheet('${x.id}')"><div class="cr-sic">🧺</div><div class="cr-sbody"><b>${escapeHtml(x.title)}</b>${meta?`<small>${meta}</small>`:''}<div class="cr-slvls"><button class="cr-lvl ${li[0]}" onclick="event.stopPropagation();SuperApp.crCycleStockLevel('${x.id}')">${li[1]}</button>${low?`<button class="cr-stadd" onclick="event.stopPropagation();SuperApp.crStockToCourses('${x.id}')">＋ aux courses</button>`:''}</div></div><button class="cr-more" onclick="event.stopPropagation();SuperApp.crStockSheet('${x.id}')">⋯</button></div>`; };
     let groups=''; CR_RAYONS.forEach(r=>{ const its=filtered.filter(x=>crRayonOf(x)===r.key); if(!its.length) return; groups+=`<div class="cr-rayon"><div class="cr-rayon-h">${r.ico} ${r.name}</div><div class="cr-stock-list">${its.map(srow).join('')}</div></div>`; });
-    const bar=on?batchBarHtml(filtered.map(x=>x.id).join(',')):'';
-    return `<div class="cr-toolbar"><div class="cr-tb-l">Mon stock <small>frigo · placards · congél.</small></div>${selBtn}</div>${groups}${bar}<div class="cr-addfab"><button onclick="SuperApp.openAdd('courses_repas','stock','Stock')">＋ Ajouter un produit</button></div>`; }
-  function crStockSheet(id){ const x=(data.stock||[]).find(s=>s.id===id); if(!x) return; const low=normalizeText(x.level||'').includes('faible'); const cur=crRayonOf(x);
-    const chips=CR_RAYONS.map(r=>`<button class="cr-rchip${r.key===cur?' on':''}" onclick="SuperApp.crSetStockRayon('${id}','${r.key}')">${r.ico} ${r.name}</button>`).join('');
-    const meta=[x.place,qtyLabel(x)].filter(Boolean).join(' · ');
-    crOpenSheet(x.title, meta, `<div class="cr-rchips">${chips}</div>${low?`<button class="cr-act" onclick="SuperApp.crStockToCourses('${id}')"><span class="i">🛒</span> Ajouter aux courses</button>`:''}<button class="cr-act" onclick="SuperApp.crStockConsume('${id}')"><span class="i">➖</span> Consommer</button><button class="cr-act" onclick="SuperApp.crStockEdit('${id}')"><span class="i">✏️</span> Modifier</button><button class="cr-act danger" onclick="SuperApp.crStockDelete('${id}')"><span class="i">🗑️</span> Supprimer</button>`); }
+    if(!groups){ const fa=useFilters&&((sf.q||'')!==''||sf.level!=='tout'||sf.rayon!=='tous'); groups=fa?`<article class="empty cute-empty"><b>🔍 Aucun résultat</b><small>Aucun produit ne correspond aux filtres.</small><button class="btn primary" onclick="SuperApp.crStockResetFilters()">Réinitialiser les filtres</button></article>`:`<article class="empty cute-empty"><b>🧺 ${(cfg&&cfg.filter)?'Aucun produit faible':'Stock vide'}</b><small>${(cfg&&cfg.filter)?'Tout est bien approvisionné 👍':'Tape un produit ci-dessus pour commencer.'}</small></article>`; }
+    const bar=on?batchBarHtml(filtered.map(x=>x.id).join(',')):''; const nLow=base.filter(x=>normalizeText(x.level||'')==='faible').length; const cnt=`${filtered.length}${(useFilters&&filtered.length!==base.length)?'/'+base.length:''} produit${filtered.length>1?'s':''} · ${nLow} faible`;
+    return crUnivers('stock', `${quick}${filterBar}<div class="cr-toolbar"><div class="cr-tb-l">Mon stock <small>${cnt}</small></div>${selBtn}</div>${groups}${bar}`); }
+  function crStockSheet(id){ const x=(data.stock||[]).find(s=>s.id===id); if(!x) return; const lv=normalizeText(x.level||'bon'); const low=lv.includes('faible'); const cur=crRayonOf(x);
+    const lchips=[['Bon','bon'],['Moyen','moyen'],['Faible','faible']].map(([lab,k])=>`<button class="cr-lvlchip${lv===k?' on':''}" data-v="${lab}" onclick="SuperApp.crSetStockLevel('${id}','${lab}')">${lab}</button>`).join('');
+    const rchips=CR_RAYONS.map(r=>`<button class="cr-rchip${r.key===cur?' on':''}" onclick="SuperApp.crSetStockRayon('${id}','${r.key}')">${r.ico} ${r.name}</button>`).join('');
+    crOpenSheet(x.title, crRayonByKey(cur).ico+' '+crRayonByKey(cur).name, `<div class="cr-sheet-lab">Niveau de stock</div><div class="cr-lvlchips">${lchips}</div><div class="cr-sheet-lab">Rayon</div><div class="cr-rchips">${rchips}</div>${low?`<button class="cr-act" onclick="SuperApp.crStockToCourses('${id}')"><span class="i">🛒</span> Ajouter aux courses</button>`:''}<button class="cr-act" onclick="SuperApp.crStockConsume('${id}')"><span class="i">➖</span> Consommer</button><button class="cr-act" onclick="SuperApp.crStockRename('${id}')"><span class="i">✏️</span> Renommer</button><button class="cr-act danger" onclick="SuperApp.crStockDelete('${id}')"><span class="i">🗑️</span> Supprimer</button>`); }
   function crStockToCourses(id){ crCloseSheet(); addStockToCourses(id); render(); }
   function crStockConsume(id){ crCloseSheet(); consumeStock(id); }
   function crStockEdit(id){ crCloseSheet(); openEdit('courses_repas',id); }
   function crStockDelete(id){ crCloseSheet(); deleteItem(id); }
+  function crStockHint(){ const inp=document.getElementById('crSadd'); const h=document.getElementById('crShint'); if(!inp||!h) return; const v=(inp.value||'').trim(); if(v){ const r=crRayonByKey(crClassify(v)); h.classList.remove('empty'); h.textContent='→ rangé dans '+r.ico+' '+r.name; } else { h.classList.add('empty'); h.textContent='Le rayon sera deviné automatiquement…'; } }
+  function crStockQuickAdd(){ const inp=document.getElementById('crSadd'); if(!inp) return; const v=(inp.value||'').trim(); if(!v) return; const key=crClassify(v); data.stock=data.stock||[]; data.stock.push(decorateSync({id:uid(),module:'courses_repas',type:'stock',title:v,category:'Stock',rayon:key,level:'Bon',date:today,status:'a_faire',statut:'a_faire'})); save(); render(); setTimeout(()=>{ const i=document.getElementById('crSadd'); if(i){i.value='';i.focus();} },10); const r=crRayonByKey(key); toast('🧺 '+v+' → '+r.ico+' '+r.name+' · Bon'); }
+  function crCycleStockLevel(id){ const x=(data.stock||[]).find(s=>s.id===id); if(!x) return; const order=['Bon','Moyen','Faible']; const idx=['bon','moyen','faible'].indexOf(normalizeText(x.level||'bon')); x.level=order[((idx<0?0:idx)+1)%3]; save(); render(); toast('Niveau : '+x.level); }
+  function crSetStockLevel(id,lvl){ const x=(data.stock||[]).find(s=>s.id===id); if(!x) return; x.level=lvl; save(); crCloseSheet(); render(); toast('Niveau : '+lvl); }
+  function crStockRename(id){ const x=(data.stock||[]).find(s=>s.id===id); if(!x) return; const v=prompt('Modifier le produit',x.title); if(v&&v.trim()){ x.title=v.trim(); save(); } crCloseSheet(); render(); }
+  function crStockFilterBar(sf, base){ const lchip=(k,lab,cls)=>`<button class="cr-fchip ${cls}${sf.level===k?' on':''}" onclick="SuperApp.crStockSetLevel('${k}')">${lab}</button>`; const rchip=(k,lab)=>`<button class="cr-fchip${sf.rayon===k?' on':''}" onclick="SuperApp.crStockSetRayon('${k}')">${lab}</button>`; return `<div class="cr-filters"><input class="cr-search" id="crStockSearch" placeholder="🔍 Rechercher un produit…" value="${escapeAttr(sf.q||'')}" oninput="SuperApp.crStockSearch(this.value)"><div class="cr-frow">${lchip('tout','Tout','')}${lchip('faible','⚠️ Faible','lvl-low')}${lchip('moyen','Moyen','lvl-mid')}${lchip('bon','Bon','lvl-good')}</div><div class="cr-frow">${rchip('tous','Tous')}${CR_RAYONS.map(r=>rchip(r.key,r.ico)).join('')}</div></div>`; }
+  function crStockSearch(v){ const sf=(state.stockFilter=state.stockFilter||{q:'',level:'tout',rayon:'tous'}); sf.q=v; render(); const i=document.getElementById('crStockSearch'); if(i){ try{ i.focus(); i.setSelectionRange(i.value.length,i.value.length); }catch(e){} } }
+  function crStockSetLevel(k){ const sf=(state.stockFilter=state.stockFilter||{q:'',level:'tout',rayon:'tous'}); sf.level=k; render(); }
+  function crStockSetRayon(k){ const sf=(state.stockFilter=state.stockFilter||{q:'',level:'tout',rayon:'tous'}); sf.rayon=k; render(); }
+  function crStockResetFilters(){ state.stockFilter={q:'',level:'tout',rayon:'tous'}; render(); }
   function crFormLevel(btn){ const g=btn.parentElement; g.querySelectorAll('.cr-lvlchip').forEach(c=>c.classList.remove('on')); btn.classList.add('on'); const f=document.getElementById('crLevelField'); if(f) f.value=btn.dataset.v; }
   function crSetStockRayon(id,key){ const x=(data.stock||[]).find(s=>s.id===id); if(!x) return; x.rayon=key; (data.rayonLearned=data.rayonLearned||{})[normalizeText(x.title)]=key; save(); crCloseSheet(); render(); toast('Rangé dans '+crRayonByKey(key).ico+' '+crRayonByKey(key).name); }
-  function crGoRepas(){ openModuleList('courses_repas','repas'); }
-  function crGoCourses(){ openModuleList('courses_repas','courses'); setTimeout(()=>{ const i=document.getElementById('crQadd'); if(i){ try{i.focus();}catch(e){} } },140); }
+  function crCloseActionDialog(){ try{ const d=document.getElementById('actionDialog'); if(d&&d.open) d.close(); }catch(e){} }
+  function crGoRepas(){ crCloseActionDialog(); openModuleList('courses_repas','repas'); }
+  function crGoCourses(){ crCloseActionDialog(); openModuleList('courses_repas','courses'); setTimeout(()=>{ const i=document.getElementById('crQadd'); if(i){ try{i.focus();}catch(e){} } },140); }
+  function crGoStock(){ crCloseActionDialog(); openModuleList('courses_repas','stock'); setTimeout(()=>{ const i=document.getElementById('crSadd'); if(i){ try{i.focus();}catch(e){} } },140); }
   function crPlaceMealAt(title,day,slot){ if(!title) return; const ex=(data.weeklyMeals||[]).find(m=>Number(m.day)===day&&(m.slot||'soir')===slot&&!statusIsHidden(m)); if(ex){ ex.title=title; } else { data.weeklyMeals=data.weeklyMeals||[]; data.weeklyMeals.push(decorateSync({id:uid(),module:'courses_repas',type:'repas_semaine',category:'Repas',title,day,slot,status:'a_faire'})); } crBumpMeal(title); save(); crCloseSheet(); render(); toast('🍽️ '+title+' ajouté'); }
   function crPlaceHabAt(i,day,slot){ const h=crHabituels(8); if(h[i]) crPlaceMealAt(h[i],day,slot); }
   function crPromptCell(day,slot){ crCloseSheet(); const v=prompt('Nom du repas ?'); if(v&&v.trim()) crPlaceMealAt(v.trim(),day,slot); }
@@ -6383,7 +6400,13 @@
     const habs=crHabituels(8);
     const chips=habs.map((t,i)=>`<button class="cr-pickhab" onclick="SuperApp.crPlaceHabAt(${i},${day},'${slot}')">${crIsFav(t)?'⭐ ':''}${escapeHtml(t)}</button>`).join('');
     const dayN=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'][day]||''; const sl=slot==='midi'?'Midi 🌞':'Soir 🌙';
-    crOpenSheet('Ajouter un repas', dayN+' · '+sl, `<div class="cr-pickhabs">${chips}<button class="cr-pickhab write" onclick="SuperApp.crPromptCell(${day},'${slot}')">✏️ Autre…</button></div>`); }
+    const ex=(data.weeklyMeals||[]).find(m=>Number(m.day)===day&&(m.slot||'soir')===slot&&!statusIsHidden(m));
+    const cur=ex?`<div class="cr-cur">🍽️ <b>${escapeHtml(ex.title)}</b><button class="cr-cur-x" onclick="SuperApp.crRemoveMealCell(${day},'${slot}')" aria-label="Retirer">×</button></div>`:'';
+    const moreActs=ex?`<button class="cr-act" onclick="SuperApp.crMealMove('${ex.id}')"><span class="i">➡️</span> Déplacer…</button><button class="cr-act" onclick="SuperApp.crMealFav('${ex.id}')"><span class="i">${crIsFav(ex.title)?'⭐':'☆'}</span> ${crIsFav(ex.title)?'Retirer des favoris':'Ajouter aux favoris'}</button><button class="cr-act danger" onclick="SuperApp.crMealDelete('${ex.id}')"><span class="i">🗑️</span> Supprimer</button>`:'';
+    crOpenSheet(ex?'Modifier le repas':'Ajouter un repas', dayN+' · '+sl, `${cur}${habs.length?`<div class="cr-sheet-lab">${ex?'Remplacer par un habituel':'Tes plats habituels'}</div><div class="cr-pickhabs">${chips}</div>`:''}<div class="cr-sheet-lab">…ou tape un plat</div><div class="cr-typezone"><input id="crMealInput" placeholder="Ex : Couscous, Gratin…" onkeydown="if(event.key==='Enter'){event.preventDefault();SuperApp.crTypeMeal(${day},'${slot}');}"><button onclick="SuperApp.crTypeMeal(${day},'${slot}')">＋</button></div>${moreActs}`);
+    setTimeout(()=>{ const i=document.getElementById('crMealInput'); if(i){ try{i.focus();}catch(e){} } },80); }
+  function crRemoveMealCell(day,slot){ const m=(data.weeklyMeals||[]).find(x=>Number(x.day)===day&&(x.slot||'soir')===slot&&!statusIsHidden(x)); if(m){ crRemoveMeal(m.id); save(); } crCloseSheet(); render(); toast('Repas retiré'); }
+  function crTypeMeal(day,slot){ const i=document.getElementById('crMealInput'); if(!i) return; const v=(i.value||'').trim(); if(!v) return; crPlaceMealAt(v,day,slot); }
 
   window.SuperApp = {
     _getData: ()=>data,
@@ -6391,7 +6414,7 @@
     _findRecord: findRecord, toast,
     setView, openModule, openItem, openItemEdit, openItemSummary, setCalendarFilter, setNotificationFilter,
     render:()=>render(),
-    crArmMeal, crArmHab, crDisarm, crPromptMeal, crPlaceMeal, crMealSheet, crMealRename, crMealDup, crMealFav, crMealMove, crDoMove, crMealDelete, crToggleFav, crSetRayon, crQuickAdd, crCourseSheet, crCourseRename, crCourseDelete, crClearDone, crStockSheet, crStockToCourses, crStockConsume, crStockEdit, crStockDelete, crFormLevel, crSetStockRayon, crGoRepas, crGoCourses, crEmptyCell, crPlaceHabAt, crPromptCell, crPlaceMealAt,
+    crArmMeal, crArmHab, crDisarm, crPromptMeal, crPlaceMeal, crMealSheet, crMealRename, crMealDup, crMealFav, crMealMove, crDoMove, crMealDelete, crToggleFav, crSetRayon, crQuickAdd, crCourseSheet, crCourseRename, crCourseDelete, crClearDone, crStockSheet, crStockToCourses, crStockConsume, crStockEdit, crStockDelete, crFormLevel, crSetStockRayon, crGoRepas, crGoCourses, crGoStock, crStockHint, crStockQuickAdd, crCycleStockLevel, crSetStockLevel, crStockRename, crTypeMeal, crRemoveMealCell, crCoursesFilterBar, crCoursesSearch, crCoursesSetRayon, crCoursesResetFilters, crStockSearch, crStockSetLevel, crStockSetRayon, crStockResetFilters, crCloseActionDialog, crEmptyCell, crPlaceHabAt, crPromptCell, crPlaceMealAt,
     setActiveProfile, openProfilePicker, closeProfileSheet, requestNotify, openQuickActions, openSanteAdd, openSlvAdd, openCoursesAdd, openEducationAdd, openEducationTypeChoice, chooseEducationType, openFamilleAdd,
     calendarMode:(m)=>{state.calendarMode=m;renderCalendar();},
     shiftMonth:(n)=>{const d=parseDMY(state.selectedDate)||new Date();d.setMonth(d.getMonth()+n);state.selectedDate=formatDMY(d);renderCalendar();},
